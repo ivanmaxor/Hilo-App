@@ -114,6 +114,7 @@ export class SessionController {
     const machine = this.machines.get(id) ?? initialState(session?.kind ?? 'claude');
     const runtime: SessionRuntime = { status: machine.status };
     if (machine.exitCode !== undefined) runtime.exitCode = machine.exitCode;
+    if (machine.subagents) runtime.subagents = machine.subagents;
     const message = this.messages.get(id);
     if (message) runtime.message = message;
     return runtime;
@@ -131,6 +132,7 @@ export class SessionController {
     if (next === prev) return;
     this.machines.set(id, next);
     if (next.status !== prev.status || next.exitCode !== prev.exitCode) this.onStatusChange(id, prev.status, next.status);
+    else if ((next.subagents ?? 0) !== (prev.subagents ?? 0)) this.publish(id);
   }
 
   private onStatusChange(id: string, from: SessionStatus, to: SessionStatus): void {

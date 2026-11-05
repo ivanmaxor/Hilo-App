@@ -13,6 +13,8 @@ import { isSafeId } from '../shared/validate';
  */
 const HOOK_EVENTS: { event: string; matcher?: string; name: HookName }[] = [
   { event: 'UserPromptSubmit', name: 'UserPromptSubmit' },
+  { event: 'SubagentStart', name: 'SubagentStart' },
+  { event: 'SubagentStop', name: 'SubagentStop' },
   { event: 'Stop', name: 'Stop' },
   { event: 'StopFailure', name: 'StopFailure' },
   { event: 'PermissionRequest', name: 'PermissionRequest' },

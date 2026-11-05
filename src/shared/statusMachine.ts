@@ -12,10 +12,14 @@ export interface MachineState {
   /** "Esperando" por el diálogo de confianza del arranque: el primer ✳ ya es que pasó. */
   blockedAtStart?: boolean;
   exitCode?: number;
+  /** Subagentes lanzados que aún no terminan. Mientras haya, la sesión no ha terminado (D24). */
+  subagents?: number;
 }
 
 export type HookName =
   | 'UserPromptSubmit'
+  | 'SubagentStart'
+  | 'SubagentStop'
   | 'Stop'
   | 'StopFailure'
   | 'PermissionRequest'
@@ -73,7 +77,7 @@ export function transition(s: MachineState, ev: MachineEvent, now: number): Mach
         const cleared = { ...s, stopLatchUntil: 0 };
         if (s.status === 'waiting' && s.blockedAtStart) return { ...cleared, status: 'idle', blockedAtStart: false };
         // ✳ también aparece esperando: no saca de "esperando".
-        if (s.status === 'working') return { ...cleared, status: 'done' };
+        if (s.status === 'working') return s.subagents ? cleared : { ...cleared, status: 'done' };
         if (s.status === 'starting') return { ...cleared, status: 'idle' };
         return cleared;
       }
@@ -83,8 +87,15 @@ export function transition(s: MachineState, ev: MachineEvent, now: number): Mach
       switch (ev.name) {
         case 'UserPromptSubmit':
           return { ...s, status: 'working', stopLatchUntil: 0 };
+        case 'SubagentStart':
+          return { ...s, subagents: (s.subagents ?? 0) + 1, status: s.status === 'done' || s.status === 'idle' ? 'working' : s.status, stopLatchUntil: 0 };
+        case 'SubagentStop':
+          // Claude también lo lanza sin un Start, por ejemplo con las sugerencias de prompt.
+          return { ...s, subagents: Math.max(0, (s.subagents ?? 0) - 1) };
         case 'Stop':
         case 'StopFailure':
+          // Terminó el principal, pero Claude lo despertará cuando acaben sus subagentes.
+          if (s.subagents) return s;
           if (s.status === 'working' || s.status === 'waiting') {
             return { ...s, status: 'done', stopLatchUntil: now + STOP_LATCH_MS };
           }
@@ -101,12 +112,14 @@ export function transition(s: MachineState, ev: MachineEvent, now: number): Mach
         return s.status === 'waiting' ? s : { ...s, status: 'waiting', stopLatchUntil: 0, blockedAtStart: false };
       }
       if (ev.status === 'idle') {
+        // Claude sigue en busy mientras tenga subagentes: si dice idle, no queda ninguno, aunque se perdiera un Stop.
+        const free = s.subagents ? { ...s, subagents: 0 } : s;
         // Esc en un permiso: no hay hook ni cambio de título, solo esta señal.
-        if (s.status === 'waiting') return { ...s, status: 'idle', blockedAtStart: false };
+        if (s.status === 'waiting') return { ...free, status: 'idle', blockedAtStart: false };
         // El título puede quedar congelado sin foco; esta señal llega tras acabar los hooks.
-        if (s.status === 'working') return { ...s, status: 'done', stopLatchUntil: 0 };
-        if (s.status === 'starting') return { ...s, status: 'idle' };
-        return s;
+        if (s.status === 'working') return { ...free, status: 'done', stopLatchUntil: 0 };
+        if (s.status === 'starting') return { ...free, status: 'idle' };
+        return free;
       }
       // busy
       if (now < s.stopLatchUntil) return s;

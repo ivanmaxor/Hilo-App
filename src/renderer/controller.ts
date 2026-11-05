@@ -128,6 +128,7 @@ function onUpdateStatus(status: UpdateStatus): void {
 
 export const dispatch = (action: Action): Promise<void> => api.dispatch(action);
 export const statusOf = (id: string): SessionStatus => app.get().runtime[id]?.status ?? 'asleep';
+export const subagentsOf = (id: string): number => app.get().runtime[id]?.subagents ?? 0;
 /** Lo que se dibuja: durante una operación en curso, el ícono de "arrancando". */
 export const displayStatus = (id: string): SessionStatus => (view.get().busy.includes(id) ? 'starting' : statusOf(id));
 

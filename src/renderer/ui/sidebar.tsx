@@ -16,8 +16,9 @@ import {
   toast,
   useStore,
   view,
+  subagentsOf,
 } from '../controller';
-import { Chevron, GearIcon, MoreIcon, PanelIcon, PlusIcon, ShellMark, StatusIcon } from './icons';
+import { Chevron, GearIcon, MoreIcon, PanelIcon, PlusIcon, ShellMark, StatusIcon, SubagentsBadge, subagentsLabel } from './icons';
 
 type Drag = { type: 'session'; id: string } | { type: 'project'; id: string } | { type: 'pane'; id: string } | null;
 let dragging: Drag = null;
@@ -99,6 +100,7 @@ function SessionRow({ session, project, index, globalIndex }: { session: Session
   const v = useStore(view);
   const [drop, setDrop] = useState<'before' | 'after' | null>(null);
   const status = displayStatus(session.id);
+  const subagents = subagentsOf(session.id);
   const active = state.ui.activeSessionId === session.id;
   const open = state.ui.panes.includes(session.id);
   const renaming = v.renaming === session.id;
@@ -109,7 +111,7 @@ function SessionRow({ session, project, index, globalIndex }: { session: Session
       style={session.color ? { '--seg': session.color } : undefined}
       data-session={session.id}
       draggable={!renaming}
-      title={`${session.name}\n${STATUS_LABEL[status]}\n${session.cwd}`}
+      title={`${session.name}\n${STATUS_LABEL[status]}${subagents ? `, ${subagentsLabel(subagents)}` : ''}\n${session.cwd}`}
       onClick={() => void selectSession(session.id, { delayWake: true })}
       onDblClick={(e) => {
         e.preventDefault();
@@ -159,6 +161,7 @@ function SessionRow({ session, project, index, globalIndex }: { session: Session
         <span class="name">{session.name}</span>
       )}
       {session.kind === 'shell' && <ShellMark />}
+      <SubagentsBadge count={subagents} />
       {status === 'done' && <span class="unread-dot" aria-hidden="true" />}
       {v.ctrlHeld && globalIndex < 9 && <kbd class="idx">{globalIndex + 1}</kbd>}
       {!renaming && (

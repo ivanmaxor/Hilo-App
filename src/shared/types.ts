@@ -119,6 +119,8 @@ export interface PersistedState {
 
 export interface SessionRuntime {
   status: SessionStatus;
+  /** Subagentes de esta sesión que siguen corriendo. */
+  subagents?: number;
   exitCode?: number;
   /** Mensaje de error para mostrar en el panel, si no pudo arrancar. */
   message?: string;

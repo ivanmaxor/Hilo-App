@@ -1,4 +1,17 @@
 import { STATUS_LABEL } from '../../shared/statusMachine';
+
+export const subagentsLabel = (count: number): string => (count === 1 ? '1 subagente corriendo' : `${count} subagentes corriendo`);
+
+/** Cuántos subagentes faltan: la sesión no avisa que terminó hasta que acaben. */
+export function SubagentsBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  const label = subagentsLabel(count);
+  return (
+    <span class="subagents" title={label} aria-label={label}>
+      {count} sub
+    </span>
+  );
+}
 import type { SessionStatus } from '../../shared/types';
 
 /**

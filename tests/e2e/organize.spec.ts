@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { defaultState } from '../../src/shared/defaults';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import type { PersistedState, RuntimeMap } from '../../src/shared/types';
 import { bufferText, cleanup, focusTerm, launch, makeState, newDataDir, openSink, pidAlive, processTree, ROOT, settle, status, waitForText, waitStatus, setWindowSize } from './helpers';
@@ -98,12 +98,12 @@ test('crear, renombrar, colorear, mover, reordenar, colapsar, y sobrevive a rein
     await page.locator('.row', { hasText: 'Dos bis' }).dragTo(page.locator('.project-head').nth(1));
     await expect.poll(() => sessionNames(page, 1)).toEqual(['Dos bis', 'Cuatro']);
     await page.locator('.row', { hasText: 'Cuatro' }).click({ button: 'right' });
-    await page.locator('.menu button', { hasText: 'hilo-demo' }).click();
+    await page.locator('.menu button', { hasText: basename(ROOT) }).click();
     await expect.poll(() => sessionNames(page, 0)).toEqual(['Tres', 'Uno bis', 'Cuatro']);
 
     // Reordenar proyectos.
     await page.locator('.project-head').nth(1).dragTo(page.locator('.project-head').nth(0), { targetPosition: { x: 40, y: 2 } });
-    await expect.poll(async () => (await appState(page)).state.projects.map((p) => p.name)).toEqual(['docs', 'hilo-demo']);
+    await expect.poll(async () => (await appState(page)).state.projects.map((p) => p.name)).toEqual(['docs', basename(ROOT)]);
 
     // Colapsar.
     await page.locator('.project-head').nth(1).click();

@@ -247,3 +247,16 @@ Con el renderer clásico, Claude Code responde a cada cambio de tamaño borrando
 Ahora xterm se ajusta al instante y el proceso recibe el tamaño 120 ms después del último cambio (`schedulePtyResize`). Con Claude real y 70 líneas de respuesta, arrastrar en 18 pasos no repite la última línea ni pierde ninguna.
 
 Queda una copia de lo reciente por cada cambio real de tamaño: 70 líneas terminaron con 92 marcas. No se limpia: se probó insertar `CSI 3 J` antes de la reimpresión y se perdieron las líneas 1 a 36, porque Claude no reimprime toda la conversación. xterm no permite borrar solo el final del historial. La salida de una sesión oculta sigue con el ancho de su último panel.
+
+## D24. Una sesión termina cuando acaban sus subagentes
+
+Pedido del dueño: Hilo avisaba que una sesión terminó cuando acababa el agente principal, con subagentes todavía corriendo. Grabación con Claude real, dos subagentes en segundo plano: el hook `Stop` llegó a los 11 s y a los 20 s, y el último `SubagentStop` a los 34 s. Cada subagente que termina despierta al principal con un `UserPromptSubmit`, seguido de otro `Stop`.
+
+La sesión sigue en "Trabajando", con una marca de cuántos faltan, y el aviso sale con el `Stop` que llega sin subagentes pendientes. No se avisa por cada uno que termina.
+
+El conteo sale de los hooks `SubagentStart` y `SubagentStop`, solo por su nombre: el comando sigue sin leer stdin, así que no se usa el `background_tasks` que trae `Stop`. Por eso cuenta con dos riesgos:
+
+- **Quedar corto.** La documentación dice que `SubagentStop` también sale con las sugerencias de prompt. Puede avisar antes de tiempo, y la sesión vuelve a "Trabajando" cuando Claude siga ocupado. Es el error menos grave.
+- **Quedar pegado.** Si se pierde un `SubagentStop`, la sesión no terminaría nunca. `~/.claude/sessions/<pid>.json` sigue en `busy` mientras hay subagentes (visto en la grabación), así que `idle` ahí pone la cuenta en cero. Ese archivo no tiene contrato: si Claude lo cambia, este rescate deja de funcionar, y una sesión pegada se resuelve al dormirla o reabrirla.
+
+Un comando en segundo plano sin subagente no cuenta: en ese caso Claude marca `shell` en ese archivo, y Hilo avisa igual que antes.

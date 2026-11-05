@@ -29,6 +29,8 @@ Si falta Claude Code o Git, al abrir Hilo por primera vez una guía explica cóm
 | Luna | Dormida: no usa memoria |
 | Círculo pequeño | Lista, ya la viste |
 
+Si Claude lanzó subagentes, la sesión sigue en "Trabajando" hasta que acaben, con una marca morada que dice cuántos faltan, como "2 sub". El aviso de que terminó sale al final.
+
 El verde se queda hasta que abres esa sesión. El bloque **Te necesitan**, abajo en la barra lateral, junta todo lo que requiere atención, ordenado por urgencia.
 
 ## Copiar y pegar

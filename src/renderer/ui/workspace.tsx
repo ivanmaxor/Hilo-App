@@ -24,8 +24,9 @@ import {
   useStore,
   view,
   wakeSession,
+  subagentsOf,
 } from '../controller';
-import { CloseIcon, DiffIcon, LayoutIcon, PlusIcon, SearchIcon, ShellMark, StatusIcon } from './icons';
+import { CloseIcon, DiffIcon, LayoutIcon, PlusIcon, SearchIcon, ShellMark, StatusIcon, subagentsLabel } from './icons';
 import { draggedPaneContent, endDragging, InlineRename, startDraggingPane, startDraggingSession } from './sidebar';
 import { MAX_PANES, moveDivider, paneDividers, paneRects, presetTree, resetDivider, type PaneDivider, type PaneEdge, type PaneNode, type PaneRect } from '../../shared/paneLayout';
 import type { SessionRecord } from '../../shared/types';
@@ -83,7 +84,7 @@ export function Tabs() {
             aria-selected={active}
             class={`tab${active ? ' active' : ''}${status === 'done' ? ' unread' : ''}${status === 'asleep' ? ' dim' : ''}`}
             style={{ '--tab-color': s.color ?? project?.color ?? 'transparent' }}
-            title={`${s.name}\n${STATUS_LABEL[status]}`}
+            title={`${s.name}\n${STATUS_LABEL[status]}${subagentsOf(s.id) ? `, ${subagentsLabel(subagentsOf(s.id))}` : ''}`}
             data-tab={s.id}
             draggable={!renaming}
             onDragStart={(e) => startDraggingSession(e, s)}

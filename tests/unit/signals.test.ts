@@ -244,3 +244,74 @@ describe('statusMachine', () => {
     ).toBe('error');
   });
 });
+
+describe('subagentes en segundo plano', () => {
+  const hook = (name: Parameters<typeof transition>[1] extends infer E ? (E extends { t: 'hook'; name: infer N } ? N : never) : never): MachineEvent => ({ t: 'hook', name });
+  const run = (events: MachineEvent[], from?: MachineState) => {
+    let s = from ?? transition(initialState('claude'), { t: 'spawn' }, 0);
+    const seen: string[] = [];
+    let now = 1000;
+    for (const ev of events) {
+      s = transition(s, ev, (now += 1000));
+      seen.push(s.status);
+    }
+    return { s, seen };
+  };
+
+  it('el orden grabado con Claude real: solo termina cuando acaba el último', () => {
+    const { s, seen } = run([
+      hook('UserPromptSubmit'),
+      hook('SubagentStart'),
+      hook('SubagentStart'),
+      hook('Stop'),
+      hook('SubagentStop'),
+      hook('UserPromptSubmit'),
+      hook('Stop'),
+      hook('UserPromptSubmit'),
+      hook('Stop'),
+      hook('SubagentStop'),
+      hook('UserPromptSubmit'),
+    ]);
+    expect(seen).not.toContain('done');
+    expect(s.subagents).toBe(0);
+    expect(run([hook('Stop')], s).s.status).toBe('done');
+  });
+
+  it('el título en listo no la da por terminada mientras queden', () => {
+    const { s } = run([hook('UserPromptSubmit'), hook('SubagentStart'), { t: 'title', kind: 'ready' }]);
+    expect(s.status).toBe('working');
+    expect(s.subagents).toBe(1);
+  });
+
+  it('un subagente en primer plano no cambia nada: Stop termina igual', () => {
+    const { s } = run([hook('UserPromptSubmit'), hook('SubagentStart'), hook('SubagentStop'), hook('Stop')]);
+    expect(s.status).toBe('done');
+  });
+
+  it('si Claude dice idle no queda ninguno, aunque se perdiera un SubagentStop', () => {
+    const { s } = run([hook('UserPromptSubmit'), hook('SubagentStart'), hook('Stop'), { t: 'sessionFile', status: 'idle' }]);
+    expect(s.status).toBe('done');
+    expect(s.subagents).toBe(0);
+  });
+
+  it('un SubagentStop sin Start no deja la cuenta negativa', () => {
+    const { s } = run([hook('UserPromptSubmit'), hook('SubagentStop'), hook('Stop')]);
+    expect(s.subagents).toBe(0);
+    expect(s.status).toBe('done');
+  });
+
+  it('un permiso pendiente sigue esperando aunque termine el principal', () => {
+    const { s } = run([hook('UserPromptSubmit'), hook('SubagentStart'), hook('PermissionRequest'), hook('Stop')]);
+    expect(s.status).toBe('waiting');
+  });
+
+  it('un subagente que retoma despierta la sesión ya terminada', () => {
+    const { s } = run([hook('UserPromptSubmit'), hook('Stop'), hook('SubagentStart')]);
+    expect(s.status).toBe('working');
+  });
+
+  it('dormir o reabrir borra la cuenta', () => {
+    const { s } = run([hook('UserPromptSubmit'), hook('SubagentStart'), { t: 'sleep' }]);
+    expect(s.subagents).toBeUndefined();
+  });
+});

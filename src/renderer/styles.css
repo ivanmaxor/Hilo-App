@@ -15,6 +15,8 @@
   --muted: #a3a5ae;
   --faint: #93959f;
   --accent: #7fa8d8;
+  --subagents: #c4b0f5;
+  --subagents-bg: rgba(196, 176, 245, 0.14);
   --on-accent: #101114;
   --working: #a3a5ae;
   --done: #5ecb8b;
@@ -38,6 +40,8 @@
   --muted: #4a4c54;
   --faint: #5a5c66;
   --accent: #285d9f;
+  --subagents: #5b3aa8;
+  --subagents-bg: rgba(91, 58, 168, 0.12);
   --on-accent: #ffffff;
   --working: #5a5c66;
   --done: #15803d;
@@ -132,6 +136,7 @@ kbd { font: 11px "Segoe UI Variable Text", "Segoe UI", sans-serif; color: var(--
 .row[style]::before { content: ""; position: absolute; left: -3px; top: 0; bottom: 0; width: 3px; background: var(--seg); }
 .row.ghost { color: var(--faint); }
 .shell-mark { flex: none; color: var(--faint); }
+.subagents { flex: none; padding: 0 5px; border-radius: 3px; background: var(--subagents-bg); color: var(--subagents); font-size: 11px; line-height: 16px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .unread-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--accent); }
 .idx { flex: none; min-width: 12px; text-align: right; color: var(--text); }
 .row-more { flex: none; display: none; place-items: center; width: 20px; height: 20px; border-radius: 3px; color: var(--muted); }
