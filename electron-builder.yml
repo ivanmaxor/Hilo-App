@@ -34,7 +34,7 @@ electronLanguages:
   - es-419
   - en-US
 extraResources:
-  - from: LICENSE.txt
+  - from: assets/LICENSE-instalador.txt
     to: LICENSE.txt
   - from: assets/THIRD_PARTY_NOTICES.txt
     to: THIRD_PARTY_NOTICES.txt
@@ -63,7 +63,7 @@ nsis:
   artifactName: Hilo-Setup-${version}.${ext}
   # Con pantallas, para mostrar la licencia antes de instalar.
   oneClick: false
-  license: LICENSE.txt
+  license: assets/LICENSE-instalador.txt
   installerLanguages:
     - es_ES
   language: "3082"

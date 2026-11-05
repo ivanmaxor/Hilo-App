@@ -19,9 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-Hilo incluye software de terceros con sus propias licencias: se detallan en
-THIRD_PARTY_NOTICES.txt, en la carpeta de instalación.
-
-Hilo no está hecho por Anthropic ni afiliado a ella. Claude Code es un producto
-de Anthropic que se instala aparte y requiere su propia cuenta.
