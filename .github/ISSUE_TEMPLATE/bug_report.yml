@@ -1,0 +1,37 @@
+name: Bug report
+description: Something in Hilo doesn't work as it should
+body:
+  - type: markdown
+    attributes:
+      value: Check that screenshots and logs don't show private paths or code. For security problems, follow SECURITY.md instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a Claude session
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: hilo
+    attributes:
+      label: Hilo version
+      description: Shown in Ajustes > Actualizaciones.
+    validations:
+      required: true
+  - type: input
+    id: claude
+    attributes:
+      label: Claude Code version
+      description: The output of `claude --version`.
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version

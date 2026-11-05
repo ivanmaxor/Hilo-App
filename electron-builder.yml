@@ -1,0 +1,96 @@
+appId: com.hilo.app
+productName: Hilo
+copyright: Copyright (c) 2026 ivanmaxor
+directories:
+  output: release
+  buildResources: assets
+files:
+  - dist/**
+  - package.json
+  - "!**/*.map"
+  - "!**/*.pdb"
+  - "!**/*.ts"
+  - "!**/*.md"
+  - "!node_modules/node-pty/deps/**"
+  - "!node_modules/node-pty/third_party/**"
+  - "!node_modules/node-pty/src/**"
+  - "!node_modules/node-pty/scripts/**"
+  - "!node_modules/node-pty/typings/**"
+  - "!node_modules/node-pty/binding.gyp"
+  - "!node_modules/node-pty/prebuilds/darwin-*/**"
+  - "!node_modules/node-pty/prebuilds/linux-*/**"
+  - "!node_modules/node-pty/prebuilds/win32-arm64/**"
+  - "!node_modules/node-pty/prebuilds/win32-x64/winpty*"
+  - "!node_modules/node-pty/lib/**/*.test.js"
+  - "!node_modules/node-addon-api/**"
+# node-pty trae binarios N-API: no hay nada que recompilar.
+npmRebuild: false
+asar: true
+asarUnpack:
+  - node_modules/node-pty/**
+  - dist/main/conoutWorker.js
+electronLanguages:
+  - es
+  - es-419
+  - en-US
+extraResources:
+  - from: LICENSE.txt
+    to: LICENSE.txt
+  - from: assets/THIRD_PARTY_NOTICES.txt
+    to: THIRD_PARTY_NOTICES.txt
+  - from: assets/fonts/CASCADIA-OFL.txt
+    to: CASCADIA-OFL.txt
+win:
+  target:
+    - target: nsis
+      arch: x64
+  icon: assets/icon.ico
+  # Todavía sin firmar, así que SmartScreen lo frena al descargarlo. Sin certificado, electron-builder
+  # omite la firma y estas líneas no cambian nada; cómo pasarle uno: la documentación de electron-builder.
+  signAndEditExecutable: true
+  # Por defecto solo firma los .exe, y Smart App Control revisa todo lo que se carga. Lo que ya trae
+  # firma de Microsoft (conpty.dll, d3dcompiler_47.dll) se deja fuera, y OpenConsole.exe se excluye.
+  signExts:
+    - .node
+    - dxcompiler.dll
+    - electron_wer.dll
+    - ffmpeg.dll
+    - vk_swiftshader.dll
+    - vulkan-1.dll
+    - "!OpenConsole.exe"
+nsis:
+  # Sin espacios: GitHub los cambia al subir el archivo, y latest.yml dejaría de coincidir.
+  artifactName: Hilo-Setup-${version}.${ext}
+  # Con pantallas, para mostrar la licencia antes de instalar.
+  oneClick: false
+  license: LICENSE.txt
+  installerLanguages:
+    - es_ES
+  language: "3082"
+  allowToChangeInstallationDirectory: false
+  perMachine: false
+  allowElevation: false
+  # Lo decide una casilla al final: ver assets/installer.nsh.
+  createDesktopShortcut: false
+  createStartMenuShortcut: true
+  shortcutName: Hilo
+  # Los datos del usuario no se borran al desinstalar.
+  deleteAppDataOnUninstall: false
+  runAfterFinish: true
+  include: assets/installer.nsh
+# Solo define de dónde se actualiza y hace que salgan latest.yml y el .blockmap.
+# Único sitio con el dueño y el repo: la app y scripts/publish-release.mjs los toman de aquí (scripts/update-target.cjs).
+# `npm run dist` no publica nada (--publish never): eso es scripts/publish-release.mjs.
+publish:
+  provider: github
+  owner: ivanmaxor
+  repo: Hilo-App
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableCookieEncryption: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  loadBrowserProcessSpecificV8Snapshot: false
+  grantFileProtocolExtraPrivileges: false

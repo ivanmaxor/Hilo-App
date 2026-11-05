@@ -1,0 +1,11 @@
+node_modules/
+dist/
+release/
+test-results/
+playwright-report/
+*.log
+.test-data/
+.claude/worktrees/
+
+.publico/
+.publico-terminos

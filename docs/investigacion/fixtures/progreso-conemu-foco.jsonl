@@ -1,0 +1,135 @@
+{"meta":{"name":"s4-conemu-dll-focus","file":"claude.exe","args":["--model","haiku","--effort","low","--strict-mcp-config","--setting-sources","project,local","--settings","C:\\Users\\dev\\AppData\\Local\\Temp\\claude\\C--Users-dev-hilo\\ad1d7e7b-7f13-4aff-92a5-47ad7fe5df7f\\scratchpad\\r2\\hooks\\s4.json"],"envAdded":["ConEmuPID"],"backend":"dll","answer":true,"cols":120,"rows":30,"epoch":1793623232400,"date":"2026-11-02T12:40:32.406Z"}}
+{"t":63,"mark":"spawn","pid":33128}
+{"t":72,"data":"\u001b[1t"}
+{"t":73,"data":"\u001b[c\u001b[?1004h\u001b[?9001h"}
+{"t":82,"reply":"\u001b[?1;2c"}
+{"t":305,"data":"\u001b]0;claude\u001b\\"}
+{"t":726,"data":"\u001b7\u001b[r\u001b8\u001b[?25h"}
+{"t":874,"data":"\u001b[?25l"}
+{"t":875,"data":"\u001b[?2004h\u001b[?2031h\u001b[?1004h"}
+{"t":875,"data":"\u001b[?9001l\u001b[?9001h"}
+{"t":875,"data":"\u001b]0;✳ Claude Code\u001b\\"}
+{"t":877,"data":"\u001b]9;4;0;\u0007"}
+{"t":940,"data":"\u001b[38;2;215;119;87m ▐\u001b[48;2;0;0;0m▛███▛█\u001b[12G\u001b[39m\u001b[49m\u001b[1mClaude\u001b[19GCode\u001b[24G\u001b[22m\u001b[38;2;153;153;153mv2.1.316\u001b[39m\r\n\u001b[38;2;215;119;87m▝▜\u001b[48;2;0;0;0m█████\u001b[49m█▀\u001b[12G\u001b[38;2;153;153;153mHaiku\u001b[18G5.5\u001b[22Gwith\u001b[27Glow\u001b[31Geffort\u001b[38G·\u001b[40GClaude\u001b[47GPro\u001b[39m\r\n\u001b[38;2;215;119;87m ▝▝\u001b[7G▝▝\u001b[12G\u001b[38;2;153;153;153m~\\AppData\\Local\\Temp\\claude\\C--Users-dev-hilo\\ad1d7e7b-7f13-4aff-92a5-47ad…\u001b[39m\r\n\r\n\r\n\u001b[38;2;136;136;136m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[39m\r\n❯ \u001b[2mTry\u001b[7G\"refactor\u001b[17G<filepath>\"\u001b[22m\r\n\u001b[38;2;136;136;136m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[39m\r\n\u001b[3G\u001b[38;2;255;193;7m⏵⏵\u001b[6Gauto\u001b[11Gmode\u001b[16Gon\u001b[38;2;153;153;153m (shift+tab\u001b[30Gto\u001b[33Gcycle)\u001b[40G·\u001b[42G←\u001b[44Gfor\u001b[48Gagents\u001b[104G○\u001b[106Glow\u001b[110G·\u001b[112G/effort\u001b[39m\r\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":957,"mark":"until /Claude Code v/ OK","elapsed":894}
+{"t":1158,"sessfile":{"sessionId":"1e53fd5c-7eb6-4ad7-a781-732ea3a2efa4","name":"cwd-fe","nameSource":"derived","version":"2.1.316","kind":"interactive"}}
+{"t":1238,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[43C\u001b[1A\u001b[38;2;153;153;153m2 agents\u001b[39m  \r\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":1239,"data":"\u001b[>0q"}
+{"t":1239,"data":"\u001b[?u\u001b]7501;?\u0007"}
+{"t":1239,"data":"\u001b[c"}
+{"t":1239,"reply":"\u001b[?1;2c"}
+{"t":1267,"sessfile":{"sessionId":"1e53fd5c-7eb6-4ad7-a781-732ea3a2efa4","status":"idle","name":"cwd-fe","nameSource":"derived","version":"2.1.316","kind":"interactive","updatedAt":1793623233276,"statusUpdatedAt":1793623233276}}
+{"t":4020,"snap":"idle","screen":" ▐▛███▛█   Claude Code v2.1.316\n▝▜██████▀  Haiku 5.5 with low effort · Claude Pro\n ▝▝   ▝▝   ~\\AppData\\Local\\Temp\\claude\\C--Users-dev-hilo\\ad1d7e7b-7f13-4aff-92a5-47ad…\n\n\n────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n❯ Try \"refactor <filepath>\"\n────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n  ⏵⏵ auto mode on (shift+tab to cycle) · ← 2 agents                                                    ○ low · /effort"}
+{"t":4020,"mark":"prompt"}
+{"t":4020,"in":"responde solo OK"}
+{"t":4032,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[3Aresponde solo OK\u001b[K\r\u001b[38C\u001b[2B             \r\n\u001b[18C\u001b[3A\u001b[?25h"}
+{"t":4733,"mark":"submit"}
+{"t":4733,"in":"\r"}
+{"t":4786,"data":"\u001b]0;◐ Claude Code\u001b\\"}
+{"t":4786,"data":"\u001b]9;4;3;\u0007"}
+{"t":4791,"data":"\u001b[?25l\u001b[18D\u001b[3B\r\u001b[4A\u001b[48;2;55;55;55m\u001b[38;2;153;153;153m❯ \u001b[38;2;255;255;255mresponde solo OK\u001b[39m                                                                                                      \r\u001b[1B\u001b[49m\u001b[K\r\u001b[1B\u001b[38;2;215;119;87m·\u001b[39m \u001b[38;2;215;119;87mMetam\u001b[38;2;235;159;127morp\u001b[38;2;215;119;87mhosing… \u001b[38;2;153;153;153m(running UserPromptSubmit hook · 0s)\u001b[39m\u001b[K\r\u001b[2C\u001b[1B\u001b[K\r\n\u001b[38;2;136;136;136m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[39m\r\n\u001b[38;2;153;153;153m❯ \u001b[39m\r\n\u001b[38;2;136;136;136m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[39m\r\n\u001b[3G\u001b[38;2;255;193;7m⏵⏵\u001b[6Gauto\u001b[11Gmode\u001b[16Gon\u001b[38;2;153;153;153m (shift+tab\u001b[30Gto\u001b[33Gcycle)\u001b[40G·\u001b[42Gesc\u001b[46Gto\u001b[49Ginterrupt\u001b[59G·\u001b[61G←\u001b[63G2\u001b[65Gagents\u001b[104G○\u001b[106Glow\u001b[110G·\u001b[112G/effort\u001b[39m\r\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":4857,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6C\u001b[6A\u001b[38;2;235;159;127mm\u001b[10G\u001b[38;2;215;119;87mp\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":4857,"sessfile":{"sessionId":"1e53fd5c-7eb6-4ad7-a781-732ea3a2efa4","status":"busy","name":"cwd-fe","nameSource":"derived","version":"2.1.316","kind":"interactive","updatedAt":1793623237186,"statusUpdatedAt":1793623237186}}
+{"t":4922,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[18C\u001b[6A\u001b[K\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":5084,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✢\u001b[6G\u001b[38;2;235;159;127ma\u001b[9G\u001b[38;2;215;119;87mr\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":5295,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m*\u001b[5G\u001b[38;2;235;159;127mt\u001b[8G\u001b[38;2;215;119;87mo\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":5414,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✶\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":5530,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✻\u001b[4G\u001b[38;2;235;159;127me\u001b[7G\u001b[38;2;215;119;87mm\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":5632,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✽\u001b[3G\u001b[38;2;235;159;127mM\u001b[6G\u001b[38;2;215;119;87ma\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":5643,"data":"\u001b]0;◐ Respuesta OK\u001b\\"}
+{"t":5746,"data":"\u001b]0;◑ Respuesta OK\u001b\\"}
+{"t":5756,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;235;159;127mG\u001b[5G\u001b[38;2;215;119;87msticulating… \u001b[39m\u001b[K\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":5793,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;255;255;255m●\u001b[3G\u001b[39mOK\u001b[K\r\u001b[2B\u001b[38;2;215;119;87m✽\u001b[39m \u001b[38;2;228;144;112mGesticulating…\u001b[38;2;215;119;87m \u001b[38;2;153;153;153m(running Stop hooks… 0/2 · 1s · ↓\u001b[39m \u001b[38;2;153;153;153m1 tokens)\u001b[39m\u001b[K\r\u001b[1B\u001b[K\r\u001b[2B\u001b[38;2;153;153;153m❯ \u001b[39m\u001b[K\r\n\u001b[38;2;136;136;136m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\u001b[39m\r\n\u001b[3G\u001b[38;2;255;193;7m⏵⏵\u001b[6Gauto\u001b[11Gmode\u001b[16Gon\u001b[38;2;153;153;153m (shift+tab\u001b[30Gto\u001b[33Gcycle)\u001b[40G·\u001b[42Gesc\u001b[46Gto\u001b[49Ginterrupt\u001b[59G·\u001b[61G←\u001b[63G2\u001b[65Gagents\u001b[104G○\u001b[106Glow\u001b[110G·\u001b[112G/effort\u001b[39m\r\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":5863,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;223;134;102mGesticulating…\u001b[52G\u001b[38;2;153;153;153m3\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":5883,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[38C\u001b[6A\u001b[38;2;153;153;153m1\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":5946,"mark":"focus-out"}
+{"t":5946,"in":"\u001b[O"}
+{"t":5983,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;220;129;97mGesticulating…\u001b[52G\u001b[38;2;153;153;153m4\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":6083,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✻\u001b[3G\u001b[38;2;218;124;92mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":6214,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✶\u001b[3GGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":6413,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m*\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":6545,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✢\u001b[3G\u001b[38;2;218;124;92mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":6644,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m·\u001b[3G\u001b[38;2;220;129;97mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":6776,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;223;134;102mGesticulating…\u001b[45G\u001b[38;2;153;153;153m2\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":6875,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;228;144;112mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":7005,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;230;149;117mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":7104,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✢\u001b[3G\u001b[38;2;233;154;122mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":7202,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m*\u001b[3G\u001b[38;2;235;159;127mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":7432,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✶\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":7564,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✻\u001b[3G\u001b[38;2;233;154;122mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":7663,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✽\u001b[3G\u001b[38;2;230;149;117mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":7762,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;228;144;112mGesticulating…\u001b[45G\u001b[38;2;153;153;153m3\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":7894,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;223;134;102mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":7993,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;220;129;97mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":8125,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✻\u001b[3G\u001b[38;2;218;124;92mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":8223,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✶\u001b[3GGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":8322,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m*\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":8552,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✢\u001b[3G\u001b[38;2;218;124;92mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":8684,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m·\u001b[3G\u001b[38;2;220;129;97mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":8784,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;223;134;102mGesticulating…\u001b[45G\u001b[38;2;153;153;153m4\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":8882,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;228;144;112mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":9014,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;230;149;117mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":9112,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✢\u001b[3G\u001b[38;2;233;154;122mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":9244,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m*\u001b[3G\u001b[38;2;235;159;127mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":9342,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✶\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":9574,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✻\u001b[3G\u001b[38;2;233;154;122mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":9673,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✽\u001b[3G\u001b[38;2;230;149;117mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":9804,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;228;144;112mGesticulating…\u001b[45G\u001b[38;2;153;153;153m5\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":9903,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;223;134;102mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":10003,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;220;129;97mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":10010,"snap":"working-unfocused","screen":" ▐▛███▛█   Claude Code v2.1.316\n▝▜██████▀  Haiku 5.5 with low effort · Claude Pro\n ▝▝   ▝▝   ~\\AppData\\Local\\Temp\\claude\\C--Users-dev-hilo\\ad1d7e7b-7f13-4aff-92a5-47ad…\n\n\n❯ responde solo OK                                                                                                      \n\n● OK\n\n✽ Gesticulating… (running Stop hooks… 1/2 · 5s · ↓ 4 tokens)\n\n────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n❯ \n────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n  ⏵⏵ auto mode on (shift+tab to cycle) · esc to interrupt · ← 2 agents                                 ○ low · /effort"}
+{"t":10011,"mark":"focus-in"}
+{"t":10011,"in":"\u001b[I"}
+{"t":10120,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✻\u001b[3G\u001b[38;2;218;124;92mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":10235,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✶\u001b[3GGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":10337,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m*\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":10455,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✢\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":10573,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;218;124;92mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":10675,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m·\u001b[3G\u001b[38;2;220;129;97mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":10794,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;225;139;107mGesticulating…\u001b[45G\u001b[38;2;153;153;153m6\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":10885,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[103C\u001b[1A\u001b[K\r\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":10901,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;228;144;112mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":10975,"data":"\u001b]0;◐ Respuesta OK\u001b\\"}
+{"t":11013,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;230;149;117mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":11133,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✢\u001b[3G\u001b[38;2;233;154;122mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":11236,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m*\u001b[3G\u001b[38;2;235;159;127mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":11355,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✶\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":11456,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✻\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":11573,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;233;154;122mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":11692,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✽\u001b[3G\u001b[38;2;230;149;117mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":11795,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;225;139;107mGesticulating…\u001b[45G\u001b[38;2;153;153;153m7\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":11914,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;223;134;102mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":11936,"data":"\u001b]0;◑ Respuesta OK\u001b\\"}
+{"t":12016,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;220;129;97mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":12135,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✻\u001b[3G\u001b[38;2;218;124;92mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":12237,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✶\u001b[3GGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":12356,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m*\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":12473,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m✢\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":12574,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;218;124;92mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":12694,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;215;119;87m·\u001b[3G\u001b[38;2;220;129;97mGesticulating…\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":12811,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[6A\u001b[38;2;225;139;107mGesticulating…\u001b[45G\u001b[38;2;153;153;153m8\u001b[39m\r\n\n\n\n\n\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":12906,"data":"\u001b]0;✳ Respuesta OK\u001b\\"}
+{"t":12906,"data":"\u001b]9;4;0;\u0007"}
+{"t":12909,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[6A\u001b[38;2;153;153;153m✻\u001b[3GBaked for 8s · done 9:40\u001b[39m\u001b[K\r\u001b[3B❯ \r\u001b[41C\u001b[2B\u001b[38;2;153;153;153m← 2\u001b[46Gagents\u001b[39m\u001b[K\r\n\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":13003,"sessfile":{"sessionId":"1e53fd5c-7eb6-4ad7-a781-732ea3a2efa4","status":"idle","name":"cwd-fe","nameSource":"derived","version":"2.1.316","kind":"interactive","updatedAt":1793623245307,"statusUpdatedAt":1793623245307}}
+{"t":17078,"snap":"done","screen":" ▐▛███▛█   Claude Code v2.1.316\n▝▜██████▀  Haiku 5.5 with low effort · Claude Pro\n ▝▝   ▝▝   ~\\AppData\\Local\\Temp\\claude\\C--Users-dev-hilo\\ad1d7e7b-7f13-4aff-92a5-47ad…\n\n\n❯ responde solo OK                                                                                                      \n\n● OK\n\n✻ Baked for 8s · done 9:40\n\n────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n❯ \n────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n  ⏵⏵ auto mode on (shift+tab to cycle) · ← 2 agents"}
+{"t":19089,"mark":"/exit"}
+{"t":19089,"in":"/exit"}
+{"t":19089,"data":"\u001b(B\u000f\u001b[?2004h"}
+{"t":19111,"data":"\u001b[?25l\u001b[2D\u001b[3B\r\u001b[2C\u001b[3A\u001b[38;2;177;185;249m/exit\r\u001b[2C\u001b[2B❯ /\u001b[1mexit\u001b[22m                       \u001b[1mExit\u001b[22m the CLI\u001b[39m\u001b[K\r\n\u001b[3G\u001b[38;2;153;153;153m \u001b[5G/context\u001b[33GVisualize\u001b[43Gcurrent\u001b[51Gcontext\u001b[59Gusage\u001b[65Gas\u001b[68Ga\u001b[70Gcolored\u001b[78Ggrid\u001b[39m\r\n\u001b[3G\u001b[38;2;153;153;153m \u001b[5G/usage-credits\u001b[33GConfigure\u001b[43Gusage\u001b[49Gcredits\u001b[57Gor\u001b[60Grequest\u001b[68Gthem\u001b[73Gfrom\u001b[78Gyour\u001b[83Gadmin\u001b[89Gwhen\u001b[94Gyou\u001b[98Ghit\u001b[102Ga\u001b[104Glimit\u001b[39m\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\u001b[7C\u001b[17A\u001b[?25h"}
+{"t":19896,"in":"\r"}
+{"t":19914,"data":"\u001b]0;◐ Respuesta OK\u001b\\"}
+{"t":19914,"data":"\u001b]9;4;3;\u0007"}
+{"t":19919,"data":"\u001b[?25l\u001b[7D\u001b[17B\u001b[2K\u001b[1A\u001b[2K\u001b[1A\u001b[2K\u001b[1A\u001b[2K\u001b[1A\u001b[2K\u001b[1A\u001b[2K\u001b[1A\u001b[2K\u001b[1A\u001b[2K\u001b[G\u001b[1A\r\u001b[10A\u001b[48;2;55;55;55m\u001b[38;2;153;153;153m❯ \u001b[38;2;255;255;255m/exit\u001b[39m                                                                                                                 \r\u001b[1B\u001b[49m\u001b[K\r\u001b[1B\u001b[38;2;215;119;87m✽\u001b[39m \u001b[38;2;215;119;87mConsidering… \u001b[39m\u001b[K\r\u001b[1B\u001b[38;2;153;153;153m  ⎿  Tip: Create skills by adding .md files to .claude/skills/ in your project or ~/.claude/skills/ for skills that work\r\u001b[2C\u001b[1B\u001b[39m   \u001b[38;2;153;153;153min any project\u001b[39m\u001b[K\r\u001b[2C\u001b[1B\u001b[K\r\u001b[1B\u001b[38;2;136;136;136m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\r\u001b[1B\u001b[38;2;153;153;153m❯ \r\u001b[1B\u001b[38;2;136;136;136m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\r\u001b[2C\u001b[1B\u001b[38;2;255;193;7m⏵⏵ auto mode on\u001b[38;2;153;153;153m (shift+tab to cycle) · esc to interrupt · ← 2 agents\r\u001b[1B\u001b[39m\u001b[K\r\u001b[1B\u001b[K\r\u001b[1B\u001b[K\r\u001b[1B\u001b[K\r\u001b[1B\u001b[K\r\u001b[1B\u001b[K\r\u001b[1B\u001b[K\r\u001b[1B\u001b[K\r\u001b[7A\u001b[2C\u001b[3A\u001b[?25h"}
+{"t":19922,"data":"\u001b[?1006l\u001b[?1003l\u001b[?1002l\u001b[?1000l"}
+{"t":19922,"data":"\u001b[2D\u001b[3B"}
+{"t":19922,"data":"\u001b[?1004l\u001b[?1004h\u001b[>4m\u001b[?2031l\u001b[?2004l\u001b(B\u000f\u001b[?1016l\u001b[?1006l\u001b[?1003l\u001b[?1002l\u001b[?1000l\u001b[?25h\u001b7\u001b[r\u001b8\u001b]9;4;0;\u0007\u001b]0;\u001b\\"}
+{"t":19923,"data":"\u001b[2m\u001b[22m\r\n\u001b[2mResume this session with:\u001b[22m\r\n\u001b[2mclaude --resume 1e53fd5c-7eb6-4ad7-a781-732ea3a2efa4\u001b[22m\r\n\u001b[2m\u001b[22m"}
+{"t":19958,"data":"\u001b]0;✳ Respuesta OK\u001b\\"}
+{"t":19958,"data":"\u001b]9;4;0;\u0007"}
+{"t":19975,"sessfile":{"sessionId":"1e53fd5c-7eb6-4ad7-a781-732ea3a2efa4","status":"idle","name":"cwd-fe","nameSource":"derived","version":"2.1.316","kind":"interactive","updatedAt":1793623252358,"statusUpdatedAt":1793623252358}}
+{"t":20411,"sessfile":null}
+{"t":20459,"exit":0}
+{"t":20504,"mark":"waitExit OK"}
+{"t":21506,"snap":"final","screen":" ▐▛███▛█   Claude Code v2.1.316\n▝▜██████▀  Haiku 5.5 with low effort · Claude Pro\n ▝▝   ▝▝   ~\\AppData\\Local\\Temp\\claude\\C--Users-dev-hilo\\ad1d7e7b-7f13-4aff-92a5-47ad…\n\n\n❯ responde solo OK                                                                                                      \n\n● OK\n\n✻ Baked for 8s · done 9:40\n\n❯ /exit                                                                                                                 \n\n✽ Considering… \n  ⎿  Tip: Create skills by adding .md files to .claude/skills/ in your project or ~/.claude/skills/ for skills that work\n     in any project\n\n────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n❯ \n────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n  ⏵⏵ auto mode on (shift+tab to cycle) · esc to interrupt · ← 2 agents\n\nResume this session with:\nclaude --resume 1e53fd5c-7eb6-4ad7-a781-732ea3a2efa4"}
+{"t":21506,"mark":"fin","exited":{"exitCode":0}}
