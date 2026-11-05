@@ -17,9 +17,9 @@ Hilo no es un producto de Anthropic ni está afiliado a Anthropic. Es un proyect
 
 ### Si Windows muestra un aviso
 
-Hilo todavía no está firmado con un certificado, así que Windows SmartScreen puede decir "Windows protegió su PC". Para seguir, pulsa **Más información** y luego **Ejecutar de todas formas**. Tu antivirus también podría preguntar.
+Hilo es un proyecto personal y no tiene certificado de firma de código, porque esos certificados se pagan. Por eso Windows SmartScreen puede decir "Windows protegió su PC". Para seguir, pulsa **Más información** y luego **Ejecutar de todas formas**. Tu antivirus también podría preguntar.
 
-Ese aviso significa que Windows no conoce al autor del archivo, no que haya encontrado algo malo. Pero tampoco garantiza nada: instálalo solo si lo bajaste de esta página y confías en ella.
+No hay ninguna intención maliciosa detrás de Hilo. El aviso significa que Windows no conoce al autor del archivo, no que haya encontrado algo malo. Pero tampoco garantiza nada: instálalo solo si lo bajaste de esta página y confías en ella.
 
 ## Cómo se actualiza
 
