@@ -429,6 +429,7 @@ function registerIpc(): void {
   });
 
   handle('usage:get', () => sessions.planUsage());
+  handle('session:lastMessage', (id: unknown) => (isStr(id) ? sessions.lastMessage(id) : null));
   handle('tools:check', () => {
     if (isTest && process.env.HILO_TEST_TOOLS) return JSON.parse(process.env.HILO_TEST_TOOLS) as ToolCheck;
     return checkTools(store.get().settings.claudePath);

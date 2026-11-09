@@ -1,3 +1,4 @@
+import { open } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, join } from 'node:path';
@@ -23,10 +24,34 @@ export function claudeConfigDir(): string {
   return process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
 }
 
-/** Solo comprueba si existe. Nunca se lee el contenido de una conversación. */
-export function transcriptExists(cwd: string, claudeId: string): boolean {
+function transcriptPath(cwd: string, claudeId: string): string {
   const slug = cwd.replace(/[^a-zA-Z0-9]/g, '-');
-  return existsSync(join(claudeConfigDir(), 'projects', slug, `${claudeId}.jsonl`));
+  return join(claudeConfigDir(), 'projects', slug, `${claudeId}.jsonl`);
+}
+
+/** Solo comprueba si existe. */
+export function transcriptExists(cwd: string, claudeId: string): boolean {
+  return existsSync(transcriptPath(cwd, claudeId));
+}
+
+/** Lo que se lee de una conversación: el final, para el último mensaje de Claude, y solo cuando el usuario pide copiarlo (D26). */
+const TRANSCRIPT_TAIL = 4 * 1024 * 1024;
+
+export async function readTranscriptTail(cwd: string, claudeId: string): Promise<string | null> {
+  if (!/^[0-9a-f-]{36}$/i.test(claudeId)) return null;
+  let handle: Awaited<ReturnType<typeof open>> | null = null;
+  try {
+    handle = await open(transcriptPath(cwd, claudeId), 'r');
+    const { size } = await handle.stat();
+    const length = Math.min(size, TRANSCRIPT_TAIL);
+    const buffer = Buffer.alloc(length);
+    await handle.read(buffer, 0, length, size - length);
+    return buffer.toString('utf8');
+  } catch {
+    return null;
+  } finally {
+    await handle?.close();
+  }
 }
 
 export interface ClaudeArgsOptions {

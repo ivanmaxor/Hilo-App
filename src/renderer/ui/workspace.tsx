@@ -21,12 +21,13 @@ import {
   terminals,
   toast,
   toggleChanges,
+  copyLastMessage,
   useStore,
   view,
   wakeSession,
   subagentsOf,
 } from '../controller';
-import { CloseIcon, DiffIcon, LayoutIcon, PlusIcon, SearchIcon, ShellMark, StatusIcon, subagentsLabel } from './icons';
+import { CloseIcon, CopyMessageIcon, DiffIcon, LayoutIcon, PlusIcon, SearchIcon, ShellMark, StatusIcon, subagentsLabel } from './icons';
 import { draggedPaneContent, endDragging, InlineRename, startDraggingPane, startDraggingSession } from './sidebar';
 import { MAX_PANES, moveDivider, paneDividers, paneRects, presetTree, resetDivider, type PaneDivider, type PaneEdge, type PaneNode, type PaneRect } from '../../shared/paneLayout';
 import type { SessionRecord } from '../../shared/types';
@@ -35,6 +36,8 @@ export function Tabs() {
   const { state } = useStore(app);
   const v = useStore(view);
   const project = activeProject();
+  const activeFound = state.ui.activeSessionId ? findSession(state, state.ui.activeSessionId) : null;
+  const activeClaude = activeFound?.session.kind === 'claude' ? activeFound.session : null;
   const sessions = (project?.sessions ?? []).filter((s) => !v.closing.includes(s.id) && !state.ui.hiddenTabs.includes(s.id));
   const activeId = state.ui.activeSessionId;
   const bar = useRef<HTMLDivElement>(null);
@@ -144,6 +147,17 @@ export function Tabs() {
       <div class="tab-drag" />
       {project && (
         <div class="view-tools">
+          {activeClaude && (
+            <button
+              class="tool-text"
+              data-action="copy-last-message"
+              title={`Copiar el último mensaje de Claude en «${activeClaude.name}», con el nombre de la sesión delante (${keysOf('copyLastMessage')})`}
+              onClick={() => void copyLastMessage(activeClaude.id)}
+            >
+              <CopyMessageIcon />
+              <span>Copiar respuesta</span>
+            </button>
+          )}
           <button
             class={`tool-text${state.ui.panes.includes(changesPaneId(project.id)) ? ' on' : ''}`}
             data-action="toggle-changes"

@@ -18,6 +18,7 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: 'nextAttention', label: 'Siguiente que requiere atención', defaultKeys: 'Ctrl+Shift+U' },
   { id: 'search', label: 'Buscar en la terminal', defaultKeys: 'Ctrl+Shift+F' },
   { id: 'copyJoined', label: 'Copiar uniendo líneas', defaultKeys: 'Ctrl+Shift+J' },
+  { id: 'copyLastMessage', label: 'Copiar el último mensaje de Claude', defaultKeys: 'Ctrl+Shift+L' },
   { id: 'toggleChanges', label: 'Ver los cambios del proyecto', defaultKeys: 'Ctrl+Shift+G' },
   { id: 'zoomIn', label: 'Aumentar fuente', defaultKeys: 'Ctrl+=' },
   { id: 'zoomOut', label: 'Reducir fuente', defaultKeys: 'Ctrl+-' },

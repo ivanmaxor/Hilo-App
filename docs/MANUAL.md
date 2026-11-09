@@ -49,6 +49,7 @@ Lo mismo sale abajo en cada sesión de Claude, en lugar de tu línea de estado. 
 | Pegar imagen | Alt+V, como en tu terminal. Si solo hay imagen en el portapapeles, Ctrl+V también funciona |
 | Salto de línea sin enviar | Shift+Enter |
 | Copiar uniendo líneas que cortó Claude | Ctrl+Shift+J |
+| Copiar el último mensaje de Claude, con el nombre de la sesión delante | Ctrl+Shift+L, el botón **Copiar respuesta** o clic derecho en la sesión |
 
 ## Dormir sesiones
 

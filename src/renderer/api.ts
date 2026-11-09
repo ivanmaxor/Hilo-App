@@ -23,6 +23,8 @@ export interface HiloApi {
   pathExists(path: string): Promise<boolean>;
   toolsCheck(): Promise<ToolCheck>;
   usageGet(): Promise<PlanUsage | null>;
+  /** El último mensaje de Claude con el nombre de la sesión delante, listo para copiar. */
+  lastMessage(id: string): Promise<string | null>;
   onUsage(cb: (usage: PlanUsage) => void): () => void;
   changesList(projectId: string): Promise<ChangesList>;
   changesDiff(projectId: string, request: FileDiffRequest): Promise<FileDiffResult>;

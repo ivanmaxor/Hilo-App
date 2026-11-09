@@ -274,3 +274,11 @@ Pedido del dueño: ver cuánto lleva de la sesión de 5 horas y de la semana, y 
 **Límites.** El dato llega solo con planes Pro, Max o Ultra y después de la primera respuesta, y es de la última vez que respondió una sesión de Hilo: lo gastado en claude.ai u otra terminal no se ve hasta la siguiente respuesta. Cuando pasa la hora de renovación se muestra "Ya se renovó" en vez de un porcentaje viejo.
 
 Colores: verde con más de la mitad libre, amarillo desde el 50 % usado y rojo desde el 80 %. Con la barra lateral reducida a íconos, como en una ventana angosta, quedan solo los dos porcentajes, con el detalle al pasar el mouse.
+
+## D26. Copiar el último mensaje de Claude
+
+Pedido del dueño, que le pega a Claude el resumen con que otra sesión cerró su tarea. Un botón ("Copiar respuesta", en la barra de pestañas), `Ctrl+Shift+L` y una opción del clic derecho copian el último mensaje de Claude con este formato: el nombre de la sesión, dos puntos, una línea en blanco y el mensaje.
+
+Se lee de la conversación que Claude guarda (`~/.claude/projects/<carpeta>/<sesión>.jsonl`), no de la pantalla: en la terminal el texto viene cortado en líneas, con márgenes y colores, y puede haberse ido del historial. Es la primera vez que Hilo lee una conversación: solo cuando el usuario lo pide, solo los últimos 4 MB, y el texto va directo al portapapeles, sin guardarse ni enviarse. Se toma el último mensaje del agente principal que tenga texto, con todos sus bloques; los subagentes no cuentan.
+
+Es un archivo interno de Claude Code, sin contrato. Si cambia su formato, el botón avisa que no hay mensaje en vez de copiar algo equivocado.

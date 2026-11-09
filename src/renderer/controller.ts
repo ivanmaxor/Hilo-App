@@ -768,6 +768,27 @@ export async function openInIde(projectId: string, file: string | null = null, l
   if (line && !result.jumped) toast(`${project.ide.name} abrió el archivo, pero no permite pedirle que vaya a una línea. Es la línea ${line}.`);
 }
 
+/** Copia el último mensaje de Claude con el nombre de la sesión delante (D26). */
+export async function copyLastMessage(id: string): Promise<void> {
+  const found = findSession(app.get().state, id);
+  if (!found) return;
+  if (found.session.kind !== 'claude') {
+    toast('Eso es una PowerShell: solo las sesiones de Claude tienen mensajes para copiar.');
+    return;
+  }
+  const text = await api.lastMessage(id).catch(() => null);
+  if (!text) {
+    toast(`«${found.session.name}» todavía no tiene un mensaje de Claude para copiar.`);
+    return;
+  }
+  try {
+    await api.clipWrite(text);
+    toast(`Se copió el último mensaje de «${found.session.name}».`);
+  } catch {
+    toast('No se pudo copiar: otro programa está usando el portapapeles.');
+  }
+}
+
 export function runCommand(action: string): void {
   const { state } = app.get();
   const active = state.ui.activeSessionId;
@@ -828,6 +849,10 @@ export function runCommand(action: string): void {
       return;
     case 'copyJoined':
       if (active) void terminals.copyJoined(active);
+      return;
+    case 'copyLastMessage':
+      if (active) void copyLastMessage(active);
+      else toast('Abre una sesión de Claude para copiar su último mensaje.');
       return;
     case 'zoomIn':
       setFontSize(state.settings.fontSize + 1);

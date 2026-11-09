@@ -28,6 +28,7 @@ const api = {
   pathExists: (p: string) => ipcRenderer.invoke('path:exists', p),
   toolsCheck: () => ipcRenderer.invoke('tools:check'),
   usageGet: () => ipcRenderer.invoke('usage:get'),
+  lastMessage: (id: string) => ipcRenderer.invoke('session:lastMessage', id),
   onUsage: (cb: Listener) => subscribe('usage:update', cb),
   changesList: (projectId: string) => ipcRenderer.invoke('changes:list', projectId),
   changesDiff: (projectId: string, request: unknown) => ipcRenderer.invoke('changes:diff', projectId, request),

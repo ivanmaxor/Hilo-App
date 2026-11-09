@@ -25,6 +25,7 @@ import {
   selectSession,
   keysOf,
   toggleChanges,
+  copyLastMessage,
   runCommand,
   sleepSession,
   startRename,
@@ -1069,6 +1070,11 @@ export function ContextMenu() {
         <button role="menuitem" onClick={() => { view.set({ menu: null }); startRename(session.id); }}>
           Renombrar <kbd>{keysOf('rename')}</kbd>
         </button>
+        {session.kind === 'claude' && (
+          <button role="menuitem" onClick={() => { close(); void copyLastMessage(session.id); }}>
+            Copiar el último mensaje <kbd>{keysOf('copyLastMessage')}</kbd>
+          </button>
+        )}
         {status === 'asleep' ? (
           <button role="menuitem" onClick={() => { close(); void wakeSession(session.id); }}>
             Despertar <kbd>{keysOf('toggleSleep')}</kbd>

@@ -1,3 +1,4 @@
+import { formatCopiedMessage, lastAssistantText } from '../../src/shared/lastMessage';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -480,5 +481,33 @@ describe('procesos', () => {
 
   it('ignora líneas mal formadas', () => {
     expect(parseSnapshot('basura\n\n|||')).toEqual([]);
+  });
+});
+
+describe('último mensaje de Claude', () => {
+  const line = (o: object) => JSON.stringify(o);
+  const assistant = (id: string, content: unknown, extra: object = {}) => line({ type: 'assistant', message: { id, role: 'assistant', content }, ...extra });
+
+  it('junta los bloques de texto del último mensaje, sin herramientas ni subagentes', () => {
+    const jsonl = [
+      assistant('m1', [{ type: 'text', text: 'viejo' }]),
+      line({ type: 'user', message: { role: 'user', content: 'hola' } }),
+      assistant('m2', [{ type: 'text', text: 'Primero' }]),
+      assistant('m2', [{ type: 'tool_use', name: 'Bash' }]),
+      assistant('m2', [{ type: 'text', text: 'Resumen' }]),
+      assistant('s1', [{ type: 'text', text: 'de un subagente' }], { isSidechain: true }),
+      line({ type: 'last-prompt' }),
+    ].join('\n');
+    expect(lastAssistantText(jsonl)).toBe('Primero\n\nResumen');
+  });
+
+  it('salta un mensaje final sin texto y una línea cortada', () => {
+    const jsonl = ['{"type":"assis', assistant('m1', [{ type: 'text', text: 'Listo' }]), assistant('m2', [{ type: 'tool_use' }])].join('\n');
+    expect(lastAssistantText(jsonl)).toBe('Listo');
+    expect(lastAssistantText('')).toBeNull();
+  });
+
+  it('el formato: nombre, dos puntos y una línea en blanco', () => {
+    expect(formatCopiedMessage('CC', 'Hice X')).toBe('CC:\n\nHice X');
   });
 });
