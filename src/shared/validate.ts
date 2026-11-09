@@ -152,6 +152,7 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     checkUpdatesOnStart: typeof r.checkUpdatesOnStart === 'boolean' ? r.checkUpdatesOnStart : base.checkUpdatesOnStart,
     setupSeen: typeof r.setupSeen === 'boolean' ? r.setupSeen : base.setupSeen,
     usageMeter: typeof r.usageMeter === 'boolean' ? r.usageMeter : base.usageMeter,
+    lastSeenVersion: typeof r.lastSeenVersion === 'string' && /^\d+\.\d+\.\d+$/.test(r.lastSeenVersion) ? r.lastSeenVersion : base.lastSeenVersion,
     changesShowSigns: typeof r.changesShowSigns === 'boolean' ? r.changesShowSigns : base.changesShowSigns,
     changesFullFile: typeof r.changesFullFile === 'boolean' ? r.changesFullFile : base.changesFullFile,
   };

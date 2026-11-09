@@ -368,6 +368,13 @@ mark { background: none; color: var(--accent); font-weight: 600; }
 .keycap.capturing { border-color: var(--accent); color: var(--accent); }
 .about { margin: 16px 0 0; color: var(--faint); font-size: 12px; }
 .update-version, .update-status { margin: 10px 0; }
+.news-entry { margin: 0 0 14px; }
+.news-entry h4 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.news-badge { padding: 0 6px; border-radius: 3px; background: var(--raised-2); color: var(--accent); font-size: 11px; font-weight: 600; }
+.news-date { margin-left: auto; color: var(--faint); font-size: 12px; font-weight: 400; }
+.news-entry ul { margin: 0; padding-left: 18px; color: var(--muted); }
+.news-entry li { margin: 2px 0; line-height: 1.45; }
+.news-entry.current ul { color: var(--text); }
 .update-status { user-select: text; }
 .update-bar { display: block; width: 100%; height: 6px; margin: 0 0 10px; accent-color: var(--accent); }
 .update-actions { flex-wrap: wrap; align-items: center; justify-content: flex-start; margin-top: 10px; }

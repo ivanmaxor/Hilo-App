@@ -282,3 +282,9 @@ Pedido del dueño, que le pega a Claude el resumen con que otra sesión cerró s
 Se lee de la conversación que Claude guarda (`~/.claude/projects/<carpeta>/<sesión>.jsonl`), no de la pantalla: en la terminal el texto viene cortado en líneas, con márgenes y colores, y puede haberse ido del historial. Es la primera vez que Hilo lee una conversación: solo cuando el usuario lo pide, solo los últimos 4 MB, y el texto va directo al portapapeles, sin guardarse ni enviarse. Se toma el último mensaje del agente principal que tenga texto, con todos sus bloques; los subagentes no cuentan.
 
 Es un archivo interno de Claude Code, sin contrato. Si cambia su formato, el botón avisa que no hay mensaje en vez de copiar algo equivocado.
+
+## D27. Novedades dentro de la app
+
+Pedido del dueño, para que quien use Hilo vea qué trae cada versión. Van en `src/shared/changelog.ts`, dentro de la app: bajarlas de GitHub sería otra conexión. Se ven en Ajustes > Novedades, y después de actualizar sale una vez un aviso con "Ver novedades" (`settings.lastSeenVersion`). Una instalación nueva no lo muestra.
+
+Una prueba unitaria falla si la versión de `package.json` no tiene su entrada, así que no se puede publicar una versión sin escribirlas. Las notas de cada versión en GitHub salen de la misma lista.

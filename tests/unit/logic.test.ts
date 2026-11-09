@@ -1,3 +1,4 @@
+import { CHANGELOG } from '../../src/shared/changelog';
 import { formatCopiedMessage, lastAssistantText } from '../../src/shared/lastMessage';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -509,5 +510,16 @@ describe('último mensaje de Claude', () => {
 
   it('el formato: nombre, dos puntos y una línea en blanco', () => {
     expect(formatCopiedMessage('CC', 'Hice X')).toBe('CC:\n\nHice X');
+  });
+});
+
+describe('novedades', () => {
+  it('la versión de package.json tiene sus novedades, y van de la más nueva a la más vieja', () => {
+    const { version } = JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', 'package.json'), 'utf8'));
+    expect(CHANGELOG[0]!.version).toBe(version);
+    const key = (v: string) => v.split('.').map((n) => n.padStart(4, '0')).join('.');
+    const keys = CHANGELOG.map((e) => key(e.version));
+    expect([...keys].sort().reverse()).toEqual(keys);
+    for (const e of CHANGELOG) expect(e.items.length).toBeGreaterThan(0);
   });
 });

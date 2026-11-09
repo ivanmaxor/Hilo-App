@@ -2,7 +2,7 @@ import '@xterm/xterm/css/xterm.css';
 import './styles.css';
 import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { app, focusActive, initController, offerSetupGuide, useStore, view } from './controller';
+import { app, focusActive, initController, offerSetupGuide, announceNews, useStore, view } from './controller';
 import { ContextMenu, Modals, Toasts } from './ui/dialogs';
 import { Sidebar } from './ui/sidebar';
 import { Tabs, Workspace } from './ui/workspace';
@@ -52,5 +52,6 @@ setInterval(() => {
 void initController().then(() => {
   render(<App />, document.getElementById('root')!);
   focusActive();
+  announceNews();
   void offerSetupGuide();
 });

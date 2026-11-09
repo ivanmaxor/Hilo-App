@@ -12,7 +12,7 @@ npm start            # compila y abre
 npm test             # unitarias (vitest), incluye grabaciones reales de Claude
 npm run typecheck
 npm run e2e          # Playwright sobre la app real, sin Claude
-npm run dist         # release/Hilo-Setup-x.y.z.exe, .blockmap y latest.yml. No publica nada
+npm run dist         # release/Hilo-Setup-x.y.z.exe, .blockmap y latest.yml. No publica nada. Antes, las novedades en src/shared/changelog.ts
 node scripts/publish-release.mjs --dry-run   # comprueba y muestra qué subiría; sin --dry-run publica en GitHub Releases
 ```
 

@@ -1003,6 +1003,23 @@ function installKeyboard(): void {
 }
 
 /** Una sola vez, y solo si falta algo: quien ya tiene todo nunca la ve. */
+/**
+ * Después de actualizar, una vez: un aviso para ver las novedades (D27). En una instalación nueva
+ * no hay nada que contar, y solo se anota la versión.
+ */
+export function announceNews(): void {
+  const { state, info } = app.get();
+  const seen = state.settings.lastSeenVersion;
+  if (seen === info.version) return;
+  const updated = seen !== '' || state.settings.setupSeen;
+  void dispatch({ type: 'settings/set', patch: { lastSeenVersion: info.version } });
+  if (!updated || info.isTest) return;
+  toast(`Hilo se actualizó a la versión ${info.version}.`, {
+    label: 'Ver novedades',
+    run: () => view.set({ modal: { type: 'settings', section: 'news' } }),
+  });
+}
+
 export async function offerSetupGuide(): Promise<void> {
   if (app.get().state.settings.setupSeen || view.get().modal) return;
   const tools = await api.toolsCheck();

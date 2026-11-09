@@ -77,6 +77,8 @@ export interface Settings {
   setupSeen: boolean;
   /** Uso del plan en la línea de estado de Claude y en la barra lateral (D25). */
   usageMeter: boolean;
+  /** La versión cuyas novedades ya se avisaron (D27). Vacío en una instalación nueva. */
+  lastSeenVersion: string;
   /** En el panel Cambios, los signos + y − además del color. */
   changesShowSigns: boolean;
   /** En el panel Cambios, todo el archivo en vez de solo las zonas cambiadas. */

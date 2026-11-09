@@ -1,3 +1,4 @@
+import { CHANGELOG } from '../../shared/changelog';
 import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { EFFORTS, MODELS, PALETTE } from '../../shared/defaults';
@@ -531,9 +532,17 @@ const SETTINGS_SECTIONS = [
   ['sessions', 'Sesiones'],
   ['claude', 'Claude Code'],
   ['updates', 'Actualizaciones'],
+  ['news', 'Novedades'],
   ['changes', 'Cambios'],
   ['shortcuts', 'Atajos'],
 ] as const;
+
+/** "9 de noviembre de 2026", sin depender del idioma del sistema. */
+function formatDate(iso: string): string {
+  const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const [y, mo, d] = iso.split('-').map(Number);
+  return `${d} de ${months[(mo ?? 1) - 1]} de ${y}`;
+}
 
 function updateMessage(status: UpdateStatus): string {
   switch (status.state) {
@@ -871,6 +880,23 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
             </section>
 
             <UpdatesSection version={info.version} checkOnStart={s.checkUpdatesOnStart} onCheckOnStart={(on) => set({ checkUpdatesOnStart: on })} />
+            <section class="settings-section" data-section="news">
+              <h3>Novedades</h3>
+              {CHANGELOG.map((entry) => (
+                <div class={`news-entry${entry.version === info.version ? ' current' : ''}`} key={entry.version} data-version={entry.version}>
+                  <h4>
+                    {entry.version}
+                    {entry.version === info.version && <span class="news-badge">la que tienes</span>}
+                    <span class="news-date">{formatDate(entry.date)}</span>
+                  </h4>
+                  <ul>
+                    {entry.items.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </section>
             <section class="settings-section" data-section="changes">
               <h3>Panel de cambios</h3>
               <label class="check">

@@ -144,7 +144,7 @@ test('ajustes: secciones, tamaño de letra y de ventana; arrastrar el divisor ca
     // Ajustes.
     await page.evaluate(() => (window as any).__hiloTest.runCommand('settings'));
     await page.screenshot({ path: join(SHOTS, 'ajustes-1.png') });
-    await expect(page.locator('.settings-nav button')).toHaveText(['Apariencia', 'Terminal', 'Sesiones', 'Claude Code', 'Actualizaciones', 'Cambios', 'Atajos']);
+    await expect(page.locator('.settings-nav button')).toHaveText(['Apariencia', 'Terminal', 'Sesiones', 'Claude Code', 'Actualizaciones', 'Novedades', 'Cambios', 'Atajos']);
     await page.getByRole('button', { name: 'Letra más grande' }).click();
     await page.getByRole('button', { name: 'Letra más grande' }).click();
     expect((await settings(page)).fontSize).toBe(18);
