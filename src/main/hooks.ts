@@ -1,6 +1,8 @@
-import { closeSync, mkdirSync, openSync, readSync, rmSync, statSync, watch, writeFileSync, type FSWatcher } from 'node:fs';
+import { closeSync, mkdirSync, openSync, readFileSync, readSync, rmSync, statSync, watch, writeFileSync, type FSWatcher } from 'node:fs';
 import { join } from 'node:path';
 import type { HookName } from '../shared/statusMachine';
+import { parseUsage, type PlanUsage } from '../shared/usage';
+import { USAGE_SCRIPT, usageCommand } from './usageScript';
 import { isSafeId } from '../shared/validate';
 
 /**
@@ -26,7 +28,7 @@ const HOOK_EVENTS: { event: string; matcher?: string; name: HookName }[] = [
 const VALID = new Set<string>(HOOK_EVENTS.map((h) => h.name));
 
 /** Exportado para las pruebas. */
-export function buildHookSettings(eventsFile: string): object {
+export function buildHookSettings(eventsFile: string, statusCommand: string | null = null): object {
   const path = eventsFile.replace(/\\/g, '/');
   // Comillas simples: literales en bash y en PowerShell, así $ o ` en la ruta no se interpretan.
   const target = path.includes("'") ? `"${path}"` : `'${path}'`;
@@ -38,7 +40,8 @@ export function buildHookSettings(eventsFile: string): object {
     if (matcher) entry.matcher = matcher;
     (hooks[event] ??= []).push(entry);
   }
-  return { hooks };
+  // Reemplaza la línea de estado del usuario solo en las sesiones de Hilo, y se apaga en Ajustes (D25).
+  return statusCommand ? { hooks, statusLine: { type: 'command', command: statusCommand, padding: 0 } } : { hooks };
 }
 
 /** Exportado para las pruebas. PowerShell 5 escribe UTF-16 al redirigir con >>. */
@@ -56,14 +59,34 @@ export function parseEvents(raw: string): HookName[] {
 export class HookChannel {
   private readonly offsets = new Map<string, number>();
   private watcher: FSWatcher | null = null;
+  private usage: PlanUsage | null = null;
+  private usageTimer: NodeJS.Timeout | null = null;
+  private readonly statusCommand: string | null;
 
   constructor(
     private readonly dir: string,
     private readonly onEvent: (sessionId: string, name: HookName) => void,
+    private readonly onUsage: (usage: PlanUsage) => void = () => undefined,
   ) {
     mkdirSync(dir, { recursive: true });
+    const script = join(dir, 'usage.ps1');
+    let command: string | null = null;
+    try {
+      writeFileSync(script, USAGE_SCRIPT);
+      command = usageCommand(script);
+    } catch (err) {
+      console.error('[uso] no se pudo escribir el script', err);
+    }
+    this.statusCommand = command;
+    this.readUsage();
     try {
       this.watcher = watch(dir, (_type, filename) => {
+        if (filename === 'usage.json') {
+          // Se escribe con un archivo temporal y un renombre: se espera a que termine.
+          if (this.usageTimer) clearTimeout(this.usageTimer);
+          this.usageTimer = setTimeout(() => this.readUsage(), 150);
+          return;
+        }
         if (typeof filename === 'string' && filename.endsWith('.events')) {
           const id = filename.slice(0, -'.events'.length);
           if (isSafeId(id)) this.drain(id);
@@ -76,9 +99,24 @@ export class HookChannel {
     }
   }
 
+  lastUsage(): PlanUsage | null {
+    return this.usage;
+  }
+
+  private readUsage(): void {
+    try {
+      const next = parseUsage(readFileSync(join(this.dir, 'usage.json'), 'utf8'));
+      if (!next || (this.usage && next.at < this.usage.at)) return;
+      this.usage = next;
+      this.onUsage(next);
+    } catch {
+      // Todavía no hay datos, o el archivo se está reemplazando.
+    }
+  }
+
   /** Prepara los archivos de la sesión y devuelve la ruta para `--settings`. */
   /** null: no se puede escribir el comando de forma segura, y la sesión sigue con las señales del título. */
-  prepare(sessionId: string): string | null {
+  prepare(sessionId: string, withUsage = false): string | null {
     if (!isSafeId(sessionId)) throw new Error('Identificador de sesión inválido');
     const eventsFile = join(this.dir, `${sessionId}.events`);
     // Una comilla simple obliga a las dobles, y dentro de ellas $ y ` se interpretarían.
@@ -87,7 +125,7 @@ export class HookChannel {
     writeFileSync(eventsFile, '');
     this.offsets.set(sessionId, 0);
     const settingsFile = join(this.dir, `${sessionId}.json`);
-    writeFileSync(settingsFile, JSON.stringify(buildHookSettings(eventsFile), null, 1));
+    writeFileSync(settingsFile, JSON.stringify(buildHookSettings(eventsFile, withUsage ? this.statusCommand : null), null, 1));
     return settingsFile;
   }
 
@@ -131,6 +169,7 @@ export class HookChannel {
   }
 
   dispose(): void {
+    if (this.usageTimer) clearTimeout(this.usageTimer);
     this.watcher?.close();
     this.watcher = null;
   }

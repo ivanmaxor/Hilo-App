@@ -151,6 +151,7 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     touchpadSpeed: Math.round(clamp(r.touchpadSpeed, 10, 100, base.touchpadSpeed)),
     checkUpdatesOnStart: typeof r.checkUpdatesOnStart === 'boolean' ? r.checkUpdatesOnStart : base.checkUpdatesOnStart,
     setupSeen: typeof r.setupSeen === 'boolean' ? r.setupSeen : base.setupSeen,
+    usageMeter: typeof r.usageMeter === 'boolean' ? r.usageMeter : base.usageMeter,
     changesShowSigns: typeof r.changesShowSigns === 'boolean' ? r.changesShowSigns : base.changesShowSigns,
     changesFullFile: typeof r.changesFullFile === 'boolean' ? r.changesFullFile : base.changesFullFile,
   };

@@ -860,6 +860,10 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
                 Detectar el estado con hooks, solo en las sesiones de Hilo. Sin esto el amarillo llega hasta 2 segundos tarde.
               </label>
               <label class="check">
+                <input type="checkbox" data-field="usage-meter" checked={s.usageMeter} disabled={!s.useHooks} onChange={(e) => set({ usageMeter: e.currentTarget.checked })} />
+                Mostrar cuánto llevas usado de tu plan, en la barra lateral y abajo en cada sesión. Reemplaza tu línea de estado de Claude, solo en las sesiones de Hilo. Necesita los hooks y vale desde el próximo despertar.
+              </label>
+              <label class="check">
                 <input type="checkbox" data-field="skip-permissions" checked={s.skipPermissions} onChange={(e) => set({ skipPermissions: e.currentTarget.checked })} />
                 Abrir Claude sin pedir permisos (--dangerously-skip-permissions). Claude ejecutaría todo sin preguntar: déjalo apagado si no sabes lo que hace. Vale desde el próximo despertar.
               </label>

@@ -38,7 +38,7 @@ Definir `HILO_E2E_CWD` con una carpeta ya confiable evita agregar entradas nueva
 ## Reglas que no se negocian
 
 - La única conexión de la app es el actualizador, con GitHub (D19): una vez al abrir si no se apagó, y con el botón. Nada se baja ni se instala sin que la persona acepte. Sin telemetría. Todo empaquetado. El renderer sigue sin red. Sin empaquetar no sale nada.
-- Nunca leer credenciales ni tocar `~/.claude/settings.json`, `~/.claude.json` ni nada global. Los hooks solo van por `claude --settings <archivo de la app>`, y el comando no lee stdin.
+- Nunca leer credenciales ni tocar `~/.claude/settings.json`, `~/.claude.json` ni nada global. Los hooks solo van por `claude --settings <archivo de la app>`, y el comando no lee stdin. La única excepción es la línea de estado (D25), que guarda solo `rate_limits`.
 - De `~/.claude/sessions/` solo se lee `<pid>.json` y se tolera que falte. El `.key` de al lado no se abre.
 - El único flag de permisos es `--dangerously-skip-permissions`, apagado por defecto desde la 1.2 (para compartir la app) y con interruptor en Ajustes (`skipPermissions`). Quien ya lo tenía encendido lo conserva, porque va guardado en su `state.json`. Las pruebas lo apagan en `makeState`: las de estados necesitan que Claude pida permisos.
 - Cada IPC valida el remitente (`trusted()` en `src/main/index.ts`), y las acciones del store van por lista blanca.

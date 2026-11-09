@@ -19,6 +19,7 @@ import {
   subagentsOf,
 } from '../controller';
 import { Chevron, GearIcon, MoreIcon, PanelIcon, PlusIcon, ShellMark, StatusIcon, SubagentsBadge, subagentsLabel } from './icons';
+import { UsageMeter } from './usage';
 
 type Drag = { type: 'session'; id: string } | { type: 'project'; id: string } | { type: 'pane'; id: string } | null;
 let dragging: Drag = null;
@@ -360,6 +361,7 @@ export function Sidebar({ narrow }: { narrow: boolean }) {
       <aside class="sidebar is-rail">
         <div class="brand" aria-hidden="true" />
         <Rail />
+        <UsageMeter compact />
         <footer class="side-foot rail-foot">
           {!narrow && (
             <button class="icon-btn" title={`Mostrar la barra lateral (${keysOf('toggleSidebar')})`} aria-label="Mostrar la barra lateral" onClick={() => void dispatch({ type: 'ui/sidebar', collapsed: false }).then(focusActive)}>
@@ -390,6 +392,7 @@ export function Sidebar({ narrow }: { narrow: boolean }) {
           </button>
         )}
       </div>
+      <UsageMeter />
       <NeedsYou />
       <footer class="side-foot">
         <span class="foot-hint" title="Saltar a una sesión">

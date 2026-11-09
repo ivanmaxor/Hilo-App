@@ -75,6 +75,8 @@ export interface Settings {
   checkUpdatesOnStart: boolean;
   /** Ya se mostró la guía de requisitos: no vuelve a salir sola. */
   setupSeen: boolean;
+  /** Uso del plan en la línea de estado de Claude y en la barra lateral (D25). */
+  usageMeter: boolean;
   /** En el panel Cambios, los signos + y − además del color. */
   changesShowSigns: boolean;
   /** En el panel Cambios, todo el archivo en vez de solo las zonas cambiadas. */

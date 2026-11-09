@@ -99,6 +99,18 @@ kbd { font: 11px "Segoe UI Variable Text", "Segoe UI", sans-serif; color: var(--
 .sidebar { position: relative; flex: none; display: flex; flex-direction: column; background: var(--side); min-height: 0; }
 .sidebar.is-rail { width: 48px; }
 .brand { height: 36px; flex: none; display: flex; align-items: center; padding: 0 14px; font-weight: 600; color: var(--muted); -webkit-app-region: drag; }
+.usage { flex: none; display: grid; gap: 5px; padding: 8px 12px 8px 17px; border-top: 1px solid var(--line); font-size: 12px; }
+.usage-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; column-gap: 8px; row-gap: 2px; }
+.usage-label { color: var(--muted); }
+.usage-pct { font-weight: 600; font-variant-numeric: tabular-nums; }
+.usage-bar { height: 4px; border-radius: 2px; background: var(--raised-2); overflow: hidden; }
+.usage-bar span { display: block; height: 100%; border-radius: 2px; background: currentColor; }
+.usage-reset { grid-column: 1 / -1; color: var(--faint); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.usage-empty { color: var(--faint); font-size: 11px; }
+.usage .lvl-ok, .usage-mini .lvl-ok { color: var(--done); }
+.usage .lvl-mid, .usage-mini .lvl-mid { color: var(--waiting); }
+.usage .lvl-low, .usage-mini .lvl-low { color: var(--error); }
+.usage-mini { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .needs { flex: none; background: var(--raised); padding: 6px 0 6px; }
 .needs h2 { margin: 0; padding: 2px 12px 4px 17px; font-size: 12px; font-weight: 600; color: var(--muted); display: flex; justify-content: space-between; }
 .needs-count { font-variant-numeric: tabular-nums; color: var(--text); }

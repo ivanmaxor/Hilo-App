@@ -31,7 +31,13 @@ Si falta Claude Code o Git, al abrir Hilo por primera vez una guía explica cóm
 
 Si Claude lanzó subagentes, la sesión sigue en "Trabajando" hasta que acaben, con una marca morada que dice cuántos faltan, como "2 sub". El aviso de que terminó sale al final.
 
-El verde se queda hasta que abres esa sesión. El bloque **Te necesitan**, abajo en la barra lateral, junta todo lo que requiere atención, ordenado por urgencia.
+El verde se queda hasta que abres esa sesión.
+
+## Uso de tu plan
+
+Abajo en la barra lateral está cuánto llevas usado de la sesión de 5 horas y de la semana, y cuándo se renueva cada una: verde si te queda más de la mitad, amarillo desde el 50 % usado y rojo desde el 80 %. Claude da el dato al responder, así que aparece después de la primera respuesta y se actualiza con cada una. Solo funciona con planes Pro, Max o Ultra.
+
+Lo mismo sale abajo en cada sesión de Claude, en lugar de tu línea de estado. Si prefieres la tuya, apágalo en Ajustes, sección Claude Code. El bloque **Te necesitan**, abajo en la barra lateral, junta todo lo que requiere atención, ordenado por urgencia.
 
 ## Copiar y pegar
 

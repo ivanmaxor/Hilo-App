@@ -1,3 +1,4 @@
+import type { PlanUsage } from '../shared/usage';
 import type { Action, AppInfo, BackgroundProcess, PersistedState, RuntimeMap, SessionRuntime, SessionStatus, ToolCheck } from '../shared/types';
 import type { UpdateStatus } from '../shared/updates';
 import type { ChangesList, FileDiffRequest, FileDiffResult } from '../shared/diff';
@@ -21,6 +22,8 @@ export interface HiloApi {
   pickFile(): Promise<string | null>;
   pathExists(path: string): Promise<boolean>;
   toolsCheck(): Promise<ToolCheck>;
+  usageGet(): Promise<PlanUsage | null>;
+  onUsage(cb: (usage: PlanUsage) => void): () => void;
   changesList(projectId: string): Promise<ChangesList>;
   changesDiff(projectId: string, request: FileDiffRequest): Promise<FileDiffResult>;
   ideDetect(): Promise<DetectedIde[]>;

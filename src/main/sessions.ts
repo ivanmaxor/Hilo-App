@@ -7,6 +7,7 @@ import { initialState, transition, type MachineEvent, type MachineState } from '
 import type { BackgroundProcess, RuntimeMap, SessionRecord, SessionRuntime, SessionStatus } from '../shared/types';
 import { buildClaudeArgs, buildCommandLine, buildEnv, claudeConfigDir, commandFor, defaultShell, resolveClaude, transcriptExists } from './claude';
 import { HookChannel } from './hooks';
+import type { PlanUsage } from '../shared/usage';
 import { backgroundProcesses, descendants, killPid, shellChildren, snapshotProcesses, taskkillTree, type ProcInfo } from './processes';
 import { ensureConoutWorker, setConoutLostHandler } from './pty/sharedConout';
 import { PtyManager } from './pty/ptyManager';
@@ -97,11 +98,15 @@ export class SessionController {
       const live = this.live.get(id);
       if (live) live.lastSignalAt = Date.now();
       this.apply(id, { t: 'hook', name });
-    });
+    }, (usage) => this.events.send('usage:update', usage));
     for (const s of allSessions(store.get())) this.machines.set(s.id, initialState(s.kind));
     setConoutLostHandler(() => console.error('[sesiones] se perdió el proceso auxiliar de terminales'));
     this.pollTimer = setInterval(() => void this.poll(), POLL_MS);
     this.pollTimer.unref();
+  }
+
+  planUsage(): PlanUsage | null {
+    return this.hooks.lastUsage();
   }
 
   runtimeMap(): RuntimeMap {
@@ -269,7 +274,7 @@ export class SessionController {
           return;
         }
         const resume = forceResume ?? transcriptExists(session.cwd, session.claudeId);
-        const settingsFile = settings.useHooks ? this.hooks.prepare(id) : null;
+        const settingsFile = settings.useHooks ? this.hooks.prepare(id, settings.usageMeter) : null;
         const claudeArgs = buildClaudeArgs({ session, resume, settingsFile, skipPermissions: settings.skipPermissions });
         if (process.env.HILO_E2E === '1' && process.env.HILO_TEST_CLAUDE_ARGS) {
           claudeArgs.push(...(JSON.parse(process.env.HILO_TEST_CLAUDE_ARGS) as string[]));

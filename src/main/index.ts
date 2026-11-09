@@ -428,6 +428,7 @@ function registerIpc(): void {
     return result.canceled ? null : (result.filePaths[0] ?? null);
   });
 
+  handle('usage:get', () => sessions.planUsage());
   handle('tools:check', () => {
     if (isTest && process.env.HILO_TEST_TOOLS) return JSON.parse(process.env.HILO_TEST_TOOLS) as ToolCheck;
     return checkTools(store.get().settings.claudePath);

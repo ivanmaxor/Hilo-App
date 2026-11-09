@@ -260,3 +260,17 @@ El conteo sale de los hooks `SubagentStart` y `SubagentStop`, solo por su nombre
 - **Quedar pegado.** Si se pierde un `SubagentStop`, la sesión no terminaría nunca. `~/.claude/sessions/<pid>.json` sigue en `busy` mientras hay subagentes (visto en la grabación), así que `idle` ahí pone la cuenta en cero. Ese archivo no tiene contrato: si Claude lo cambia, este rescate deja de funcionar, y una sesión pegada se resuelve al dormirla o reabrirla.
 
 Un comando en segundo plano sin subagente no cuenta: en ese caso Claude marca `shell` en ese archivo, y Hilo avisa igual que antes.
+
+## D25. Uso del plan en la barra lateral
+
+Pedido del dueño: ver cuánto lleva de la sesión de 5 horas y de la semana, y cuándo se renueva cada una, con colores según lo que queda.
+
+**De dónde sale.** Claude Code le pasa ese dato a su línea de estado (`rate_limits.five_hour` y `seven_day`: porcentaje usado y hora de renovación). Hilo agrega `statusLine` al mismo archivo de `--settings` de los hooks, así que vale solo en sus sesiones. Consultar el uso por la API exigiría el token, y Hilo no lo lee.
+
+**Excepción a "el comando no lee stdin".** La línea de estado tiene que leerlo para recibir el dato. Ese JSON no trae el prompt ni el contenido de archivos: trae el modelo, la carpeta, costos y la ruta del transcript. `usage.ps1`, que Hilo escribe en su carpeta `hooks`, guarda en `usage.json` solo `rate_limits` y la hora, y no escribe nada más.
+
+**Lo que cuesta.** Reemplaza la línea de estado que el usuario tuviera, solo en las sesiones de Hilo; por eso muestra el uso ahí también y se apaga en Ajustes (`usageMeter`, encendido por defecto, y necesita los hooks). Lanza una PowerShell después de cada respuesta de Claude, de unos 200 ms.
+
+**Límites.** El dato llega solo con planes Pro, Max o Ultra y después de la primera respuesta, y es de la última vez que respondió una sesión de Hilo: lo gastado en claude.ai u otra terminal no se ve hasta la siguiente respuesta. Cuando pasa la hora de renovación se muestra "Ya se renovó" en vez de un porcentaje viejo.
+
+Colores: verde con más de la mitad libre, amarillo desde el 50 % usado y rojo desde el 80 %. Con la barra lateral reducida a íconos, como en una ventana angosta, quedan solo los dos porcentajes, con el detalle al pasar el mouse.

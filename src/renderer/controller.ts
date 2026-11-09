@@ -1,3 +1,4 @@
+import type { PlanUsage } from '../shared/usage';
 import type { ToolCheck } from '../shared/types';
 import { changesPaneId, sessionInPane } from '../shared/paneContent';
 import { MAX_PANES, paneInDirection, presetTree } from '../shared/paneLayout';
@@ -984,7 +985,14 @@ export async function offerSetupGuide(): Promise<void> {
   view.set({ modal: { type: 'setup', tools } });
 }
 
+/** Uso del plan de Claude: lo último que dijo alguna sesión de Hilo (D25). */
+export const planUsage = createStore<{ usage: PlanUsage | null }>({ usage: null });
+
 export async function initController(): Promise<void> {
+  void api.usageGet().then((usage) => {
+    if (usage && (!planUsage.get().usage || usage.at >= planUsage.get().usage!.at)) planUsage.set({ usage });
+  });
+  api.onUsage((usage) => planUsage.set({ usage }));
   const initial = await api.getState();
   app.set(initial);
   view.set({ focused: initial.focused ?? true });
