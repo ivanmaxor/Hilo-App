@@ -40,6 +40,11 @@ export function isValidEffort(v: unknown): v is string {
 
 export const isColor = (v: unknown): v is string | null => v === null || (typeof v === 'string' && COLOR.test(v));
 const isName = (v: unknown): v is string => typeof v === 'string' && v.length <= MAX_NAME;
+export const MAX_NOTE = 4000;
+export const MAX_RECENT_COLORS = 6;
+/** Un emoji o un par de caracteres: sin espacios al borde ni caracteres de control. */
+export const isMark = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 16 && v.trim() === v && !/[\u0000-\u001f\u007f-\u009f]/.test(v);
+export const isNote = (v: unknown): v is string => typeof v === 'string' && v.length <= MAX_NOTE && !v.includes('\0');
 export const isPath = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= MAX_PATH && !v.includes('\0');
 const isIndex = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
 
@@ -55,7 +60,10 @@ function isSession(v: unknown): v is SessionRecord {
     isPath(s.cwd) &&
     typeof s.createdAt === 'number' &&
     (s.model === undefined || isValidModel(s.model)) &&
-    (s.effort === undefined || isValidEffort(s.effort))
+    (s.effort === undefined || isValidEffort(s.effort)) &&
+    (s.mark === undefined || isMark(s.mark)) &&
+    (s.unread === undefined || typeof s.unread === 'boolean') &&
+    (s.note === undefined || isNote(s.note))
   );
 }
 
@@ -77,6 +85,12 @@ export function isValidAction(a: Action): boolean {
     case 'project/color':
     case 'session/color':
       return isSafeId(a.id) && isColor(a.color);
+    case 'session/mark':
+      return isSafeId(a.id) && (a.mark === null || isMark(a.mark));
+    case 'session/unread':
+      return isSafeId(a.id) && typeof a.unread === 'boolean';
+    case 'session/note':
+      return isSafeId(a.id) && isNote(a.note);
     case 'project/collapse':
       return isSafeId(a.id) && typeof a.collapsed === 'boolean';
     case 'project/remove':
@@ -152,6 +166,9 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     checkUpdatesOnStart: typeof r.checkUpdatesOnStart === 'boolean' ? r.checkUpdatesOnStart : base.checkUpdatesOnStart,
     setupSeen: typeof r.setupSeen === 'boolean' ? r.setupSeen : base.setupSeen,
     usageMeter: typeof r.usageMeter === 'boolean' ? r.usageMeter : base.usageMeter,
+    recentColors: Array.isArray(r.recentColors)
+      ? [...new Set(r.recentColors.filter((c): c is string => typeof c === 'string' && COLOR.test(c)).map((c) => c.toLowerCase()))].slice(0, MAX_RECENT_COLORS)
+      : base.recentColors,
     lastSeenVersion: typeof r.lastSeenVersion === 'string' && /^\d+\.\d+\.\d+$/.test(r.lastSeenVersion) ? r.lastSeenVersion : base.lastSeenVersion,
     changesShowSigns: typeof r.changesShowSigns === 'boolean' ? r.changesShowSigns : base.changesShowSigns,
     changesFullFile: typeof r.changesFullFile === 'boolean' ? r.changesFullFile : base.changesFullFile,

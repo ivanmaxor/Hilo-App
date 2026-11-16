@@ -86,6 +86,24 @@ export function Chevron({ open }: { open: boolean }) {
   );
 }
 
+export function FolderIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 14 14" width={size} height={size} aria-hidden="true">
+      <path d="M1.5 3.5A1 1 0 0 1 2.5 2.5h3l1.2 1.5h4.8a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+    </svg>
+  );
+}
+
+/** Hay una nota en la sesión: se lee al pasar el ratón. */
+export function NoteIcon() {
+  return (
+    <svg class="note-mark" viewBox="0 0 14 14" width="12" height="12" aria-label="Tiene una nota" role="img">
+      <path d="M3 1.5h5.5L11 4v8.5H3z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+      <path d="M5 7h4M5 9.5h3" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+    </svg>
+  );
+}
+
 export function PlusIcon({ size = 14 }: { size?: number }) {
   return (
     <svg viewBox="0 0 14 14" width={size} height={size} aria-hidden="true">

@@ -1,4 +1,5 @@
 import type { PlanUsage } from '../shared/usage';
+import { addRecentColor } from '../shared/color';
 import type { ToolCheck } from '../shared/types';
 import { changesPaneId, sessionInPane } from '../shared/paneContent';
 import { MAX_PANES, paneInDirection, presetTree } from '../shared/paneLayout';
@@ -58,7 +59,13 @@ export type Modal =
   | { type: 'setup'; tools: ToolCheck }
   /** Elegir el IDE de un proyecto. Si se venía a abrir algo, se abre después de elegir. */
   | { type: 'ide'; projectId: string; file: string | null; line: number | null }
+  /** Un color fuera de la paleta, para una sesión o un proyecto. */
+  | { type: 'color'; target: ColorTarget }
+  | { type: 'note'; id: string }
+  | { type: 'mark'; id: string }
   | { type: 'confirm'; title: string; body: string; ok: string; danger: boolean; list?: string[]; resolve(ok: boolean): void };
+
+export type ColorTarget = { type: 'session'; id: string } | { type: 'project'; id: string };
 
 export interface MenuState {
   x: number;
@@ -704,7 +711,7 @@ function cycle(delta: number): void {
 export function attentionSessions(): SessionRecord[] {
   const { state } = app.get();
   return allSessions(state)
-    .filter((s) => ['waiting', 'error', 'done'].includes(statusOf(s.id)))
+    .filter((s) => ['waiting', 'error', 'done'].includes(statusOf(s.id)) || s.unread)
     .sort((a, b) => STATUS_PRIORITY[statusOf(a.id)] - STATUS_PRIORITY[statusOf(b.id)]);
 }
 
@@ -766,6 +773,37 @@ export async function openInIde(projectId: string, file: string | null = null, l
   }
   // Lo dice para que no se busque la línea donde no llegó: Visual Studio y Eclipse solo abren el archivo.
   if (line && !result.jumped) toast(`${project.ide.name} abrió el archivo, pero no permite pedirle que vaya a una línea. Es la línea ${line}.`);
+}
+
+/** No leída: terminó y no se ha abierto, o se marcó a mano. */
+export function isUnread(session: SessionRecord): boolean {
+  return statusOf(session.id) === 'done' || !!session.unread;
+}
+
+export async function markRead(id: string): Promise<void> {
+  await dispatch({ type: 'session/unread', id, unread: false });
+  await api.markRead(id).catch(() => undefined);
+}
+
+export async function markUnread(id: string): Promise<void> {
+  await dispatch({ type: 'session/unread', id, unread: true });
+}
+
+/** Pone el color y lo recuerda entre los recientes si no es de la paleta. */
+export async function applyColor(target: ColorTarget, color: string | null): Promise<void> {
+  await dispatch(target.type === 'session' ? { type: 'session/color', id: target.id, color } : { type: 'project/color', id: target.id, color });
+  if (color) rememberColor(color);
+}
+
+export function rememberColor(color: string): void {
+  const { recentColors } = app.get().state.settings;
+  const next = addRecentColor(recentColors, color);
+  if (next.join() !== recentColors.join()) void dispatch({ type: 'settings/set', patch: { recentColors: next } });
+}
+
+export async function openProjectFolder(id: string): Promise<void> {
+  const problem = await api.openProjectFolder(id).catch(() => 'No se pudo abrir la carpeta.');
+  if (problem) toast(problem);
 }
 
 /** Copia el último mensaje de Claude con el nombre de la sesión delante (D26). */

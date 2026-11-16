@@ -25,6 +25,10 @@ export interface HiloApi {
   usageGet(): Promise<PlanUsage | null>;
   /** El último mensaje de Claude con el nombre de la sesión delante, listo para copiar. */
   lastMessage(id: string): Promise<string | null>;
+  /** Quita el verde de "terminó" sin abrir la sesión. */
+  markRead(id: string): Promise<void>;
+  /** Abre la carpeta del proyecto en el Explorador. Devuelve el problema, o '' si se abrió. */
+  openProjectFolder(id: string): Promise<string>;
   onUsage(cb: (usage: PlanUsage) => void): () => void;
   changesList(projectId: string): Promise<ChangesList>;
   changesDiff(projectId: string, request: FileDiffRequest): Promise<FileDiffResult>;

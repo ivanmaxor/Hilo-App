@@ -223,6 +223,17 @@ export function reduce(state: PersistedState, action: Action): PersistedState {
     case 'session/color':
       return mapSession(state, action.id, (s) => ({ ...s, color: action.color }));
 
+    case 'session/mark':
+      return mapSession(state, action.id, ({ mark: _, ...s }) => (action.mark ? { ...s, mark: action.mark } : s));
+
+    case 'session/unread':
+      return mapSession(state, action.id, ({ unread: _, ...s }) => (action.unread ? { ...s, unread: true } : s));
+
+    case 'session/note': {
+      const note = action.note.replace(/\s+$/, '');
+      return mapSession(state, action.id, ({ note: _, ...s }) => (note.trim() ? { ...s, note } : s));
+    }
+
     case 'session/remove': {
       // Se sigue en el mismo proyecto: primero la de abajo, después la de arriba.
       const found = findSession(state, action.id);
@@ -270,6 +281,8 @@ export function reduce(state: PersistedState, action: Action): PersistedState {
     }
 
     case 'ui/select': {
+      // Abrirla es leerla: se quita la marca de no leída.
+      if (action.id && findSession(state, action.id)?.session.unread) state = mapSession(state, action.id, ({ unread: _, ...s }) => s);
       const { ui } = state;
       if (action.id === null) return { ...state, ui: { ...ui, activeSessionId: null } };
       // Si ya está en otro panel, se enfoca ese panel en vez de duplicarla.

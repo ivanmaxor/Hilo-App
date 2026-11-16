@@ -12,6 +12,7 @@ import {
   createShellQuick,
   dispatch,
   displayStatus,
+  isUnread,
   focusActive,
   keysOf,
   newProjectFlow,
@@ -85,7 +86,7 @@ export function Tabs() {
             key={s.id}
             role="tab"
             aria-selected={active}
-            class={`tab${active ? ' active' : ''}${status === 'done' ? ' unread' : ''}${status === 'asleep' ? ' dim' : ''}`}
+            class={`tab${active ? ' active' : ''}${isUnread(s) ? ' unread' : ''}${status === 'asleep' ? ' dim' : ''}`}
             style={{ '--tab-color': s.color ?? project?.color ?? 'transparent' }}
             title={`${s.name}\n${STATUS_LABEL[status]}${subagentsOf(s.id) ? `, ${subagentsLabel(subagentsOf(s.id))}` : ''}`}
             data-tab={s.id}
@@ -116,7 +117,10 @@ export function Tabs() {
                 }}
               />
             ) : (
-              <span class="tab-name">{s.name}</span>
+              <span class="tab-name">
+                {s.mark && <span class="mark">{s.mark}</span>}
+                {s.name}
+              </span>
             )}
             {s.kind === 'shell' && <ShellMark />}
             <button
@@ -259,6 +263,7 @@ function Overlay({ sessionId, name, active }: { sessionId: string; name: string;
   const btn = useRef<HTMLButtonElement>(null);
   const message = runtime[sessionId]?.message;
   const blocking = status === 'error' && !!message;
+  const note = findSession(app.get().state, sessionId)?.session.note;
   useEffect(() => {
     // Un doble clic en la fila puede estar abriendo el campo de renombrar: no se le quita el foco.
     if (active && (status === 'asleep' || blocking) && !view.get().renaming && !view.get().modal) btn.current?.focus();
@@ -273,6 +278,15 @@ function Overlay({ sessionId, name, active }: { sessionId: string; name: string;
         <button ref={btn} class="primary" onClick={() => void wakeSession(sessionId).then(focusActive)}>
           Despertar
         </button>
+        {note && (
+          <div class="overlay-note" data-note={sessionId}>
+            <span class="overlay-note-label">Nota</span>
+            <p>{note}</p>
+            <button class="link" onClick={() => view.set({ modal: { type: 'note', id: sessionId } })}>
+              Editar la nota
+            </button>
+          </div>
+        )}
       </div>
     );
   }

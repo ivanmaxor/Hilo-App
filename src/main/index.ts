@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, screen, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, screen, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
 import { checkTools } from './tools';
 import type { ToolCheck } from '../shared/types';
 import { mkdirSync } from 'node:fs';
@@ -271,7 +271,7 @@ const isCells = (v: unknown): v is number => isInt(v) && v <= 2000;
 
 const ALLOWED_ACTIONS = new Set<Action['type']>([
   'project/add', 'project/rename', 'project/color', 'project/collapse', 'project/remove', 'project/move',
-  'session/add', 'session/rename', 'session/color', 'session/remove', 'session/move',
+  'session/add', 'session/rename', 'session/color', 'session/mark', 'session/unread', 'session/note', 'session/remove', 'session/move',
   'ui/select', 'ui/layout', 'ui/pane', 'ui/paneInsert', 'ui/paneRemove', 'ui/activePane', 'ui/tabClose', 'ui/tree', 'ui/sidebar', 'settings/set',
 ]);
 
@@ -430,6 +430,14 @@ function registerIpc(): void {
 
   handle('usage:get', () => sessions.planUsage());
   handle('session:lastMessage', (id: unknown) => (isStr(id) ? sessions.lastMessage(id) : null));
+  handle('session:markRead', (id: unknown) => (isStr(id) ? sessions.markRead(id) : undefined));
+  // La ruta sale del estado guardado, nunca del renderer.
+  handle('project:openFolder', async (id: unknown) => {
+    const project = projectById(id);
+    if (!project) return 'Ese proyecto ya no está.';
+    const problem = await shell.openPath(project.path);
+    return problem ? `No se pudo abrir ${project.path}: ${problem}` : '';
+  });
   handle('tools:check', () => {
     if (isTest && process.env.HILO_TEST_TOOLS) return JSON.parse(process.env.HILO_TEST_TOOLS) as ToolCheck;
     return checkTools(store.get().settings.claudePath);

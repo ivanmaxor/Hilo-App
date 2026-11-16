@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import {
@@ -41,9 +41,12 @@ test("el uso del plan llega desde la línea de estado y se ve en la barra latera
     await send(page, id, "responde solo OK");
     await waitStatus(page, id, "done", 60_000);
 
-    const file = join(ctx.dataDir, "hooks", "usage.json");
-    await expect.poll(() => existsSync(file), { timeout: 30_000 }).toBe(true);
-    const saved = JSON.parse(readFileSync(file, "utf8"));
+    // Un archivo por sesión de Claude, con el id que Claude le da a la conversación.
+    const hooks = join(ctx.dataDir, "hooks");
+    const usageFile = () =>
+      readdirSync(hooks).find((n) => /^usage-.+\.json$/.test(n));
+    await expect.poll(usageFile, { timeout: 30_000 }).toBeTruthy();
+    const saved = JSON.parse(readFileSync(join(hooks, usageFile()!), "utf8"));
     // Solo el uso: nada de la conversación ni de la carpeta.
     expect(Object.keys(saved).sort()).toEqual(expect.arrayContaining(["at"]));
     for (const key of Object.keys(saved))

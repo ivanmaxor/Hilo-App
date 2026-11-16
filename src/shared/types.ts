@@ -24,6 +24,12 @@ export interface SessionRecord {
   model?: string;
   effort?: string;
   createdAt: number;
+  /** Un emoji o símbolo a elección, delante del nombre. */
+  mark?: string;
+  /** Marcada a mano como no leída: se quita al abrirla. */
+  unread?: boolean;
+  /** Una nota de la persona, que se ve aunque la sesión esté dormida. */
+  note?: string;
 }
 
 /** El IDE de un proyecto. La ruta sale de la detección o del diálogo nativo, nunca del renderer. */
@@ -79,6 +85,8 @@ export interface Settings {
   usageMeter: boolean;
   /** La versión cuyas novedades ya se avisaron (D27). Vacío en una instalación nueva. */
   lastSeenVersion: string;
+  /** Los últimos colores elegidos fuera de la paleta, del más nuevo al más viejo. */
+  recentColors: string[];
   /** En el panel Cambios, los signos + y − además del color. */
   changesShowSigns: boolean;
   /** En el panel Cambios, todo el archivo en vez de solo las zonas cambiadas. */
@@ -162,6 +170,9 @@ export type Action =
   | { type: 'session/add'; projectId: string; session: SessionRecord; index?: number }
   | { type: 'session/rename'; id: string; name: string }
   | { type: 'session/color'; id: string; color: string | null }
+  | { type: 'session/mark'; id: string; mark: string | null }
+  | { type: 'session/unread'; id: string; unread: boolean }
+  | { type: 'session/note'; id: string; note: string }
   | { type: 'session/remove'; id: string }
   | { type: 'session/claudeId'; id: string; claudeId: string }
   | { type: 'session/awake'; id: string; awake: boolean }

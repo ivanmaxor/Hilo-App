@@ -135,8 +135,8 @@ kbd { font: 11px "Segoe UI Variable Text", "Segoe UI", sans-serif; color: var(--
 .count { font-size: 12px; font-weight: 400; color: var(--faint); font-variant-numeric: tabular-nums; }
 .icon-btn { display: inline-grid; place-items: center; width: 24px; height: 24px; color: var(--muted); border-radius: 3px; }
 .icon-btn:hover { background: var(--raised-2); color: var(--text); }
-.project-head .add { width: 20px; height: 20px; opacity: 0; }
-.project-head:hover .add, .project-head .add:focus-visible { opacity: 1; }
+.project-head .add, .project-head .folder { width: 20px; height: 20px; opacity: 0; }
+.project-head:hover .add, .project-head .add:focus-visible, .project-head:hover .folder, .project-head .folder:focus-visible { opacity: 1; }
 .row { position: relative; width: 100%; height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 10px 0 14px; color: var(--muted); cursor: default; text-align: left; }
 .row .name { flex: 1; }
 .row:hover { background: var(--raised); }
@@ -392,6 +392,36 @@ mark { background: none; color: var(--accent); font-weight: 600; }
 .menu-label { padding: 2px 12px; color: var(--faint); font-size: 12px; }
 .menu-swatches { padding: 4px 12px 6px; }
 .menu-swatches .swatches { flex-wrap: nowrap; gap: 3px; }
+.swatch-picker { display: flex; flex-direction: column; gap: 6px; }
+.swatches.recent { min-height: 20px; }
+.menu-swatches .swatches.recent { min-height: 18px; }
+.swatch.more { background: conic-gradient(#e06c75, #e5c07b, #98c379, #56b6c2, #61afef, #c678dd, #e06c75); }
+.menu-marks { display: flex; gap: 1px; padding: 2px 6px 6px; }
+.mark-pick { width: 21px; height: 24px; flex: none; display: grid; place-items: center; border-radius: 4px; font-size: 14px; line-height: 1; }
+.mark-pick:hover, .mark-pick:focus-visible { background: var(--raised-2); outline: none; }
+.mark-pick.on { background: var(--raised-2); box-shadow: inset 0 0 0 1px var(--accent); }
+.mark-pick.more { color: var(--muted); font-size: 13px; }
+.mark-grid { display: grid; grid-template-columns: repeat(auto-fill, 30px); gap: 4px; margin-bottom: 4px; }
+.mark-grid .mark-pick { width: 30px; height: 30px; font-size: 17px; }
+.row .mark { flex: none; font-size: 12px; line-height: 1; max-width: 32px; overflow: hidden; }
+.row .note-mark { flex: none; color: var(--faint); }
+.tab-name .mark { margin-right: 5px; font-size: 12px; }
+.note-input { width: 100%; min-height: 120px; resize: vertical; padding: 8px; background: var(--bg); border: 1px solid var(--field-line); border-radius: 4px; color: var(--text); font: inherit; line-height: 1.45; user-select: text; }
+.note-input:focus { outline: none; border-color: var(--accent); }
+.note-delete { margin-right: auto; color: var(--error); }
+.overlay-note { max-width: 520px; margin-top: 18px; padding: 10px 14px; border-left: 3px solid var(--accent); background: var(--raised); border-radius: 4px; text-align: left; }
+.overlay-note-label { color: var(--faint); font-size: 12px; }
+.overlay-note p { margin: 4px 0 6px; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.color-picker { display: flex; flex-direction: column; gap: 10px; }
+.cp-area { position: relative; height: 150px; border-radius: 4px; cursor: crosshair; touch-action: none; background-image: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent); }
+.cp-hue { position: relative; height: 12px; border-radius: 6px; cursor: ew-resize; touch-action: none; background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
+.cp-thumb { position: absolute; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5); transform: translate(-50%, -50%); pointer-events: none; }
+.cp-row { display: flex; align-items: center; gap: 8px; }
+.cp-preview { width: 30px; height: 30px; flex: none; border-radius: 4px; }
+.cp-hex { width: 90px; height: 30px; padding: 0 8px; background: var(--bg); border: 1px solid var(--field-line); border-radius: 4px; font-variant-numeric: tabular-nums; user-select: text; }
+.cp-hex:focus { outline: none; border-color: var(--accent); }
+.cp-row .primary { margin-left: auto; }
+.cp-hint { margin: 10px 0 0; font-size: 12px; }
 .menu-swatches .swatch { flex: none; width: 18px; height: 18px; }
 .danger-item { color: var(--error); }
 

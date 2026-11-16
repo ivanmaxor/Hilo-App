@@ -7,7 +7,7 @@ import { isValidIdePath } from '../shared/ide';
 import { changesProjectOf, sessionInPane } from '../shared/paneContent';
 import { reduce } from '../shared/reducer';
 import type { Action, PersistedState, ProjectRecord, SessionRecord } from '../shared/types';
-import { isClaudeId, isColor, isPath, isSafeId, isValidEffort, isValidModel, MAX_NAME, sanitizeSettings } from '../shared/validate';
+import { isClaudeId, isColor, isMark, isNote, isPath, isSafeId, isValidEffort, isValidModel, MAX_NAME, sanitizeSettings } from '../shared/validate';
 
 const SAVE_DELAY_MS = 300;
 const RETRIES = 6;
@@ -249,6 +249,9 @@ function sanitizeSession(raw: unknown): SessionRecord | null {
   };
   if (isValidModel(raw.model)) session.model = raw.model;
   if (isValidEffort(raw.effort)) session.effort = raw.effort;
+  if (isMark(raw.mark)) session.mark = raw.mark;
+  if (raw.unread === true) session.unread = true;
+  if (isNote(raw.note) && raw.note.trim()) session.note = raw.note;
   return session;
 }
 

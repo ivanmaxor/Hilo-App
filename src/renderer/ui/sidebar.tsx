@@ -8,6 +8,8 @@ import {
   cancelPendingWake,
   dispatch,
   displayStatus,
+  isUnread,
+  openProjectFolder,
   focusActive,
   newProjectFlow,
   selectSession,
@@ -18,7 +20,7 @@ import {
   view,
   subagentsOf,
 } from '../controller';
-import { Chevron, GearIcon, MoreIcon, PanelIcon, PlusIcon, ShellMark, StatusIcon, SubagentsBadge, subagentsLabel } from './icons';
+import { Chevron, FolderIcon, GearIcon, MoreIcon, NoteIcon, PanelIcon, PlusIcon, ShellMark, StatusIcon, SubagentsBadge, subagentsLabel } from './icons';
 import { UsageMeter } from './usage';
 
 type Drag = { type: 'session'; id: string } | { type: 'project'; id: string } | { type: 'pane'; id: string } | null;
@@ -105,14 +107,15 @@ function SessionRow({ session, project, index, globalIndex }: { session: Session
   const active = state.ui.activeSessionId === session.id;
   const open = state.ui.panes.includes(session.id);
   const renaming = v.renaming === session.id;
+  const unread = isUnread(session);
 
   return (
     <div
-      class={`row${active ? ' active' : ''}${open && !active ? ' open' : ''}${status === 'done' ? ' unread' : ''}${status === 'asleep' ? ' dim' : ''}${drop ? ` drop-${drop}` : ''}`}
+      class={`row${active ? ' active' : ''}${open && !active ? ' open' : ''}${unread ? ' unread' : ''}${status === 'asleep' ? ' dim' : ''}${drop ? ` drop-${drop}` : ''}`}
       style={session.color ? { '--seg': session.color } : undefined}
       data-session={session.id}
       draggable={!renaming}
-      title={`${session.name}\n${STATUS_LABEL[status]}${subagents ? `, ${subagentsLabel(subagents)}` : ''}\n${session.cwd}`}
+      title={`${session.name}\n${STATUS_LABEL[status]}${subagents ? `, ${subagentsLabel(subagents)}` : ''}${session.unread ? ', marcada como no leída' : ''}\n${session.cwd}${session.note ? `\n\nNota: ${session.note}` : ''}`}
       onClick={() => void selectSession(session.id, { delayWake: true })}
       onDblClick={(e) => {
         e.preventDefault();
@@ -149,6 +152,7 @@ function SessionRow({ session, project, index, globalIndex }: { session: Session
       }}
     >
       <StatusIcon status={status} />
+      {session.mark && <span class="mark" aria-hidden="true">{session.mark}</span>}
       {renaming ? (
         <InlineRename
           value={session.name}
@@ -161,14 +165,15 @@ function SessionRow({ session, project, index, globalIndex }: { session: Session
       ) : (
         <span class="name">{session.name}</span>
       )}
+      {session.note && <NoteIcon />}
       {session.kind === 'shell' && <ShellMark />}
       <SubagentsBadge count={subagents} />
-      {status === 'done' && <span class="unread-dot" aria-hidden="true" />}
+      {unread && <span class="unread-dot" aria-hidden="true" />}
       {v.ctrlHeld && globalIndex < 9 && <kbd class="idx">{globalIndex + 1}</kbd>}
       {!renaming && (
         <button
           class="row-more"
-          title="Opciones: dormir, color, mover, cerrar"
+          title="Opciones: leída, nota, marca, color, mover, cerrar"
           aria-label={`Opciones de ${session.name}`}
           onClick={(e) => {
             e.stopPropagation();
@@ -269,6 +274,18 @@ ${project.path}`}
           {live}/{project.sessions.length}
         </span>
         <button
+          class="icon-btn folder"
+          data-action="open-folder"
+          title={`Abrir la carpeta en el Explorador\n${project.path}`}
+          aria-label={`Abrir la carpeta de ${project.name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            void openProjectFolder(project.id);
+          }}
+        >
+          <FolderIcon />
+        </button>
+        <button
           class="icon-btn add"
           title="Nueva sesión en este proyecto"
           aria-label={`Nueva sesión en ${project.name}`}
@@ -333,7 +350,7 @@ function Rail() {
               key={s.id}
               class={`rail-cell${state.ui.activeSessionId === s.id ? ' active' : ''}`}
               data-session={s.id}
-              title={`${s.name}\n${STATUS_LABEL[statusOf(s.id)]}`}
+              title={`${s.mark ? `${s.mark} ` : ''}${s.name}\n${STATUS_LABEL[statusOf(s.id)]}${s.note ? `\n\nNota: ${s.note}` : ''}`}
               aria-label={`${s.name}: ${STATUS_LABEL[statusOf(s.id)]}`}
               onClick={() => void selectSession(s.id)}
               onContextMenu={(e) => {

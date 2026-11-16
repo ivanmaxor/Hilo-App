@@ -178,6 +178,11 @@ export class SessionController {
     if (found) this.events.notify(found.session, status);
   }
 
+  /** "Marcar como leída": el verde se va sin abrirla. */
+  markRead(id: string): void {
+    this.apply(id, { t: 'viewed' });
+  }
+
   /** El verde dura hasta que el usuario abre la sesión, con un segundo de gracia. */
   private scheduleViewed(id: string): void {
     const pending = this.viewTimers.get(id);

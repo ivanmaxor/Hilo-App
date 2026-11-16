@@ -11,6 +11,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.3.4",
+    date: "2026-11-16",
+    items: [
+      "Marcar una sesión como leída o como no leída, con clic derecho. La no leída se queda con su punto hasta que la abras.",
+      "Una marca para cada sesión: un emoji delante del nombre, de una lista o el que quieras.",
+      "Notas en las sesiones: se leen al pasar el ratón y en el panel de una sesión dormida.",
+      "Cualquier color para sesiones y proyectos, con los últimos que elegiste a mano y un botón para copiar el código.",
+      "Un botón en cada proyecto para abrir su carpeta en el Explorador.",
+      "El uso del plan ya no vuelve a un dato viejo: con varias sesiones abiertas gana el más reciente, también después de una restauración del plan.",
+    ],
+  },
+  {
     version: "1.3.3",
     date: "2026-11-09",
     items: [

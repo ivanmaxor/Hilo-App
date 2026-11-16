@@ -34,8 +34,15 @@ import {
   useStore,
   view,
   wakeSession,
+  applyColor,
+  isUnread,
+  markRead,
+  markUnread,
+  openProjectFolder,
+  rememberColor,
 } from '../controller';
 import { CloseIcon, StatusIcon } from './icons';
+import { ColorDialog, ColorPicker, MarkDialog, NoteDialog, QUICK_MARKS } from './extras';
 
 const EFFORT_LABEL: Record<string, string> = {
   low: 'Bajo (low)',
@@ -45,12 +52,12 @@ const EFFORT_LABEL: Record<string, string> = {
   max: 'Máximo (max)',
 };
 
-function closeModal(): void {
+export function closeModal(): void {
   view.set({ modal: null });
   focusActive();
 }
 
-function Backdrop({ children, onClose, labelledBy }: { children: ComponentChildren; onClose(): void; labelledBy: string }) {
+export function Backdrop({ children, onClose, labelledBy }: { children: ComponentChildren; onClose(): void; labelledBy: string }) {
   const dialog = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -107,23 +114,61 @@ function Backdrop({ children, onClose, labelledBy }: { children: ComponentChildr
   );
 }
 
-export function Swatches({ value, onPick }: { value: string | null; onPick(color: string | null): void }) {
+/**
+ * La paleta, los últimos colores elegidos fuera de ella y "Más colores". Con `onMore`, "Más colores" lo
+ * resuelve quien llama (un menú abre un diálogo); sin él, el selector se abre aquí mismo.
+ */
+export function Swatches({ value, onPick, onMore }: { value: string | null; onPick(color: string | null): void; onMore?(): void }) {
+  const { state } = useStore(app);
+  const [open, setOpen] = useState(false);
+  const current = value?.toLowerCase() ?? null;
+  const inPalette = PALETTE.some((p) => p.hex.toLowerCase() === current);
+  const recent = state.settings.recentColors;
+  // El color que tiene ahora, aunque ya no esté entre los recientes.
+  const extra = current && !inPalette && !recent.includes(current) ? [current, ...recent].slice(0, recent.length + 1) : recent;
+  const pick = (color: string | null) => {
+    if (color) rememberColor(color);
+    onPick(color);
+  };
+  const swatch = (hex: string, label: string, key: string) => (
+    <button
+      type="button"
+      key={key}
+      class={`swatch${current === hex.toLowerCase() ? ' on' : ''}`}
+      role="radio"
+      aria-checked={current === hex.toLowerCase()}
+      title={label}
+      aria-label={label}
+      style={{ background: hex }}
+      onClick={() => pick(hex)}
+    />
+  );
   return (
-    <div class="swatches" role="radiogroup" aria-label="Color">
-      <button type="button" class={`swatch none${value === null ? ' on' : ''}`} role="radio" aria-checked={value === null} title="Sin color" onClick={() => onPick(null)} />
-      {PALETTE.map((p) => (
+    <div class="swatch-picker">
+      <div class="swatches" role="radiogroup" aria-label="Color">
+        <button type="button" class={`swatch none${value === null ? ' on' : ''}`} role="radio" aria-checked={value === null} title="Sin color" onClick={() => onPick(null)} />
+        {PALETTE.map((p) => swatch(p.hex, p.label, p.id))}
+      </div>
+      <div class="swatches recent" role="radiogroup" aria-label="Colores recientes">
+        {extra.map((hex) => swatch(hex, `Reciente: ${hex}`, hex))}
         <button
           type="button"
-          key={p.id}
-          class={`swatch${value === p.hex ? ' on' : ''}`}
-          role="radio"
-          aria-checked={value === p.hex}
-          title={p.label}
-          aria-label={p.label}
-          style={{ background: p.hex }}
-          onClick={() => onPick(p.hex)}
+          class={`swatch more${open ? ' on' : ''}`}
+          data-action="more-colors"
+          title="Más colores: cualquiera, o pegar un código"
+          aria-label="Más colores"
+          onClick={() => (onMore ? onMore() : setOpen(!open))}
         />
-      ))}
+      </div>
+      {open && !onMore && (
+        <ColorPicker
+          initial={value}
+          onUse={(color) => {
+            setOpen(false);
+            pick(color);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1026,6 +1071,12 @@ export function Modals() {
       return <IdeDialog modal={m} />;
     case 'settings':
       return <SettingsDialog modal={m} />;
+    case 'color':
+      return <ColorDialog modal={m} />;
+    case 'note':
+      return <NoteDialog modal={m} />;
+    case 'mark':
+      return <MarkDialog modal={m} />;
   }
 }
 
@@ -1101,6 +1152,18 @@ export function ContextMenu() {
             Copiar el último mensaje <kbd>{keysOf('copyLastMessage')}</kbd>
           </button>
         )}
+        {isUnread(session) ? (
+          <button role="menuitem" data-action="mark-read" onClick={() => { close(); void markRead(session.id); }}>
+            Marcar como leída
+          </button>
+        ) : (
+          <button role="menuitem" data-action="mark-unread" onClick={() => { close(); void markUnread(session.id); }}>
+            Marcar como no leída
+          </button>
+        )}
+        <button role="menuitem" data-action="note" onClick={() => view.set({ menu: null, modal: { type: 'note', id: session.id } })}>
+          {session.note ? 'Editar la nota…' : 'Dejar una nota…'}
+        </button>
         {status === 'asleep' ? (
           <button role="menuitem" onClick={() => { close(); void wakeSession(session.id); }}>
             Despertar <kbd>{keysOf('toggleSleep')}</kbd>
@@ -1139,9 +1202,24 @@ export function ContextMenu() {
           </button>
         )}
         <div class="menu-sep" />
+        <div class="menu-label">Marca</div>
+        <div class="menu-marks" role="group" aria-label="Marca">
+          {QUICK_MARKS.map((mark) => (
+            <button key={mark} class={`mark-pick${session.mark === mark ? ' on' : ''}`} title={session.mark === mark ? 'Quitar la marca' : undefined} onClick={() => { close(); void dispatch({ type: 'session/mark', id: session.id, mark: session.mark === mark ? null : mark }); }}>
+              {mark}
+            </button>
+          ))}
+          <button class="mark-pick more" title="Más marcas, o una propia" aria-label="Más marcas" onClick={() => view.set({ menu: null, modal: { type: 'mark', id: session.id } })}>
+            …
+          </button>
+        </div>
         <div class="menu-label">Color</div>
         <div class="menu-swatches">
-          <Swatches value={session.color} onPick={(color) => { close(); void dispatch({ type: 'session/color', id: session.id, color }); }} />
+          <Swatches
+            value={session.color}
+            onPick={(color) => { close(); void applyColor({ type: 'session', id: session.id }, color); }}
+            onMore={() => view.set({ menu: null, modal: { type: 'color', target: { type: 'session', id: session.id } } })}
+          />
         </div>
         {state.projects.length > 1 && (
           <>
@@ -1186,6 +1264,9 @@ export function ContextMenu() {
       <button role="menuitem" data-action="menu-changes" onClick={() => { close(); void toggleChanges(project.id); }}>
         {state.ui.panes.includes(changesPaneId(project.id)) ? 'Quitar los cambios' : 'Ver los cambios'} <kbd>{keysOf('toggleChanges')}</kbd>
       </button>
+      <button role="menuitem" data-action="menu-folder" onClick={() => { close(); void openProjectFolder(project.id); }}>
+        Abrir la carpeta
+      </button>
       <button role="menuitem" data-action="menu-ide" onClick={() => { view.set({ menu: null }); void openInIde(project.id); }}>
         {project.ide ? `Abrir en ${project.ide.name}` : 'Abrir en un IDE…'}
       </button>
@@ -1197,7 +1278,11 @@ export function ContextMenu() {
       <div class="menu-sep" />
       <div class="menu-label">Color</div>
       <div class="menu-swatches">
-        <Swatches value={project.color} onPick={(color) => { close(); void dispatch({ type: 'project/color', id: project.id, color }); }} />
+        <Swatches
+          value={project.color}
+          onPick={(color) => { close(); void applyColor({ type: 'project', id: project.id }, color); }}
+          onMore={() => view.set({ menu: null, modal: { type: 'color', target: { type: 'project', id: project.id } } })}
+        />
       </div>
       <div class="menu-sep" />
       <button

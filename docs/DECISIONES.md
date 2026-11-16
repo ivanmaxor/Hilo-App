@@ -288,3 +288,20 @@ Es un archivo interno de Claude Code, sin contrato. Si cambia su formato, el bot
 Pedido del dueño, para que quien use Hilo vea qué trae cada versión. Van en `src/shared/changelog.ts`, dentro de la app: bajarlas de GitHub sería otra conexión. Se ven en Ajustes > Novedades, y después de actualizar sale una vez un aviso con "Ver novedades" (`settings.lastSeenVersion`). Una instalación nueva no lo muestra.
 
 Una prueba unitaria falla si la versión de `package.json` no tiene su entrada, así que no se puede publicar una versión sin escribirlas. Las notas de cada versión en GitHub salen de la misma lista.
+
+## D28. Marcas, notas, no leída y colores propios
+
+Pedido del dueño, que tiene muchas sesiones dormidas y quiere distinguir cuáles revisar.
+
+- **No leída a mano** es `unread` en la sesión guardada, aparte del `done` del proceso: tiene que valer también en una sesión dormida, que no tiene estado propio. Se quita al abrirla (`ui/select`), y cuenta en **Te necesitan**. "Marcar como leída" además manda `viewed` a la máquina de estados, para quitar el verde de `done`.
+- **Marca** (`mark`): texto corto, hasta 16 caracteres sin controles, normalmente un emoji. **Nota** (`note`): hasta 4000 caracteres. Las dos se validan al llegar del renderer y al leer `state.json`.
+- **Colores**: `#rrggbb` cualquiera, que ya aceptaba el estado. El selector está hecho en la app (tono, saturación y brillo), no es el de Windows. `settings.recentColors` guarda los 6 últimos elegidos fuera de la paleta.
+- **Abrir la carpeta**: `shell.openPath` con la ruta del proyecto guardado; el renderer solo manda el id.
+
+## D29. El uso del plan, por sesión de Claude
+
+Cada proceso de Claude sabe el uso de su última respuesta y lo repite en cada refresco de la línea de estado. Con un solo `usage.json` ganaba el último que escribía, así que una sesión quieta volvía a poner un dato viejo, como el 100 % de antes de una restauración del plan.
+
+Ahora `usage.ps1` escribe `usage-<sesión>.json` y anota en cada ventana (`five_hour`, `seven_day`) cuándo cambió su valor (`changed`), y solo reescribe si algo cambió. Hilo junta los archivos con `mergeUsage`: por ventana gana una vigente, y entre ellas la que cambió más tarde. La línea de estado de cada sesión muestra lo mismo. Los temporales de un refresco cortado se borran al abrir, y los archivos de más de 8 días también.
+
+Claude Code tiene también un límite semanal por modelo (`model_scoped`, como Fable), pero no se lo da a la línea de estado: Hilo no lo puede mostrar sin leer el token.

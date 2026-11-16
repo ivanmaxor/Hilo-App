@@ -1,3 +1,5 @@
+import { addRecentColor, hexToHsv, hsvToHex, normalizeHex } from '../../src/shared/color';
+import { mergeUsage, parseUsage } from '../../src/shared/usage';
 import { CHANGELOG } from '../../src/shared/changelog';
 import { formatCopiedMessage, lastAssistantText } from '../../src/shared/lastMessage';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -521,5 +523,69 @@ describe('novedades', () => {
     const keys = CHANGELOG.map((e) => key(e.version));
     expect([...keys].sort().reverse()).toEqual(keys);
     for (const e of CHANGELOG) expect(e.items.length).toBeGreaterThan(0);
+  });
+});
+
+describe('marca, nota y no leída', () => {
+  it('se ponen y se quitan, y abrir la sesión la da por leída', () => {
+    let s = stateWith([project('p', [session('a'), session('b')])]);
+    s = reduce(s, { type: 'session/mark', id: 'a', mark: '🔥' });
+    s = reduce(s, { type: 'session/note', id: 'a', note: 'revisar el login  \n' });
+    s = reduce(s, { type: 'session/unread', id: 'a', unread: true });
+    expect(findSession(s, 'a')!.session).toMatchObject({ mark: '🔥', note: 'revisar el login', unread: true });
+    s = reduce(s, { type: 'ui/select', id: 'a' });
+    expect(findSession(s, 'a')!.session.unread).toBeUndefined();
+    s = reduce(s, { type: 'session/mark', id: 'a', mark: null });
+    s = reduce(s, { type: 'session/note', id: 'a', note: '   ' });
+    expect(Object.keys(findSession(s, 'a')!.session)).not.toEqual(expect.arrayContaining(['mark']));
+    expect(findSession(s, 'a')!.session.note).toBeUndefined();
+  });
+
+  it('valida lo que llega del renderer y lo guardado', () => {
+    expect(isValidAction({ type: 'session/mark', id: 'a', mark: '⭐' })).toBe(true);
+    expect(isValidAction({ type: 'session/mark', id: 'a', mark: ' x' })).toBe(false);
+    expect(isValidAction({ type: 'session/mark', id: 'a', mark: 'a\u0007' })).toBe(false);
+    expect(isValidAction({ type: 'session/note', id: 'a', note: 'x'.repeat(5000) })).toBe(false);
+    const loaded = sanitize({ projects: [{ id: 'p', name: 'P', path: 'C:\p', sessions: [{ id: 'a', claudeId: 'a', cwd: 'C:\p', mark: 123, note: 'hola', unread: 'sí' }] }] });
+    expect(loaded.projects[0]!.sessions[0]).toMatchObject({ note: 'hola' });
+    expect(loaded.projects[0]!.sessions[0]!.mark).toBeUndefined();
+    expect(loaded.projects[0]!.sessions[0]!.unread).toBeUndefined();
+    expect(sanitizeSettings({ recentColors: ['#AABBCC', 'rojo', '#aabbcc', '#123456'] }).recentColors).toEqual(['#aabbcc', '#123456']);
+  });
+});
+
+describe('colores', () => {
+  it('convierte y recuerda los recientes sin repetir ni guardar los de la paleta', () => {
+    expect(normalizeHex('ABC')).toBe('#aabbcc');
+    expect(normalizeHex('#12345g')).toBeNull();
+    for (const hex of ['#ff0000', '#6f9bd1', '#000000', '#ffffff', '#3a7f22']) expect(hsvToHex(hexToHsv(hex))).toBe(hex);
+    let recent: string[] = [];
+    recent = addRecentColor(recent, '#111111');
+    recent = addRecentColor(recent, '#6F9BD1');
+    recent = addRecentColor(recent, '#222222');
+    recent = addRecentColor(recent, '#111111');
+    expect(recent).toEqual(['#111111', '#222222']);
+    for (let i = 0; i < 10; i++) recent = addRecentColor(recent, `#00000${i}`.slice(0, 7));
+    expect(recent).toHaveLength(6);
+  });
+});
+
+describe('uso del plan entre varias sesiones', () => {
+  const now = 1_800_000_000_000;
+  const reading = (used: number, resetsAt: number, changed: number) => ({ used, resetsAt, changed });
+  it('gana el dato que cambió más tarde, no el que se escribió al último', () => {
+    // Una sesión quieta sigue diciendo 100 % después de una restauración; la que respondió dice 3 %.
+    const quieta = { at: now - 1000, week: reading(100, now + 86_400_000, now - 3_600_000) };
+    const nueva = { at: now - 5000, week: reading(3, now + 86_400_000, now - 60_000), session: reading(2, now + 3_600_000, now - 60_000) };
+    expect(mergeUsage([quieta, nueva], now)).toMatchObject({ week: { used: 3 }, session: { used: 2 } });
+    expect(mergeUsage([nueva, quieta], now)).toMatchObject({ week: { used: 3 } });
+  });
+  it('una ventana vigente gana a una vencida, y lee los archivos de cada sesión', () => {
+    const vencida = { at: 0, session: reading(90, now - 1000, now - 500) };
+    const vigente = { at: 0, session: reading(10, now + 1000, now - 9_000_000) };
+    expect(mergeUsage([vencida, vigente], now)!.session!.used).toBe(10);
+    const parsed = parseUsage('{"at":1,"five_hour":{"used":40,"resets_at":1800003600,"changed":1799999000}}');
+    expect(parsed).toEqual({ at: 1_799_999_000_000, session: { used: 40, resetsAt: 1_800_003_600_000, changed: 1_799_999_000_000 } });
+    expect(parseUsage('{"at":5,"seven_day":{"used":1,"resets_at":1800003600}}')!.week!.changed).toBe(0);
   });
 });

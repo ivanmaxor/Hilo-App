@@ -35,7 +35,7 @@ El verde se queda hasta que abres esa sesión.
 
 ## Uso de tu plan
 
-Abajo en la barra lateral está cuánto llevas usado de la sesión de 5 horas y de la semana, y cuándo se renueva cada una: verde si te queda más de la mitad, amarillo desde el 50 % usado y rojo desde el 80 %. Claude da el dato al responder, así que aparece después de la primera respuesta y se actualiza con cada una. Solo funciona con planes Pro, Max o Ultra.
+Abajo en la barra lateral está cuánto llevas usado de la sesión de 5 horas y de la semana, y cuándo se renueva cada una: verde si te queda más de la mitad, amarillo desde el 50 % usado y rojo desde el 80 %. Claude da el dato al responder, así que aparece después de la primera respuesta y se actualiza con cada una. Con varias sesiones abiertas se muestra el dato más reciente: una sesión que lleva rato quieta no lo pisa con lo que vio antes, por ejemplo, de una restauración del plan. Solo funciona con planes Pro, Max o Ultra.
 
 Lo mismo sale abajo en cada sesión de Claude, en lugar de tu línea de estado. Si prefieres la tuya, apágalo en Ajustes, sección Claude Code. El bloque **Te necesitan**, abajo en la barra lateral, junta todo lo que requiere atención, ordenado por urgencia.
 
@@ -92,6 +92,11 @@ No chocan con los de Claude Code ni con PowerShell. Todos se pueden cambiar en A
 
 - Doble clic o F2 para renombrar, en la barra o en la pestaña.
 - Clic derecho en una sesión o un proyecto: color, mover, dormir, cerrar.
+- Clic derecho en una sesión, **Marcar como no leída**: queda con su punto y en **Te necesitan** hasta que la abras. **Marcar como leída** quita el verde de "terminó" sin abrirla.
+- **Marca**: un emoji delante del nombre, para distinguir las sesiones a tu manera. En **…** hay más, o escribe el que quieras (Win + . abre los emojis de Windows).
+- **Dejar una nota**: se lee al pasar el ratón por la sesión y en su panel mientras está dormida. Ctrl+Enter guarda.
+- **Color**: además de la paleta, el círculo de colores abre un selector con cualquier color, un campo para pegar un código como `#ff8800` y un botón para copiarlo. Los últimos 6 que elegiste a mano quedan a la vista para otras sesiones.
+- El ícono de carpeta en la cabecera de un proyecto, o clic derecho, **Abrir la carpeta**, la abre en el Explorador.
 - Arrastra para reordenar sesiones y proyectos, o suelta una sesión sobre otro proyecto para moverla.
 - Al dividir, cada panel nuevo te deja elegir qué mostrar. Nada se abre solo.
 - Arrastra una sesión desde la barra, una pestaña o la cabecera de un panel. Sobre el centro de un panel la reemplaza; cerca de un borde aparece un círculo con un más y la suma de ese lado, hasta 4 paneles.
