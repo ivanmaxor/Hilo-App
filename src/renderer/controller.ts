@@ -784,12 +784,13 @@ setInterval(() => clock.set({ now: Date.now() }), 60_000);
 const STALE_STEPS = [3_600_000, 5 * 3_600_000, 24 * 3_600_000];
 
 /**
- * 0 a 3: cuánto hace del último mensaje de una sesión de Claude quieta. 1 h amarillo, 5 h naranja,
- * 1 día rojo (D30). Si trabaja, te espera o terminó, ya se ve por su estado.
+ * 0 a 3: cuánto hace del último mensaje de una sesión de Claude abierta y quieta. 1 h amarillo, 5 h
+ * naranja, 1 día rojo (D30). Si trabaja, te espera o terminó, ya se ve por su estado, y una dormida no se colorea.
  */
 export function staleLevel(session: SessionRecord, now = clock.get().now): number {
   if (session.kind !== 'claude' || !app.get().state.settings.staleMarks) return 0;
-  if (!['idle', 'asleep', 'exited'].includes(statusOf(session.id))) return 0;
+  // Solo las abiertas y quietas: una dormida ya no se está trabajando.
+  if (statusOf(session.id) !== 'idle') return 0;
   const age = now - (session.lastActiveAt ?? session.createdAt);
   return STALE_STEPS.filter((step) => age >= step).length;
 }

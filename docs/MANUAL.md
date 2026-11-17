@@ -98,7 +98,7 @@ No chocan con los de Claude Code ni con PowerShell. Todos se pueden cambiar en A
 - **Color**: además de la paleta, el círculo de colores abre un selector con cualquier color, un campo para pegar un código como `#ff8800` y un botón para copiarlo. Los últimos 6 que elegiste a mano quedan a la vista para otras sesiones.
 - Al crear una sesión, **Carpeta** > **Elegir otra…** la deja trabajando en otra carpeta sin salir del proyecto. Después no se cambia: Claude guarda la conversación por carpeta y la retoma ahí.
 - Si abres `claude` dentro de una PowerShell de Hilo, esa misma fila pasa a ser una sesión de Claude, en la carpeta donde lo abriste (también después de un `cd`) y en el mismo proyecto. Al despertarla otro día, retoma esa conversación.
-- Una sesión de Claude quieta cambia de color según su último mensaje, tuyo o de Claude: amarillo a la hora, naranja a las 5 horas y rojo al día. Al pasar el ratón dice cuánto hace. Se apaga en Ajustes > Sesiones.
+- Una sesión de Claude abierta y quieta cambia de color según su último mensaje, tuyo o de Claude: amarillo a la hora, naranja a las 5 horas y rojo al día. Al pasar el ratón dice cuánto hace. Las dormidas no cambian: ya no se están trabajando. Se apaga en Ajustes > Sesiones.
 - El ícono de carpeta en la cabecera de un proyecto, o clic derecho, **Abrir la carpeta**, la abre en el Explorador.
 - Arrastra para reordenar sesiones y proyectos, o suelta una sesión sobre otro proyecto para moverla.
 - Al dividir, cada panel nuevo te deja elegir qué mostrar. Nada se abre solo.

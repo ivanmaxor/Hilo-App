@@ -905,7 +905,7 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
               </label>
               <label class="check">
                 <input type="checkbox" data-field="stale-marks" checked={s.staleMarks} onChange={(e) => set({ staleMarks: e.currentTarget.checked })} />
-                Colorear las sesiones de Claude sin mensajes: amarillo a la hora, naranja a las 5 horas y rojo al día
+                Colorear las sesiones de Claude abiertas sin mensajes: amarillo a la hora, naranja a las 5 horas y rojo al día
               </label>
             </section>
 

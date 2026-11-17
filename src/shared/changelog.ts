@@ -11,6 +11,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.3.6",
+    date: "2026-11-17",
+    items: [
+      "El color por tiempo sin mensajes ahora es solo para las sesiones abiertas. Las dormidas, con la luna, se quedan grises.",
+    ],
+  },
+  {
     version: "1.3.5",
     date: "2026-11-17",
     items: [
