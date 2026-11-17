@@ -21,6 +21,11 @@ With more than a couple of Claude Code sessions, tabs stop being enough: you can
 - **Status at a glance.** Every session shows whether it's working, finished and unseen, waiting for you, or dead. A "needs you" list gathers what requires attention.
 - **Sessions that survive.** Close Hilo or shut down your PC, and your sessions come back with their conversation, using `claude --resume`.
 - **Sleeping sessions.** Put a session to sleep to close its process and free its memory. One click brings it back.
+- **Your plan's usage.** How much of the 5-hour session and the week you've used, and when each one resets, in green, yellow or red. It comes from Claude Code's status line, not from your token.
+- **Copy the last reply.** One button (or Ctrl+Shift+L) copies Claude's last message with the session name in front, ready to paste into another session.
+- **Organize your way.** Mark sessions as read or unread, put an emoji in front of their name, leave notes you can read while they sleep, and use any color, with your recent ones at hand.
+- **Spot what you left behind.** An open Claude session changes color the longer it goes without a message: yellow after an hour, orange after 5 hours, red after a day.
+- **Folders and projects.** A session can work in a different folder than its project. Start `claude` inside a PowerShell session and that same session becomes a Claude session, in the folder you were in.
 - **Real terminals.** xterm.js on top of ConPTY, so Claude Code behaves as it does in your usual terminal. PowerShell sessions work too.
 - **Splits.** Up to four panes, vertical or horizontal. Drag a session to a pane's edge to add it there.
 - **Changes panel.** See which files differ from the last commit, with new lines in green and removed lines in red. It's read-only.
@@ -59,6 +64,8 @@ The released installers are built on the author's PC, so reading this code tells
 - There's no telemetry or analytics, and no remote fonts or scripts. The interface itself has no network access.
 - Hilo never reads your Claude token or credentials, and doesn't change your global Claude Code configuration. Its status hooks only reach the sessions it opens, through `claude --settings`.
 - Claude Code connects to Anthropic on its own inside each session, as it would in any terminal.
+- What Hilo does read, and why: the plan usage Claude Code passes to its status line (only `rate_limits` is saved); the end of a conversation file, only when you press "Copy reply"; and Claude's own `~/.claude/sessions/<pid>.json`, for a session's status and folder.
+- Don't take this list on trust: the whole code is here. Clone the repo and ask your own Claude Code to review it, starting with `src/main/`.
 
 Without a signature, an update is only checked against the SHA-512 published on GitHub, over HTTPS. That catches a damaged download, not someone taking over this GitHub account.
 
