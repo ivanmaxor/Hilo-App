@@ -1,5 +1,5 @@
 import { open } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import type { SessionRecord } from '../shared/types';
@@ -27,6 +27,15 @@ export function claudeConfigDir(): string {
 function transcriptPath(cwd: string, claudeId: string): string {
   const slug = cwd.replace(/[^a-zA-Z0-9]/g, '-');
   return join(claudeConfigDir(), 'projects', slug, `${claudeId}.jsonl`);
+}
+
+/** Cuándo se escribió por última vez la conversación: el último mensaje. null si no existe. */
+export function transcriptMtime(cwd: string, claudeId: string): number | null {
+  try {
+    return statSync(transcriptPath(cwd, claudeId)).mtimeMs;
+  } catch {
+    return null;
+  }
 }
 
 /** Solo comprueba si existe. */

@@ -13,6 +13,7 @@ import {
   dispatch,
   displayStatus,
   isUnread,
+  staleClass,
   focusActive,
   keysOf,
   newProjectFlow,
@@ -86,7 +87,7 @@ export function Tabs() {
             key={s.id}
             role="tab"
             aria-selected={active}
-            class={`tab${active ? ' active' : ''}${isUnread(s) ? ' unread' : ''}${status === 'asleep' ? ' dim' : ''}`}
+            class={`tab${active ? ' active' : ''}${isUnread(s) ? ' unread' : ''}${staleClass(s)}${status === 'asleep' ? ' dim' : ''}`}
             style={{ '--tab-color': s.color ?? project?.color ?? 'transparent' }}
             title={`${s.name}\n${STATUS_LABEL[status]}${subagentsOf(s.id) ? `, ${subagentsLabel(subagentsOf(s.id))}` : ''}`}
             data-tab={s.id}

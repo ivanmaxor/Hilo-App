@@ -84,6 +84,13 @@ kbd { font: 11px "Segoe UI Variable Text", "Segoe UI", sans-serif; color: var(--
 .st-error { color: var(--error); }
 .st-asleep { color: var(--asleep); }
 .st-exited { color: var(--faint); }
+/* Sin mensajes desde hace 1 h, 5 h y 1 día (D30). */
+.stale-1 .st { color: #d6b85a; }
+.stale-2 .st { color: #e08b45; }
+.stale-3 .st { color: #e2665e; }
+[data-theme="light"] .stale-1 .st { color: #a8861c; }
+[data-theme="light"] .stale-2 .st { color: #b85f17; }
+[data-theme="light"] .stale-3 .st { color: #b33a32; }
 .st-cut { stroke: var(--cut); fill: none; }
 .st-half { transform-origin: 8px 8px; }
 .icon-tick .st-half { transform: rotate(180deg); }
@@ -422,6 +429,7 @@ mark { background: none; color: var(--accent); font-weight: 600; }
 .cp-hex:focus { outline: none; border-color: var(--accent); }
 .cp-row .primary { margin-left: auto; }
 .cp-hint { margin: 10px 0 0; font-size: 12px; }
+.session-cwd { flex: 1; min-width: 0; align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
 .menu-swatches .swatch { flex: none; width: 18px; height: 18px; }
 .danger-item { color: var(--error); }
 

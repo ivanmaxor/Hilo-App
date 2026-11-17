@@ -654,6 +654,8 @@ export interface NewSessionInput {
   color: string | null;
   model?: string;
   effort?: string;
+  /** Otra carpeta que la del proyecto. */
+  cwd?: string;
 }
 
 export async function createSession(input: NewSessionInput): Promise<void> {
@@ -666,7 +668,7 @@ export async function createSession(input: NewSessionInput): Promise<void> {
     kind: input.kind,
     name: input.name,
     color: input.color,
-    cwd: project.path,
+    cwd: input.cwd ?? project.path,
     createdAt: Date.now(),
   };
   if (input.model) session.model = input.model;
@@ -773,6 +775,28 @@ export async function openInIde(projectId: string, file: string | null = null, l
   }
   // Lo dice para que no se busque la línea donde no llegó: Visual Studio y Eclipse solo abren el archivo.
   if (line && !result.jumped) toast(`${project.ide.name} abrió el archivo, pero no permite pedirle que vaya a una línea. Es la línea ${line}.`);
+}
+
+/** La hora, una vez por minuto: para lo que cambia con el tiempo, como las sesiones sin mensajes. */
+export const clock = createStore({ now: Date.now() });
+setInterval(() => clock.set({ now: Date.now() }), 60_000);
+
+const STALE_STEPS = [3_600_000, 5 * 3_600_000, 24 * 3_600_000];
+
+/**
+ * 0 a 3: cuánto hace del último mensaje de una sesión de Claude quieta. 1 h amarillo, 5 h naranja,
+ * 1 día rojo (D30). Si trabaja, te espera o terminó, ya se ve por su estado.
+ */
+export function staleLevel(session: SessionRecord, now = clock.get().now): number {
+  if (session.kind !== 'claude' || !app.get().state.settings.staleMarks) return 0;
+  if (!['idle', 'asleep', 'exited'].includes(statusOf(session.id))) return 0;
+  const age = now - (session.lastActiveAt ?? session.createdAt);
+  return STALE_STEPS.filter((step) => age >= step).length;
+}
+
+export function staleClass(session: SessionRecord): string {
+  const level = staleLevel(session);
+  return level ? ` stale-${level}` : '';
 }
 
 /** No leída: terminó y no se ha abierto, o se marcó a mano. */

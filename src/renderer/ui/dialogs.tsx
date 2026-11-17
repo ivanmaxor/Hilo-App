@@ -184,6 +184,8 @@ function NewSessionDialog({ modal }: { modal: Extract<Modal, { type: 'newSession
   const [color, setColor] = useState<string | null>(null);
   const [model, setModel] = useState('');
   const [effort, setEffort] = useState('');
+  /** null: la del proyecto. */
+  const [cwd, setCwd] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -193,6 +195,7 @@ function NewSessionDialog({ modal }: { modal: Extract<Modal, { type: 'newSession
   useEffect(() => {
     if (!touched.current) setName(defaultSessionName(project, kind));
   }, [projectId, kind]);
+  useEffect(() => setCwd(null), [projectId]);
 
   const submit = (e: Event) => {
     e.preventDefault();
@@ -200,6 +203,7 @@ function NewSessionDialog({ modal }: { modal: Extract<Modal, { type: 'newSession
     const input: Parameters<typeof createSession>[0] = { projectId: project.id, kind, name: name.trim() || defaultSessionName(project, kind), color };
     if (kind === 'claude' && model.trim()) input.model = model.trim();
     if (kind === 'claude' && effort) input.effort = effort;
+    if (cwd) input.cwd = cwd;
     view.set({ modal: null });
     void createSession(input);
   };
@@ -234,11 +238,27 @@ function NewSessionDialog({ modal }: { modal: Extract<Modal, { type: 'newSession
                 })
               }
             >
-              Otra carpeta
+              Nuevo proyecto…
             </button>
           </div>
-          {project && <small class="path">{project.path}</small>}
         </label>
+        <div class="field">
+          <span>Carpeta</span>
+          <div class="field-row">
+            <small class="path session-cwd" data-field="cwd" title={cwd ?? project?.path}>
+              {cwd ?? project?.path ?? ''}
+            </small>
+            <button type="button" data-action="pick-cwd" onClick={() => void api.pickFolder().then((p) => p && setCwd(p))}>
+              Elegir otra…
+            </button>
+            {cwd && (
+              <button type="button" onClick={() => setCwd(null)}>
+                La del proyecto
+              </button>
+            )}
+          </div>
+          <small>Puede ser otra carpeta y seguir en este proyecto. Claude guarda la conversación por carpeta, así que no se cambia después.</small>
+        </div>
         <label class="field">
           <span>Nombre</span>
           <input
@@ -882,6 +902,10 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
               <label class="check">
                 <input type="checkbox" data-field="notifications" checked={s.notifications} onChange={(e) => set({ notifications: e.currentTarget.checked })} />
                 Avisar con una notificación de Windows si una sesión termina o me espera mientras no la miro
+              </label>
+              <label class="check">
+                <input type="checkbox" data-field="stale-marks" checked={s.staleMarks} onChange={(e) => set({ staleMarks: e.currentTarget.checked })} />
+                Colorear las sesiones de Claude sin mensajes: amarillo a la hora, naranja a las 5 horas y rojo al día
               </label>
             </section>
 

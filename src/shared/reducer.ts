@@ -229,6 +229,13 @@ export function reduce(state: PersistedState, action: Action): PersistedState {
     case 'session/unread':
       return mapSession(state, action.id, ({ unread: _, ...s }) => (action.unread ? { ...s, unread: true } : s));
 
+    case 'session/adopt':
+      // Una PowerShell donde se abrió Claude: la misma fila pasa a ser esa sesión de Claude, en su carpeta.
+      return mapSession(state, action.id, (s) => ({ ...s, kind: 'claude', claudeId: action.claudeId, cwd: action.cwd }));
+
+    case 'session/active':
+      return mapSession(state, action.id, (s) => (action.at > (s.lastActiveAt ?? 0) ? { ...s, lastActiveAt: action.at } : s));
+
     case 'session/note': {
       const note = action.note.replace(/\s+$/, '');
       return mapSession(state, action.id, ({ note: _, ...s }) => (note.trim() ? { ...s, note } : s));

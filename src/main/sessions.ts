@@ -5,7 +5,7 @@ import { OscTitleScanner, classifyTitle } from '../shared/oscScanner';
 import { findSession, allSessions } from '../shared/reducer';
 import { initialState, transition, type MachineEvent, type MachineState } from '../shared/statusMachine';
 import type { BackgroundProcess, RuntimeMap, SessionRecord, SessionRuntime, SessionStatus } from '../shared/types';
-import { buildClaudeArgs, buildCommandLine, buildEnv, claudeConfigDir, commandFor, defaultShell, resolveClaude, transcriptExists } from './claude';
+import { buildClaudeArgs, buildCommandLine, buildEnv, claudeConfigDir, commandFor, defaultShell, resolveClaude, transcriptExists, transcriptMtime } from './claude';
 import { HookChannel } from './hooks';
 import type { PlanUsage } from '../shared/usage';
 import { formatCopiedMessage, lastAssistantText } from '../shared/lastMessage';
@@ -14,7 +14,7 @@ import { backgroundProcesses, descendants, killPid, shellChildren, snapshotProce
 import { ensureConoutWorker, setConoutLostHandler } from './pty/sharedConout';
 import { PtyManager } from './pty/ptyManager';
 import type { Store } from './store';
-import { isClaudeId } from '../shared/validate';
+import { isClaudeId, isPath } from '../shared/validate';
 
 const POLL_MS = 1500;
 /** Con 9 arranques a la vez una sesión sana puede tardar más de 10 s: esto es solo la red de seguridad. */
@@ -57,6 +57,9 @@ interface Live {
   stopping: Promise<void> | null;
   /** Otro id de conversación visto en el archivo de sesión: se adopta si se repite. */
   otherClaudeId: string | null;
+  /** En una PowerShell: se está buscando el Claude que se abrió dentro (D30). */
+  detecting?: boolean;
+  nextDetect?: number;
   cols: number;
   rows: number;
 }
@@ -102,9 +105,60 @@ export class SessionController {
       this.apply(id, { t: 'hook', name });
     }, (usage) => this.events.send('usage:update', usage));
     for (const s of allSessions(store.get())) this.machines.set(s.id, initialState(s.kind));
+    // Las sesiones de antes de la 1.3.5 no saben cuándo fue su último mensaje: lo dice la fecha de su conversación.
+    for (const s of allSessions(store.get())) {
+      if (s.kind !== 'claude' || s.lastActiveAt) continue;
+      const at = transcriptMtime(s.cwd, s.claudeId);
+      if (at) store.dispatch({ type: 'session/active', id: s.id, at });
+    }
     setConoutLostHandler(() => console.error('[sesiones] se perdió el proceso auxiliar de terminales'));
     this.pollTimer = setInterval(() => void this.poll(), POLL_MS);
     this.pollTimer.unref();
+  }
+
+/**
+   * Claude abierto a mano dentro de una PowerShell de Hilo: se busca su proceso una vez (no se vigila de
+   * forma continua) y su archivo de sesión, que dice la conversación y la carpeta real aunque se haya
+   * hecho `cd`. La misma fila pasa a ser esa sesión de Claude, en el mismo proyecto (D30).
+   */
+  private async detectClaudeInShell(id: string, live: Live, retries = 3): Promise<void> {
+    if (live.detecting || Date.now() < (live.nextDetect ?? 0)) return;
+    live.detecting = true;
+    live.nextDetect = Date.now() + 10_000;
+    let adopted = false;
+    try {
+      const procs = await snapshotProcesses();
+      if (!procs || this.live.get(id) !== live || live.session.kind !== 'shell') return;
+      const candidates = descendants(live.pid, procs).filter((p) => /^claude\.exe$/i.test(p.name) || (/^(node|bun)\.exe$/i.test(p.name) && /claude/i.test(p.command)));
+      for (const proc of candidates) {
+        const info = await readClaudeSessionFile(proc.pid);
+        if (!info || this.live.get(id) !== live) continue;
+        // Ya es otra sesión de Hilo: dos filas con la misma conversación se pisarían.
+        if (allSessions(this.store.get()).some((s) => s.id !== id && s.claudeId === info.sessionId)) return;
+        this.store.dispatch({ type: 'session/adopt', id, claudeId: info.sessionId, cwd: info.cwd });
+        const session = findSession(this.store.get(), id)?.session;
+        if (!session) return;
+        live.session = session;
+        live.claudePid = proc.pid;
+        live.otherClaudeId = null;
+        this.machines.set(id, { kind: 'claude', status: 'idle', stopLatchUntil: 0 });
+        this.store.dispatch({ type: 'session/active', id, at: Date.now() });
+        this.publish(id);
+        this.events.send('app:notice', `«${session.name}» ahora es una sesión de Claude, en ${info.cwd}.`);
+        adopted = true;
+        return;
+      }
+    } finally {
+      live.detecting = false;
+      // Claude escribe su archivo de sesión un poco después de poner el título: se reintenta.
+      if (!adopted && retries > 0 && this.live.get(id) === live && live.session.kind === 'shell') {
+        const timer = setTimeout(() => {
+          live.nextDetect = 0;
+          void this.detectClaudeInShell(id, live, retries - 1);
+        }, 4000);
+        timer.unref();
+      }
+    }
   }
 
   /** El último mensaje de Claude en esta sesión, ya con el formato para copiar. null si no hay. */
@@ -153,6 +207,8 @@ export class SessionController {
 
   private onStatusChange(id: string, from: SessionStatus, to: SessionStatus): void {
     this.publish(id);
+    // Empezar a trabajar es un mensaje tuyo; terminar, uno de Claude.
+    if (to === 'working' || from === 'working') this.store.dispatch({ type: 'session/active', id, at: Date.now() });
     const pending = this.notifyTimers.get(id);
     if (pending) {
       clearTimeout(pending);
@@ -209,7 +265,13 @@ export class SessionController {
     const live = this.live.get(id);
     if (!live) return;
     live.lastActivity = Date.now();
-    if (live.session.kind !== 'claude') return;
+    if (live.session.kind !== 'claude') {
+      // Una PowerShell donde se abrió Claude: su título lo delata (D30).
+      for (const title of live.scanner.feed(data)) {
+        if (classifyTitle(title) !== 'other') void this.detectClaudeInShell(id, live);
+      }
+      return;
+    }
     if (live.tail.length < 16_384) {
       live.tail += data;
       // El diálogo de confianza de la carpeta y la advertencia de --dangerously-skip-permissions bloquean
@@ -665,5 +727,16 @@ export class SessionController {
   private async autoSleepOne(id: string): Promise<void> {
     await this.sleep(id);
     this.events.send('session:autoSlept', id);
+  }
+}
+
+/** De `~/.claude/sessions/<pid>.json` solo la conversación y la carpeta. El `.key` de al lado no se abre. */
+async function readClaudeSessionFile(pid: number): Promise<{ sessionId: string; cwd: string } | null> {
+  try {
+    const parsed = JSON.parse(await fsp.readFile(join(claudeConfigDir(), 'sessions', `${pid}.json`), 'utf8')) as { pid?: unknown; sessionId?: unknown; cwd?: unknown };
+    if (parsed.pid !== pid || !isClaudeId(parsed.sessionId) || !isPath(parsed.cwd)) return null;
+    return { sessionId: parsed.sessionId, cwd: parsed.cwd };
+  } catch {
+    return null;
   }
 }

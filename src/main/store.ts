@@ -251,6 +251,7 @@ function sanitizeSession(raw: unknown): SessionRecord | null {
   if (isValidEffort(raw.effort)) session.effort = raw.effort;
   if (isMark(raw.mark)) session.mark = raw.mark;
   if (raw.unread === true) session.unread = true;
+  if (typeof raw.lastActiveAt === 'number' && Number.isFinite(raw.lastActiveAt) && raw.lastActiveAt > 0) session.lastActiveAt = raw.lastActiveAt;
   if (isNote(raw.note) && raw.note.trim()) session.note = raw.note;
   return session;
 }

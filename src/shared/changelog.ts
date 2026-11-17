@@ -11,6 +11,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.3.5",
+    date: "2026-11-17",
+    items: [
+      "Al crear una sesión puedes elegir otra carpeta y dejarla en el mismo proyecto.",
+      "Si abres Claude dentro de una PowerShell de Hilo, esa misma sesión pasa a ser de Claude, en la carpeta donde lo abriste aunque hayas hecho cd. Sigue en su proyecto, con su nombre, color y marca.",
+      "Las sesiones de Claude quietas cambian de color según su último mensaje, tuyo o de Claude: amarillo a la hora, naranja a las 5 horas y rojo al día. Se apaga en Ajustes > Sesiones.",
+    ],
+  },
+  {
     version: "1.3.4",
     date: "2026-11-16",
     items: [

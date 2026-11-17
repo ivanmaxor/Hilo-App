@@ -589,3 +589,18 @@ describe('uso del plan entre varias sesiones', () => {
     expect(parseUsage('{"at":5,"seven_day":{"used":1,"resets_at":1800003600}}')!.week!.changed).toBe(0);
   });
 });
+
+describe('PowerShell que pasa a Claude, y último mensaje', () => {
+  it('la misma fila pasa a Claude con la carpeta real, y el último mensaje solo avanza', () => {
+    let s = stateWith([project('p', [session('a', { kind: 'shell', name: 'Mi PowerShell', mark: '⭐' })])]);
+    const claudeId = '11111111-2222-4333-8444-555555555555';
+    s = reduce(s, { type: 'session/adopt', id: 'a', claudeId, cwd: 'C:\\otra' });
+    expect(findSession(s, 'a')!.session).toMatchObject({ kind: 'claude', claudeId, cwd: 'C:\\otra', name: 'Mi PowerShell', mark: '⭐' });
+    expect(findSession(s, 'a')!.project.id).toBe('p');
+    s = reduce(s, { type: 'session/active', id: 'a', at: 2000 });
+    s = reduce(s, { type: 'session/active', id: 'a', at: 1000 });
+    expect(findSession(s, 'a')!.session.lastActiveAt).toBe(2000);
+    expect(isValidAction({ type: 'session/adopt', id: 'a', claudeId: 'x', cwd: 'C:\\' })).toBe(false);
+    expect(sanitizeSettings({}).staleMarks).toBe(true);
+  });
+});

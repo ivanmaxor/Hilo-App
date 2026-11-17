@@ -30,6 +30,8 @@ export interface SessionRecord {
   unread?: boolean;
   /** Una nota de la persona, que se ve aunque la sesión esté dormida. */
   note?: string;
+  /** El último mensaje, de la persona o de Claude, en milisegundos. */
+  lastActiveAt?: number;
 }
 
 /** El IDE de un proyecto. La ruta sale de la detección o del diálogo nativo, nunca del renderer. */
@@ -87,6 +89,8 @@ export interface Settings {
   lastSeenVersion: string;
   /** Los últimos colores elegidos fuera de la paleta, del más nuevo al más viejo. */
   recentColors: string[];
+  /** Colorear las sesiones de Claude sin mensajes desde hace 1 h, 5 h y 1 día (D30). */
+  staleMarks: boolean;
   /** En el panel Cambios, los signos + y − además del color. */
   changesShowSigns: boolean;
   /** En el panel Cambios, todo el archivo en vez de solo las zonas cambiadas. */
@@ -173,6 +177,9 @@ export type Action =
   | { type: 'session/mark'; id: string; mark: string | null }
   | { type: 'session/unread'; id: string; unread: boolean }
   | { type: 'session/note'; id: string; note: string }
+  /** Solo las dispara el proceso principal: no están en la lista blanca del IPC. */
+  | { type: 'session/adopt'; id: string; claudeId: string; cwd: string }
+  | { type: 'session/active'; id: string; at: number }
   | { type: 'session/remove'; id: string }
   | { type: 'session/claudeId'; id: string; claudeId: string }
   | { type: 'session/awake'; id: string; awake: boolean }

@@ -29,6 +29,7 @@ export const DEFAULT_SETTINGS: Settings = {
   usageMeter: true,
   lastSeenVersion: '',
   recentColors: [],
+  staleMarks: true,
   // Sin signos: quien no está acostumbrado a los diffs lee mejor solo el color y los números.
   changesShowSigns: false,
   changesFullFile: false,

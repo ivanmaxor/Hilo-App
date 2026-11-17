@@ -10,6 +10,8 @@ import {
   displayStatus,
   isUnread,
   openProjectFolder,
+  clock,
+  staleClass,
   focusActive,
   newProjectFlow,
   selectSession,
@@ -22,6 +24,7 @@ import {
 } from '../controller';
 import { Chevron, FolderIcon, GearIcon, MoreIcon, NoteIcon, PanelIcon, PlusIcon, ShellMark, StatusIcon, SubagentsBadge, subagentsLabel } from './icons';
 import { UsageMeter } from './usage';
+import { formatSpan } from '../../shared/usage';
 
 type Drag = { type: 'session'; id: string } | { type: 'project'; id: string } | { type: 'pane'; id: string } | null;
 let dragging: Drag = null;
@@ -108,14 +111,17 @@ function SessionRow({ session, project, index, globalIndex }: { session: Session
   const open = state.ui.panes.includes(session.id);
   const renaming = v.renaming === session.id;
   const unread = isUnread(session);
+  const { now } = useStore(clock);
+  const stale = staleClass(session);
+  const lastMessage = session.kind === 'claude' && session.lastActiveAt ? `\nÚltimo mensaje hace ${formatSpan(now - session.lastActiveAt)}` : '';
 
   return (
     <div
-      class={`row${active ? ' active' : ''}${open && !active ? ' open' : ''}${unread ? ' unread' : ''}${status === 'asleep' ? ' dim' : ''}${drop ? ` drop-${drop}` : ''}`}
+      class={`row${active ? ' active' : ''}${open && !active ? ' open' : ''}${unread ? ' unread' : ''}${stale}${status === 'asleep' ? ' dim' : ''}${drop ? ` drop-${drop}` : ''}`}
       style={session.color ? { '--seg': session.color } : undefined}
       data-session={session.id}
       draggable={!renaming}
-      title={`${session.name}\n${STATUS_LABEL[status]}${subagents ? `, ${subagentsLabel(subagents)}` : ''}${session.unread ? ', marcada como no leída' : ''}\n${session.cwd}${session.note ? `\n\nNota: ${session.note}` : ''}`}
+      title={`${session.name}\n${STATUS_LABEL[status]}${subagents ? `, ${subagentsLabel(subagents)}` : ''}${session.unread ? ', marcada como no leída' : ''}${lastMessage}\n${session.cwd}${session.note ? `\n\nNota: ${session.note}` : ''}`}
       onClick={() => void selectSession(session.id, { delayWake: true })}
       onDblClick={(e) => {
         e.preventDefault();
@@ -341,6 +347,7 @@ function NeedsYou() {
 
 function Rail() {
   const { state } = useStore(app);
+  useStore(clock);
   return (
     <nav class="rail" aria-label="Sesiones">
       {state.projects.map((project) => (
@@ -348,7 +355,7 @@ function Rail() {
           {project.sessions.filter((s) => !view.get().closing.includes(s.id)).map((s) => (
             <button
               key={s.id}
-              class={`rail-cell${state.ui.activeSessionId === s.id ? ' active' : ''}`}
+              class={`rail-cell${state.ui.activeSessionId === s.id ? ' active' : ''}${staleClass(s)}`}
               data-session={s.id}
               title={`${s.mark ? `${s.mark} ` : ''}${s.name}\n${STATUS_LABEL[statusOf(s.id)]}${s.note ? `\n\nNota: ${s.note}` : ''}`}
               aria-label={`${s.name}: ${STATUS_LABEL[statusOf(s.id)]}`}

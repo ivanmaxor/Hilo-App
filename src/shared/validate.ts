@@ -63,7 +63,8 @@ function isSession(v: unknown): v is SessionRecord {
     (s.effort === undefined || isValidEffort(s.effort)) &&
     (s.mark === undefined || isMark(s.mark)) &&
     (s.unread === undefined || typeof s.unread === 'boolean') &&
-    (s.note === undefined || isNote(s.note))
+    (s.note === undefined || isNote(s.note)) &&
+    (s.lastActiveAt === undefined || (typeof s.lastActiveAt === 'number' && Number.isFinite(s.lastActiveAt)))
   );
 }
 
@@ -91,6 +92,10 @@ export function isValidAction(a: Action): boolean {
       return isSafeId(a.id) && typeof a.unread === 'boolean';
     case 'session/note':
       return isSafeId(a.id) && isNote(a.note);
+    case 'session/adopt':
+      return isSafeId(a.id) && isClaudeId(a.claudeId) && isPath(a.cwd);
+    case 'session/active':
+      return isSafeId(a.id) && typeof a.at === 'number' && Number.isFinite(a.at);
     case 'project/collapse':
       return isSafeId(a.id) && typeof a.collapsed === 'boolean';
     case 'project/remove':
@@ -169,6 +174,7 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     recentColors: Array.isArray(r.recentColors)
       ? [...new Set(r.recentColors.filter((c): c is string => typeof c === 'string' && COLOR.test(c)).map((c) => c.toLowerCase()))].slice(0, MAX_RECENT_COLORS)
       : base.recentColors,
+    staleMarks: typeof r.staleMarks === 'boolean' ? r.staleMarks : base.staleMarks,
     lastSeenVersion: typeof r.lastSeenVersion === 'string' && /^\d+\.\d+\.\d+$/.test(r.lastSeenVersion) ? r.lastSeenVersion : base.lastSeenVersion,
     changesShowSigns: typeof r.changesShowSigns === 'boolean' ? r.changesShowSigns : base.changesShowSigns,
     changesFullFile: typeof r.changesFullFile === 'boolean' ? r.changesFullFile : base.changesFullFile,
