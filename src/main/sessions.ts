@@ -57,6 +57,8 @@ interface Live {
   stopping: Promise<void> | null;
   /** Otro id de conversación visto en el archivo de sesión: se adopta si se repite. */
   otherClaudeId: string | null;
+  /** El ejecutable de Claude que se lanzó, para decirlo si se cierra al arrancar. */
+  command?: string;
   /** En una PowerShell: se está buscando el Claude que se abrió dentro (D30). */
   detecting?: boolean;
   nextDetect?: number;
@@ -330,6 +332,7 @@ export class SessionController {
 
     let pid: number;
     let wrapped = false;
+    let command: string | undefined;
     try {
       let file: string;
       let commandLine: string;
@@ -351,6 +354,7 @@ export class SessionController {
           );
           return;
         }
+        command = claude;
         const resume = forceResume ?? transcriptExists(session.cwd, session.claudeId);
         const settingsFile = settings.useHooks ? this.hooks.prepare(id, settings.usageMeter) : null;
         const claudeArgs = buildClaudeArgs({ session, resume, settingsFile, skipPermissions: settings.skipPermissions });
@@ -359,7 +363,7 @@ export class SessionController {
         }
         ({ file, commandLine, wrapped } = commandFor(claude, claudeArgs));
       }
-      pid = this.pty.spawn(id, { file, commandLine, cwd: session.cwd, env: buildEnv(id), cols, rows });
+      pid = this.pty.spawn(id, { file, commandLine, cwd: session.cwd, env: buildEnv(id, process.env, this.store.get().settings.classicRenderer), cols, rows });
     } catch (err) {
       this.fail(session, `No se pudo iniciar el proceso:\n${err instanceof Error ? err.message : String(err)}`);
       return;
@@ -388,6 +392,7 @@ export class SessionController {
       rows,
     };
     if (session.kind === 'claude') {
+      live.command = command;
       live.startTimer = setTimeout(() => this.apply(id, { t: 'startTimeout' }), START_TIMEOUT_MS);
       live.startTimer.unref();
     }
@@ -413,6 +418,20 @@ export class SessionController {
     if (code !== undefined && this.retryAfterFailedLaunch(live, code)) {
       for (const cb of callbacks) cb();
       return;
+    }
+    // Claude se cerró con error antes de quedar listo: el código solo no dice nada. Se muestra qué se lanzó.
+    if (
+      live.session.kind === 'claude' &&
+      !live.requested &&
+      code !== undefined &&
+      code !== 0 &&
+      Date.now() - live.startedAt < FAST_FAIL_MS &&
+      this.machines.get(id)?.status === 'starting'
+    ) {
+      this.messages.set(
+        id,
+        `Claude se cerró al arrancar (código ${code}).\nSe lanzó: ${live.command ?? '?'}\nSi ese archivo no es Claude Code, corrige la ruta de claude en Ajustes, o déjala vacía para que Hilo lo busque.`,
+      );
     }
     // Un /exit limpio también fue a propósito.
     this.forgetAwake(id, live.requested || code === 0);

@@ -4,11 +4,15 @@ import { homedir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import type { SessionRecord } from '../shared/types';
 import { isValidEffort, isValidModel } from '../shared/validate';
+import { claudePathProblem } from '../shared/claudePath';
 
-/** Busca `claude` en la ruta configurada, en el PATH y en la ruta del instalador nativo. */
+/**
+ * Busca `claude` en la ruta configurada, en el PATH y en la ruta del instalador nativo. Una ruta configurada
+ * que no parece Claude Code (un instalador, Claude Desktop) se ignora: Ajustes lo avisa.
+ */
 export function resolveClaude(configured: string): string | null {
   // Una ruta de red caída bloquearía el proceso principal 20 s al arrancar: que falle al lanzar.
-  if (configured) return configured.startsWith('\\\\') || existsSync(configured) ? configured : null;
+  if (configured && !claudePathProblem(configured)) return configured.startsWith('\\\\') || existsSync(configured) ? configured : null;
   const dirs = (process.env.PATH ?? process.env.Path ?? '').split(delimiter).filter(Boolean);
   dirs.push(join(homedir(), '.local', 'bin'));
   for (const dir of dirs) {
@@ -183,7 +187,12 @@ const PARENT_SESSION_ONLY = new Set(['NO_COLOR', 'GIT_EDITOR']);
  * Entorno de las terminales. `WT_SESSION` hace que Claude Code recorra la misma
  * rama que en Windows Terminal: salida sincronizada sin parpadeo (decisión D3).
  */
-export function buildEnv(sessionId: string, base: NodeJS.ProcessEnv = process.env): Record<string, string> {
+/**
+ * `classic`: Claude Code usa su pantalla clásica, como con `/tui default`. La pantalla completa dibuja en una
+ * pantalla alternativa sin historial, y la rueda y la barra de Hilo no la desplazan (D31). Solo en las sesiones
+ * de Hilo: es una variable del proceso, no se toca la configuración del usuario.
+ */
+export function buildEnv(sessionId: string, base: NodeJS.ProcessEnv = process.env, classic = false): Record<string, string> {
   const env: Record<string, string> = {};
   const insideClaude = Object.keys(base).some((k) => k.toUpperCase() === 'CLAUDECODE' || k.toUpperCase() === 'CLAUDE_CODE_CHILD_SESSION');
   for (const [key, value] of Object.entries(base)) {
@@ -195,6 +204,7 @@ export function buildEnv(sessionId: string, base: NodeJS.ProcessEnv = process.en
   env.TERM = 'xterm-256color';
   env.COLORTERM = 'truecolor';
   env.WT_SESSION = sessionId;
+  if (classic) env.CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN = '1';
   return env;
 }
 

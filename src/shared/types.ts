@@ -85,6 +85,8 @@ export interface Settings {
   setupSeen: boolean;
   /** Uso del plan en la línea de estado de Claude y en la barra lateral (D25). */
   usageMeter: boolean;
+  /** Claude con su pantalla clásica (como `/tui default`), para que el historial se desplace en Hilo (D31). */
+  classicRenderer: boolean;
   /** La versión cuyas novedades ya se avisaron (D27). Vacío en una instalación nueva. */
   lastSeenVersion: string;
   /** Los últimos colores elegidos fuera de la paleta, del más nuevo al más viejo. */

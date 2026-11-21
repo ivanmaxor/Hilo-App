@@ -1,3 +1,4 @@
+import { claudePathProblem } from '../../src/shared/claudePath';
 import { addRecentColor, hexToHsv, hsvToHex, normalizeHex } from '../../src/shared/color';
 import { mergeUsage, parseUsage } from '../../src/shared/usage';
 import { CHANGELOG } from '../../src/shared/changelog';
@@ -602,5 +603,24 @@ describe('PowerShell que pasa a Claude, y último mensaje', () => {
     expect(findSession(s, 'a')!.session.lastActiveAt).toBe(2000);
     expect(isValidAction({ type: 'session/adopt', id: 'a', claudeId: 'x', cwd: 'C:\\' })).toBe(false);
     expect(sanitizeSettings({}).staleMarks).toBe(true);
+  });
+});
+
+describe('ruta de claude', () => {
+  it('reconoce Claude Code y rechaza instaladores y Claude Desktop', () => {
+    expect(claudePathProblem('')).toBeNull();
+    expect(claudePathProblem('C:\\Users\\x\\.local\\bin\\claude.exe')).toBeNull();
+    expect(claudePathProblem('C:\\Users\\x\\AppData\\Roaming\\npm\\claude.cmd')).toBeNull();
+    expect(claudePathProblem('C:\\Users\\x\\Downloads\\Claude Setup.exe')).toContain('Claude Setup.exe');
+    expect(claudePathProblem('C:\\Users\\x\\AppData\\Local\\AnthropicClaude\\claude.exe')).toContain('Claude Desktop');
+    expect(claudePathProblem('C:\\Program Files\\WindowsApps\\Claude_1.0.0_x64__abc\\app\\claude.exe')).toContain('Claude Desktop');
+  });
+});
+
+describe('pantalla clásica de Claude', () => {
+  it('se pide por el entorno del proceso, solo si está encendida', () => {
+    expect(buildEnv('id', { PATH: 'x' }, true).CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN).toBe('1');
+    expect(buildEnv('id', { PATH: 'x' }).CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN).toBeUndefined();
+    expect(sanitizeSettings({}).classicRenderer).toBe(true);
   });
 });

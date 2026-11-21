@@ -171,6 +171,7 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     checkUpdatesOnStart: typeof r.checkUpdatesOnStart === 'boolean' ? r.checkUpdatesOnStart : base.checkUpdatesOnStart,
     setupSeen: typeof r.setupSeen === 'boolean' ? r.setupSeen : base.setupSeen,
     usageMeter: typeof r.usageMeter === 'boolean' ? r.usageMeter : base.usageMeter,
+    classicRenderer: typeof r.classicRenderer === 'boolean' ? r.classicRenderer : base.classicRenderer,
     recentColors: Array.isArray(r.recentColors)
       ? [...new Set(r.recentColors.filter((c): c is string => typeof c === 'string' && COLOR.test(c)).map((c) => c.toLowerCase()))].slice(0, MAX_RECENT_COLORS)
       : base.recentColors,

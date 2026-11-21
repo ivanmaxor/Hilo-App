@@ -11,6 +11,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.3.7",
+    date: "2026-11-21",
+    items: [
+      "Claude abre con su pantalla clásica (como /tui default), así el historial se desplaza bien con la rueda. Se puede cambiar en Ajustes > Claude Code.",
+      "Si la ruta de claude en Ajustes apunta a otra cosa, como un instalador o Claude Desktop, Hilo lo avisa y busca Claude Code por su cuenta.",
+      "Si Claude se cierra apenas arranca, el aviso dice qué archivo se lanzó y dónde corregirlo.",
+    ],
+  },
+  {
     version: "1.3.6",
     date: "2026-11-17",
     items: [

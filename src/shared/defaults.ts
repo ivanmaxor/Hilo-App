@@ -27,6 +27,7 @@ export const DEFAULT_SETTINGS: Settings = {
   checkUpdatesOnStart: true,
   setupSeen: false,
   usageMeter: true,
+  classicRenderer: true,
   lastSeenVersion: '',
   recentColors: [],
   staleMarks: true,

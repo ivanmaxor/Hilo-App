@@ -1,4 +1,5 @@
 import { CHANGELOG } from '../../shared/changelog';
+import { claudePathProblem } from '../../shared/claudePath';
 import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { EFFORTS, MODELS, PALETTE } from '../../shared/defaults';
@@ -928,7 +929,16 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
                 </div>
                 <small>Déjala vacía para que Hilo la busque sola.</small>
               </label>
-              {claudeMissing && <small class="warn block">No existe ese archivo.</small>}
+              {claudePathProblem(s.claudePath) ? (
+                <small class="warn block" data-warn="claude-path">
+                  {claudePathProblem(s.claudePath)} Mientras tanto, Hilo la ignora y busca claude por su cuenta.{' '}
+                  <button type="button" class="link" onClick={() => set({ claudePath: '' })}>
+                    Dejarla vacía
+                  </button>
+                </small>
+              ) : (
+                claudeMissing && <small class="warn block">No existe ese archivo.</small>
+              )}
               <div class="field-row setup-open">
                 <button type="button" onClick={() => void api.toolsCheck().then((tools) => view.set({ modal: { type: 'setup', tools } }))}>
                   Ver requisitos
@@ -941,6 +951,10 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
               <label class="check">
                 <input type="checkbox" data-field="usage-meter" checked={s.usageMeter} disabled={!s.useHooks} onChange={(e) => set({ usageMeter: e.currentTarget.checked })} />
                 Mostrar cuánto llevas usado de tu plan, en la barra lateral y abajo en cada sesión. Reemplaza tu línea de estado de Claude, solo en las sesiones de Hilo. Necesita los hooks y vale desde el próximo despertar.
+              </label>
+              <label class="check">
+                <input type="checkbox" data-field="classic-renderer" checked={s.classicRenderer} onChange={(e) => set({ classicRenderer: e.currentTarget.checked })} />
+                Usar la pantalla clásica de Claude (como /tui default), para que el historial se desplace con la rueda y la barra de Hilo. Vale desde el próximo despertar.
               </label>
               <label class="check">
                 <input type="checkbox" data-field="skip-permissions" checked={s.skipPermissions} onChange={(e) => set({ skipPermissions: e.currentTarget.checked })} />

@@ -92,3 +92,23 @@ test("Claude abierto dentro de una PowerShell la vuelve esa sesión de Claude, c
     cleanup(ctx.dataDir);
   }
 });
+
+test('una ruta de claude que no es Claude Code se avisa en Ajustes y se puede vaciar', async () => {
+  const state = makeState([]);
+  // Un .exe que existe pero no es Claude Code, como el instalador del reporte.
+  state.settings.claudePath = process.execPath;
+  const ctx = await launch({ state });
+  try {
+    const { page } = ctx;
+    await page.evaluate(() => (window as any).__hiloTest.runCommand('settings'));
+    await page.locator('.settings-nav button', { hasText: 'Claude Code' }).click();
+    const warn = page.locator('[data-warn="claude-path"]');
+    await expect(warn).toContainText('no parece Claude Code');
+    await warn.getByRole('button', { name: 'Dejarla vacía' }).click();
+    await expect(warn).toHaveCount(0);
+    expect(await page.evaluate(() => (window as any).__hiloTest.app.get().state.settings.claudePath)).toBe('');
+  } finally {
+    await ctx.close();
+    cleanup(ctx.dataDir);
+  }
+});
