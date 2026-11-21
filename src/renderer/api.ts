@@ -52,6 +52,8 @@ export interface HiloApi {
   onWindowFocus(cb: (focused: boolean) => void): () => void;
   onSessionFocus(cb: (id: string) => void): () => void;
   onAutoSlept(cb: (id: string) => void): () => void;
+  /** Una sesión terminó, te espera o falló. `unseen`: no la estabas mirando. */
+  onAlert(cb: (id: string, status: SessionStatus, unseen: boolean) => void): () => void;
   onNotice(cb: (message: string) => void): () => void;
 }
 

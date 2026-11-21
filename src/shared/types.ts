@@ -1,4 +1,5 @@
 import type { PaneEdge, PaneNode } from './paneLayout';
+import type { SoundChoice } from './sounds';
 export type SessionKind = 'claude' | 'shell';
 
 /** Estado que se ve en el ícono. `done` es el verde "no leído". */
@@ -66,6 +67,16 @@ export interface Settings {
   wakeOnSelect: boolean;
   autoSleepMinutes: number;
   notifications: boolean;
+  /** Sonido al terminar, al esperarte y al fallar (D32). 'none' = sin sonido. */
+  soundDone: SoundChoice;
+  soundWaiting: SoundChoice;
+  soundError: SoundChoice;
+  /** De 0 a 100. */
+  soundVolume: number;
+  /** Minutos entre repeticiones mientras nadie la atiende; 0 = una vez. */
+  soundRepeat: number;
+  /** Sonar también si la sesión está a la vista. */
+  soundAlways: boolean;
   useHooks: boolean;
   /** Lanza Claude con --dangerously-skip-permissions: decisión del dueño, ver docs/DECISIONES.md. */
   skipPermissions: boolean;

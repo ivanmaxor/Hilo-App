@@ -429,6 +429,8 @@ mark { background: none; color: var(--accent); font-weight: 600; }
 .cp-hex:focus { outline: none; border-color: var(--accent); }
 .cp-row .primary { margin-left: auto; }
 .cp-hint { margin: 10px 0 0; font-size: 12px; }
+.settings-sub { margin: 18px 0 4px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.field input.range { height: 24px; padding: 0; border: 0; background: none; accent-color: var(--accent); }
 .session-cwd { flex: 1; min-width: 0; align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
 .menu-swatches .swatch { flex: none; width: 18px; height: 18px; }
 .danger-item { color: var(--error); }

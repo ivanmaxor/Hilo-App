@@ -11,6 +11,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.3.8",
+    date: "2026-11-21",
+    items: [
+      "Sonidos de aviso cuando una sesión termina, te espera o falla, con 7 sonidos para elegir, volumen y botón para probarlos. Se configuran en Ajustes > Sesiones.",
+      "Se pueden repetir cada 1, 2, 5 o 10 minutos hasta que abras la sesión o le respondas, y elegir si suenan también mientras la estás mirando.",
+      "Si Hilo toca su sonido, la notificación de Windows llega en silencio, para no sonar dos veces.",
+    ],
+  },
+  {
     version: "1.3.7",
     date: "2026-11-21",
     items: [

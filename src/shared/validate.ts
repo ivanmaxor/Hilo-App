@@ -1,3 +1,4 @@
+import { isSoundChoice, SOUND_REPEATS } from './sounds';
 import { isValidTree } from './paneLayout';
 import { DEFAULT_SETTINGS, EFFORTS } from './defaults';
 import { changesProjectOf } from './paneContent';
@@ -160,6 +161,12 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     wakeOnSelect: typeof r.wakeOnSelect === 'boolean' ? r.wakeOnSelect : base.wakeOnSelect,
     autoSleepMinutes: Math.round(clamp(r.autoSleepMinutes, 0, 1440, base.autoSleepMinutes)),
     notifications: typeof r.notifications === 'boolean' ? r.notifications : base.notifications,
+    soundDone: isSoundChoice(r.soundDone) ? r.soundDone : base.soundDone,
+    soundWaiting: isSoundChoice(r.soundWaiting) ? r.soundWaiting : base.soundWaiting,
+    soundError: isSoundChoice(r.soundError) ? r.soundError : base.soundError,
+    soundVolume: Math.round(clamp(r.soundVolume, 0, 100, base.soundVolume)),
+    soundRepeat: (SOUND_REPEATS as readonly number[]).includes(r.soundRepeat as number) ? (r.soundRepeat as number) : base.soundRepeat,
+    soundAlways: typeof r.soundAlways === 'boolean' ? r.soundAlways : base.soundAlways,
     useHooks: typeof r.useHooks === 'boolean' ? r.useHooks : base.useHooks,
     skipPermissions: typeof r.skipPermissions === 'boolean' ? r.skipPermissions : base.skipPermissions,
     confirmMultilinePaste: typeof r.confirmMultilinePaste === 'boolean' ? r.confirmMultilinePaste : base.confirmMultilinePaste,

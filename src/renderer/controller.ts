@@ -1,5 +1,7 @@
 import type { PlanUsage } from '../shared/usage';
 import { addRecentColor } from '../shared/color';
+import { soundFor, type SoundChoice } from '../shared/sounds';
+import { playSound } from './sound';
 import type { ToolCheck } from '../shared/types';
 import { changesPaneId, sessionInPane } from '../shared/paneContent';
 import { MAX_PANES, paneInDirection, presetTree } from '../shared/paneLayout';
@@ -800,6 +802,56 @@ export function staleClass(session: SessionRecord): string {
   return level ? ` stale-${level}` : '';
 }
 
+/** En pruebas no suena nada: se anota lo que habría sonado. */
+export const playedSounds: { id: string; sound: SoundChoice }[] = [];
+
+function play(sessionId: string, sound: SoundChoice): void {
+  if (sound === 'none') return;
+  if (app.get().info.isTest) {
+    playedSounds.push({ id: sessionId, sound });
+    return;
+  }
+  playSound(sound, app.get().state.settings.soundVolume);
+}
+
+/** El botón "Probar" de Ajustes. */
+export function previewSound(sound: SoundChoice): void {
+  if (sound !== 'none') playSound(sound, app.get().state.settings.soundVolume);
+}
+
+const soundRepeats = new Map<string, ReturnType<typeof setInterval>>();
+
+/** ¿La estás mirando ahora? */
+function inView(id: string): boolean {
+  return document.hasFocus() && app.get().state.ui.panes.includes(id);
+}
+
+/**
+ * Sonido al terminar, esperarte o fallar (D32). Con repetición, vuelve a sonar cada N minutos mientras
+ * la sesión siga igual: abrirla quita el verde, y responderle saca de "te espera".
+ */
+function onAlert(id: string, status: SessionStatus, unseen: boolean): void {
+  const settings = app.get().state.settings;
+  const sound = soundFor(settings, status);
+  const previous = soundRepeats.get(id);
+  if (previous) clearInterval(previous);
+  soundRepeats.delete(id);
+  if (sound === 'none' || (!unseen && !settings.soundAlways)) return;
+  play(id, sound);
+  if (!settings.soundRepeat) return;
+  const timer = setInterval(() => {
+    const now = app.get().state.settings;
+    const again = soundFor(now, status);
+    if (statusOf(id) !== status || again === 'none' || !now.soundRepeat) {
+      clearInterval(timer);
+      soundRepeats.delete(id);
+      return;
+    }
+    if (now.soundAlways || !inView(id)) play(id, again);
+  }, settings.soundRepeat * 60_000);
+  soundRepeats.set(id, timer);
+}
+
 /** No leída: terminó y no se ha abierto, o se marcó a mano. */
 export function isUnread(session: SessionRecord): boolean {
   return statusOf(session.id) === 'done' || !!session.unread;
@@ -1153,6 +1205,7 @@ export async function initController(): Promise<void> {
   });
   api.onSessionFocus((id) => void selectSession(id));
   api.onAutoSlept((id) => disposeIfAsleep(id));
+  api.onAlert(onAlert);
   api.onNotice((message) => toast(message));
   api.onUpdateStatus(onUpdateStatus);
   void api.updateGet().then(onUpdateStatus);
@@ -1187,6 +1240,6 @@ export async function initController(): Promise<void> {
   }
 
   if (initial.info.isTest) {
-    (window as unknown as { __hiloTest: unknown }).__hiloTest = { terminals, app, view, runCommand, selectSession, sleepSession, createSession, wakeSession, closeSession };
+    (window as unknown as { __hiloTest: unknown }).__hiloTest = { terminals, app, view, playedSounds, runCommand, selectSession, sleepSession, createSession, wakeSession, closeSession };
   }
 }

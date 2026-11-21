@@ -53,6 +53,7 @@ const api = {
   onWindowFocus: (cb: Listener) => subscribe('window:focus', cb),
   onSessionFocus: (cb: Listener) => subscribe('session:focus', cb),
   onAutoSlept: (cb: Listener) => subscribe('session:autoSlept', cb),
+  onAlert: (cb: Listener) => subscribe('session:alert', cb),
   onNotice: (cb: Listener) => subscribe('app:notice', cb),
 };
 

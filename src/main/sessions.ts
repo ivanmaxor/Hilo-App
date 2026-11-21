@@ -221,17 +221,20 @@ export class SessionController {
     if (to === 'done') {
       const timer = setTimeout(() => {
         this.notifyTimers.delete(id);
-        if (this.machines.get(id)?.status === 'done') this.notifyIfUnseen(id, 'done');
+        if (this.machines.get(id)?.status === 'done') this.alert(id, 'done');
       }, DONE_NOTIFY_DELAY_MS);
       timer.unref();
       this.notifyTimers.set(id, timer);
     } else if (to === 'waiting' || to === 'error') {
-      this.notifyIfUnseen(id, to);
+      this.alert(id, to);
     }
   }
 
-  private notifyIfUnseen(id: string, status: SessionStatus): void {
-    if (this.windowFocused && this.visible.has(id)) return;
+  /** Terminó, te espera o falló: el renderer decide el sonido; la notificación sale solo si no la estás mirando. */
+  private alert(id: string, status: SessionStatus): void {
+    const unseen = !(this.windowFocused && this.visible.has(id));
+    this.events.send('session:alert', id, status, unseen);
+    if (!unseen) return;
     const found = findSession(this.store.get(), id);
     if (found) this.events.notify(found.session, status);
   }

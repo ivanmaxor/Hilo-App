@@ -6,6 +6,7 @@ import { access } from 'node:fs/promises';
 import { release } from 'node:os';
 import { join } from 'node:path';
 import { STATUS_LABEL } from '../shared/statusMachine';
+import { soundFor } from '../shared/sounds';
 import { findSession } from '../shared/reducer';
 import { isSafeId, isValidAction, sanitizeSettings } from '../shared/validate';
 import { ideName, isValidIdePath, type DetectedIde, type IdeOpenResult } from '../shared/ide';
@@ -81,7 +82,9 @@ const sessions = new SessionController(store, dataDir, {
     const record: (typeof sentNotifications)[number] = { id: session.id, name: session.name, status };
     if (isTest) sentNotifications.push(record);
     if ((isTest && process.env.HILO_TEST_REAL_NOTIFY !== '1') || !Notification.isSupported()) return;
-    const n = new Notification({ title: session.name, body: NOTIFY_TEXT[status] ?? STATUS_LABEL[status] });
+    // Si Hilo toca su propio sonido, la notificación no suma el de Windows.
+    const silent = soundFor(store.get().settings, status) !== 'none';
+    const n = new Notification({ title: session.name, body: NOTIFY_TEXT[status] ?? STATUS_LABEL[status], silent });
     liveNotifications.add(n);
     n.on('click', () => {
       liveNotifications.delete(n);

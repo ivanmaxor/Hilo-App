@@ -15,6 +15,12 @@ export const DEFAULT_SETTINGS: Settings = {
   wakeOnSelect: true,
   autoSleepMinutes: 0,
   notifications: true,
+  soundDone: 'gota',
+  soundWaiting: 'dos-notas',
+  soundError: 'grave',
+  soundVolume: 60,
+  soundRepeat: 0,
+  soundAlways: false,
   useHooks: true,
   // Quien lo quiera lo enciende en Ajustes: Claude ejecutaría todo sin preguntar.
   skipPermissions: false,

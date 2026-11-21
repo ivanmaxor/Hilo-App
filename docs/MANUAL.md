@@ -39,6 +39,12 @@ Abajo en la barra lateral está cuánto llevas usado de la sesión de 5 horas y 
 
 Lo mismo sale abajo en cada sesión de Claude, en lugar de tu línea de estado. Si prefieres la tuya, apágalo en Ajustes, sección Claude Code. El bloque **Te necesitan**, abajo en la barra lateral, junta todo lo que requiere atención, ordenado por urgencia.
 
+## Sonidos
+
+Hilo suena cuando una sesión termina, te espera (un permiso o una pregunta) o falla. En Ajustes > Sesiones eliges un sonido para cada caso, o ninguno, el volumen y si se repite cada 1, 2, 5 o 10 minutos hasta que abras la sesión o le respondas. Por defecto no suena si ya estás mirando esa sesión. Cuando Hilo toca su sonido, la notificación de Windows llega en silencio.
+
+Si tenías un hook de sonido propio en la configuración de Claude Code, sigue sonando también en las sesiones de Hilo: Hilo no toca tu configuración. Para oír solo el de Hilo, quítalo de tu `settings.json`.
+
 ## Copiar y pegar
 
 | Acción | Cómo |

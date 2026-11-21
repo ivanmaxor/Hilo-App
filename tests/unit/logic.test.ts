@@ -1,3 +1,4 @@
+import { soundFor } from '../../src/shared/sounds';
 import { claudePathProblem } from '../../src/shared/claudePath';
 import { addRecentColor, hexToHsv, hsvToHex, normalizeHex } from '../../src/shared/color';
 import { mergeUsage, parseUsage } from '../../src/shared/usage';
@@ -622,5 +623,17 @@ describe('pantalla clásica de Claude', () => {
     expect(buildEnv('id', { PATH: 'x' }, true).CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN).toBe('1');
     expect(buildEnv('id', { PATH: 'x' }).CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN).toBeUndefined();
     expect(sanitizeSettings({}).classicRenderer).toBe(true);
+  });
+});
+
+describe('sonidos', () => {
+  it('cada estado tiene su sonido, y los ajustes raros vuelven al valor por defecto', () => {
+    const s = sanitizeSettings({ soundDone: 'campana', soundWaiting: 'none', soundError: 'trompeta', soundVolume: 300, soundRepeat: 3 });
+    expect(soundFor(s, 'done')).toBe('campana');
+    expect(soundFor(s, 'waiting')).toBe('none');
+    expect(soundFor(s, 'error')).toBe('grave');
+    expect(soundFor(s, 'idle')).toBe('none');
+    expect(s.soundVolume).toBe(100);
+    expect(s.soundRepeat).toBe(0);
   });
 });

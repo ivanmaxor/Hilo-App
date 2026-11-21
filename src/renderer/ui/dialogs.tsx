@@ -1,3 +1,4 @@
+import { SOUND_REPEATS, SOUNDS, type SoundChoice } from '../../shared/sounds';
 import { CHANGELOG } from '../../shared/changelog';
 import { claudePathProblem } from '../../shared/claudePath';
 import type { ComponentChildren } from 'preact';
@@ -41,6 +42,7 @@ import {
   markUnread,
   openProjectFolder,
   rememberColor,
+  previewSound,
 } from '../controller';
 import { CloseIcon, StatusIcon } from './icons';
 import { ColorDialog, ColorPicker, MarkDialog, NoteDialog, QUICK_MARKS } from './extras';
@@ -903,6 +905,63 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
               <label class="check">
                 <input type="checkbox" data-field="notifications" checked={s.notifications} onChange={(e) => set({ notifications: e.currentTarget.checked })} />
                 Avisar con una notificación de Windows si una sesión termina o me espera mientras no la miro
+              </label>
+              <h4 class="settings-sub">Sonidos</h4>
+              {(
+                [
+                  ['soundDone', 'Cuando termina'],
+                  ['soundWaiting', 'Cuando te espera (un permiso o una pregunta)'],
+                  ['soundError', 'Cuando falla'],
+                ] as const
+              ).map(([key, label]) => (
+                <label class="field" key={key}>
+                  <span>{label}</span>
+                  <div class="field-row">
+                    <select data-field={key} value={s[key]} onChange={(e) => set({ [key]: e.currentTarget.value as SoundChoice })}>
+                      <option value="none">Sin sonido</option>
+                      {SOUNDS.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button type="button" data-action={`preview-${key}`} disabled={s[key] === 'none'} onClick={() => previewSound(s[key])}>
+                      Probar
+                    </button>
+                  </div>
+                </label>
+              ))}
+              <label class="field">
+                <span>Volumen: {s.soundVolume} %</span>
+                <input
+                  type="range"
+                  class="range"
+                  data-field="sound-volume"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={s.soundVolume}
+                  onChange={(e) => {
+                    set({ soundVolume: Number(e.currentTarget.value) });
+                    const first = [s.soundDone, s.soundWaiting, s.soundError].find((x) => x !== 'none');
+                    if (first) setTimeout(() => previewSound(first), 50);
+                  }}
+                />
+              </label>
+              <label class="field">
+                <span>Repetir</span>
+                <select data-field="sound-repeat" value={String(s.soundRepeat)} onChange={(e) => set({ soundRepeat: Number(e.currentTarget.value) })}>
+                  {SOUND_REPEATS.map((m) => (
+                    <option key={m} value={String(m)}>
+                      {m === 0 ? 'No repetir' : m === 1 ? 'Cada 1 minuto' : `Cada ${m} minutos`}
+                    </option>
+                  ))}
+                </select>
+                <small>Vuelve a sonar mientras nadie la atienda: hasta que la abras o le respondas.</small>
+              </label>
+              <label class="check">
+                <input type="checkbox" data-field="sound-always" checked={s.soundAlways} onChange={(e) => set({ soundAlways: e.currentTarget.checked })} />
+                Sonar también si estoy mirando esa sesión
               </label>
               <label class="check">
                 <input type="checkbox" data-field="stale-marks" checked={s.staleMarks} onChange={(e) => set({ staleMarks: e.currentTarget.checked })} />
