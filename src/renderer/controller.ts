@@ -803,20 +803,43 @@ export function staleClass(session: SessionRecord): string {
 }
 
 /** En pruebas no suena nada: se anota lo que habría sonado. */
-export const playedSounds: { id: string; sound: SoundChoice }[] = [];
+export const playedSounds: { id: string; sound: SoundChoice; duration: number }[] = [];
 
-function play(sessionId: string, sound: SoundChoice): void {
+/** El aviso que está sonando en cada sesión, para cortarlo. */
+const soundLoops = new Map<string, () => void>();
+
+/**
+ * Toca el aviso con la duración elegida. Se corta antes si la sesión deja ese estado o si la empiezas a
+ * mirar, salvo con "sonar también si la estoy mirando".
+ */
+function play(sessionId: string, sound: SoundChoice, status: SessionStatus): void {
   if (sound === 'none') return;
+  const settings = app.get().state.settings;
   if (app.get().info.isTest) {
-    playedSounds.push({ id: sessionId, sound });
+    playedSounds.push({ id: sessionId, sound, duration: settings.soundDuration });
     return;
   }
-  playSound(sound, app.get().state.settings.soundVolume);
+  soundLoops.get(sessionId)?.();
+  let first = true;
+  const keepGoing = () => {
+    const ok = statusOf(sessionId) === status && (first || app.get().state.settings.soundAlways || !inView(sessionId));
+    first = false;
+    return ok;
+  };
+  const stop = playSound(sound, settings.soundVolume, settings.soundDuration, keepGoing, () => {
+    if (soundLoops.get(sessionId) === stop) soundLoops.delete(sessionId);
+  });
+  soundLoops.set(sessionId, stop);
 }
 
-/** El botón "Probar" de Ajustes. */
-export function previewSound(sound: SoundChoice): void {
-  if (sound !== 'none') playSound(sound, app.get().state.settings.soundVolume);
+/** El botón "Probar" de Ajustes, con la duración elegida. Devuelve con qué detenerlo. */
+export function previewSound(sound: SoundChoice, onEnd: () => void = () => undefined): () => void {
+  if (sound === 'none') {
+    onEnd();
+    return () => undefined;
+  }
+  const { soundVolume, soundDuration } = app.get().state.settings;
+  return playSound(sound, soundVolume, soundDuration, () => true, onEnd);
 }
 
 const soundRepeats = new Map<string, ReturnType<typeof setInterval>>();
@@ -837,7 +860,7 @@ function onAlert(id: string, status: SessionStatus, unseen: boolean): void {
   if (previous) clearInterval(previous);
   soundRepeats.delete(id);
   if (sound === 'none' || (!unseen && !settings.soundAlways)) return;
-  play(id, sound);
+  play(id, sound, status);
   if (!settings.soundRepeat) return;
   const timer = setInterval(() => {
     const now = app.get().state.settings;
@@ -847,7 +870,7 @@ function onAlert(id: string, status: SessionStatus, unseen: boolean): void {
       soundRepeats.delete(id);
       return;
     }
-    if (now.soundAlways || !inView(id)) play(id, again);
+    if (now.soundAlways || !inView(id)) play(id, again, status);
   }, settings.soundRepeat * 60_000);
   soundRepeats.set(id, timer);
 }

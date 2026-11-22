@@ -1,20 +1,44 @@
-import { SOUND_REPEATS, SOUNDS, type SoundChoice } from '../../shared/sounds';
-import { CHANGELOG } from '../../shared/changelog';
-import { claudePathProblem } from '../../shared/claudePath';
-import type { ComponentChildren } from 'preact';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { EFFORTS, MODELS, PALETTE } from '../../shared/defaults';
-import { fuzzyMatch } from '../../shared/fuzzy';
-import { eventToKeys, isModifierOnly, prettyKeys, shortcutProblem, SHORTCUTS } from '../../shared/shortcuts';
-import { STATUS_LABEL, STATUS_PRIORITY } from '../../shared/statusMachine';
-import { allSessions, findSession } from '../../shared/reducer';
-import type { Modal } from '../controller';
-import { moveToast } from './sidebar';
-import type { SessionKind, Settings, StartupMode, TerminalColors, ThemeName, ToolCheck } from '../../shared/types';
-import { RELEASES_URL, type UpdateStatus } from '../../shared/updates';
-import { changesPaneId } from '../../shared/paneContent';
-import type { DetectedIde } from '../../shared/ide';
-import { api } from '../api';
+import {
+  SOUND_DURATIONS,
+  SOUND_REPEATS,
+  SOUNDS,
+  type SoundChoice,
+} from "../../shared/sounds";
+import { CHANGELOG } from "../../shared/changelog";
+import { claudePathProblem } from "../../shared/claudePath";
+import type { ComponentChildren } from "preact";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "preact/hooks";
+import { EFFORTS, MODELS, PALETTE } from "../../shared/defaults";
+import { fuzzyMatch } from "../../shared/fuzzy";
+import {
+  eventToKeys,
+  isModifierOnly,
+  prettyKeys,
+  shortcutProblem,
+  SHORTCUTS,
+} from "../../shared/shortcuts";
+import { STATUS_LABEL, STATUS_PRIORITY } from "../../shared/statusMachine";
+import { allSessions, findSession } from "../../shared/reducer";
+import type { Modal } from "../controller";
+import { moveToast } from "./sidebar";
+import type {
+  SessionKind,
+  Settings,
+  StartupMode,
+  TerminalColors,
+  ThemeName,
+  ToolCheck,
+} from "../../shared/types";
+import { RELEASES_URL, type UpdateStatus } from "../../shared/updates";
+import { changesPaneId } from "../../shared/paneContent";
+import type { DetectedIde } from "../../shared/ide";
+import { api } from "../api";
 import {
   addProjectFromFolder,
   app,
@@ -43,16 +67,22 @@ import {
   openProjectFolder,
   rememberColor,
   previewSound,
-} from '../controller';
-import { CloseIcon, StatusIcon } from './icons';
-import { ColorDialog, ColorPicker, MarkDialog, NoteDialog, QUICK_MARKS } from './extras';
+} from "../controller";
+import { CloseIcon, StatusIcon } from "./icons";
+import {
+  ColorDialog,
+  ColorPicker,
+  MarkDialog,
+  NoteDialog,
+  QUICK_MARKS,
+} from "./extras";
 
 const EFFORT_LABEL: Record<string, string> = {
-  low: 'Bajo (low)',
-  medium: 'Medio (medium)',
-  high: 'Alto (high)',
-  xhigh: 'Muy alto (xhigh)',
-  max: 'Máximo (max)',
+  low: "Bajo (low)",
+  medium: "Medio (medium)",
+  high: "Alto (high)",
+  xhigh: "Muy alto (xhigh)",
+  max: "Máximo (max)",
 };
 
 export function closeModal(): void {
@@ -60,7 +90,15 @@ export function closeModal(): void {
   focusActive();
 }
 
-export function Backdrop({ children, onClose, labelledBy }: { children: ComponentChildren; onClose(): void; labelledBy: string }) {
+export function Backdrop({
+  children,
+  onClose,
+  labelledBy,
+}: {
+  children: ComponentChildren;
+  onClose(): void;
+  labelledBy: string;
+}) {
   const dialog = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -70,16 +108,25 @@ export function Backdrop({ children, onClose, labelledBy }: { children: Componen
     const onKey = (e: KeyboardEvent) => {
       const root = dialog.current;
       if (!root) return;
-      if (e.key === 'Escape') {
-        if ((document.activeElement as HTMLElement | null)?.classList.contains('capturing')) return;
+      if (e.key === "Escape") {
+        if (
+          (document.activeElement as HTMLElement | null)?.classList.contains(
+            "capturing",
+          )
+        )
+          return;
         e.preventDefault();
         e.stopPropagation();
         close.current();
         return;
       }
-      if (e.key !== 'Tab') return;
+      if (e.key !== "Tab") return;
       // El foco no se escapa: detrás hay una terminal que recibiría lo que se escriba.
-      const items = [...root.querySelectorAll<HTMLElement>('button, input, select, [tabindex="0"]')].filter((el) => !el.hasAttribute('disabled'));
+      const items = [
+        ...root.querySelectorAll<HTMLElement>(
+          'button, input, select, [tabindex="0"]',
+        ),
+      ].filter((el) => !el.hasAttribute("disabled"));
       if (!items.length) return;
       const first = items[0]!;
       const last = items[items.length - 1]!;
@@ -95,8 +142,8 @@ export function Backdrop({ children, onClose, labelledBy }: { children: Componen
         first.focus();
       }
     };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, []);
 
   return (
@@ -110,7 +157,13 @@ export function Backdrop({ children, onClose, labelledBy }: { children: Componen
         if (e.target === e.currentTarget) e.preventDefault();
       }}
     >
-      <div ref={dialog} class="dialog" role="dialog" aria-modal="true" aria-labelledby={labelledBy}>
+      <div
+        ref={dialog}
+        class="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={labelledBy}
+      >
         {children}
       </div>
     </div>
@@ -121,14 +174,25 @@ export function Backdrop({ children, onClose, labelledBy }: { children: Componen
  * La paleta, los últimos colores elegidos fuera de ella y "Más colores". Con `onMore`, "Más colores" lo
  * resuelve quien llama (un menú abre un diálogo); sin él, el selector se abre aquí mismo.
  */
-export function Swatches({ value, onPick, onMore }: { value: string | null; onPick(color: string | null): void; onMore?(): void }) {
+export function Swatches({
+  value,
+  onPick,
+  onMore,
+}: {
+  value: string | null;
+  onPick(color: string | null): void;
+  onMore?(): void;
+}) {
   const { state } = useStore(app);
   const [open, setOpen] = useState(false);
   const current = value?.toLowerCase() ?? null;
   const inPalette = PALETTE.some((p) => p.hex.toLowerCase() === current);
   const recent = state.settings.recentColors;
   // El color que tiene ahora, aunque ya no esté entre los recientes.
-  const extra = current && !inPalette && !recent.includes(current) ? [current, ...recent].slice(0, recent.length + 1) : recent;
+  const extra =
+    current && !inPalette && !recent.includes(current)
+      ? [current, ...recent].slice(0, recent.length + 1)
+      : recent;
   const pick = (color: string | null) => {
     if (color) rememberColor(color);
     onPick(color);
@@ -137,7 +201,7 @@ export function Swatches({ value, onPick, onMore }: { value: string | null; onPi
     <button
       type="button"
       key={key}
-      class={`swatch${current === hex.toLowerCase() ? ' on' : ''}`}
+      class={`swatch${current === hex.toLowerCase() ? " on" : ""}`}
       role="radio"
       aria-checked={current === hex.toLowerCase()}
       title={label}
@@ -149,14 +213,25 @@ export function Swatches({ value, onPick, onMore }: { value: string | null; onPi
   return (
     <div class="swatch-picker">
       <div class="swatches" role="radiogroup" aria-label="Color">
-        <button type="button" class={`swatch none${value === null ? ' on' : ''}`} role="radio" aria-checked={value === null} title="Sin color" onClick={() => onPick(null)} />
+        <button
+          type="button"
+          class={`swatch none${value === null ? " on" : ""}`}
+          role="radio"
+          aria-checked={value === null}
+          title="Sin color"
+          onClick={() => onPick(null)}
+        />
         {PALETTE.map((p) => swatch(p.hex, p.label, p.id))}
       </div>
-      <div class="swatches recent" role="radiogroup" aria-label="Colores recientes">
+      <div
+        class="swatches recent"
+        role="radiogroup"
+        aria-label="Colores recientes"
+      >
         {extra.map((hex) => swatch(hex, `Reciente: ${hex}`, hex))}
         <button
           type="button"
-          class={`swatch more${open ? ' on' : ''}`}
+          class={`swatch more${open ? " on" : ""}`}
           data-action="more-colors"
           title="Más colores: cualquiera, o pegar un código"
           aria-label="Más colores"
@@ -176,17 +251,25 @@ export function Swatches({ value, onPick, onMore }: { value: string | null; onPi
   );
 }
 
-function NewSessionDialog({ modal }: { modal: Extract<Modal, { type: 'newSession' }> }) {
+function NewSessionDialog({
+  modal,
+}: {
+  modal: Extract<Modal, { type: "newSession" }>;
+}) {
   const { state } = useStore(app);
   const [kind, setKind] = useState<SessionKind>(modal.kind);
-  const [projectId, setProjectId] = useState<string>(modal.projectId ?? state.projects[0]?.id ?? '');
+  const [projectId, setProjectId] = useState<string>(
+    modal.projectId ?? state.projects[0]?.id ?? "",
+  );
   const project = state.projects.find((p) => p.id === projectId) ?? null;
-  const [name, setName] = useState(() => defaultSessionName(project, modal.kind));
+  const [name, setName] = useState(() =>
+    defaultSessionName(project, modal.kind),
+  );
   // En una ref: el efecto de abajo corre después del repintado y no debe pisar lo ya escrito.
   const touched = useRef(false);
   const [color, setColor] = useState<string | null>(null);
-  const [model, setModel] = useState('');
-  const [effort, setEffort] = useState('');
+  const [model, setModel] = useState("");
+  const [effort, setEffort] = useState("");
   /** null: la del proyecto. */
   const [cwd, setCwd] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -203,9 +286,14 @@ function NewSessionDialog({ modal }: { modal: Extract<Modal, { type: 'newSession
   const submit = (e: Event) => {
     e.preventDefault();
     if (!project) return;
-    const input: Parameters<typeof createSession>[0] = { projectId: project.id, kind, name: name.trim() || defaultSessionName(project, kind), color };
-    if (kind === 'claude' && model.trim()) input.model = model.trim();
-    if (kind === 'claude' && effort) input.effort = effort;
+    const input: Parameters<typeof createSession>[0] = {
+      projectId: project.id,
+      kind,
+      name: name.trim() || defaultSessionName(project, kind),
+      color,
+    };
+    if (kind === "claude" && model.trim()) input.model = model.trim();
+    if (kind === "claude" && effort) input.effort = effort;
     if (cwd) input.cwd = cwd;
     view.set({ modal: null });
     void createSession(input);
@@ -216,17 +304,32 @@ function NewSessionDialog({ modal }: { modal: Extract<Modal, { type: 'newSession
       <form onSubmit={submit}>
         <h2 id="new-title">Nueva sesión</h2>
         <div class="seg" role="radiogroup" aria-label="Tipo de sesión">
-          <button type="button" role="radio" aria-checked={kind === 'claude'} class={kind === 'claude' ? 'on' : ''} onClick={() => setKind('claude')}>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={kind === "claude"}
+            class={kind === "claude" ? "on" : ""}
+            onClick={() => setKind("claude")}
+          >
             Claude Code
           </button>
-          <button type="button" role="radio" aria-checked={kind === 'shell'} class={kind === 'shell' ? 'on' : ''} onClick={() => setKind('shell')}>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={kind === "shell"}
+            class={kind === "shell" ? "on" : ""}
+            onClick={() => setKind("shell")}
+          >
             PowerShell
           </button>
         </div>
         <label class="field">
           <span>Proyecto</span>
           <div class="field-row">
-            <select value={projectId} onChange={(e) => setProjectId(e.currentTarget.value)}>
+            <select
+              value={projectId}
+              onChange={(e) => setProjectId(e.currentTarget.value)}
+            >
               {state.projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -248,10 +351,18 @@ function NewSessionDialog({ modal }: { modal: Extract<Modal, { type: 'newSession
         <div class="field">
           <span>Carpeta</span>
           <div class="field-row">
-            <small class="path session-cwd" data-field="cwd" title={cwd ?? project?.path}>
-              {cwd ?? project?.path ?? ''}
+            <small
+              class="path session-cwd"
+              data-field="cwd"
+              title={cwd ?? project?.path}
+            >
+              {cwd ?? project?.path ?? ""}
             </small>
-            <button type="button" data-action="pick-cwd" onClick={() => void api.pickFolder().then((p) => p && setCwd(p))}>
+            <button
+              type="button"
+              data-action="pick-cwd"
+              onClick={() => void api.pickFolder().then((p) => p && setCwd(p))}
+            >
               Elegir otra…
             </button>
             {cwd && (
@@ -260,7 +371,10 @@ function NewSessionDialog({ modal }: { modal: Extract<Modal, { type: 'newSession
               </button>
             )}
           </div>
-          <small>Puede ser otra carpeta y seguir en este proyecto. Claude guarda la conversación por carpeta, así que no se cambia después.</small>
+          <small>
+            Puede ser otra carpeta y seguir en este proyecto. Claude guarda la
+            conversación por carpeta, así que no se cambia después.
+          </small>
         </div>
         <label class="field">
           <span>Nombre</span>
@@ -279,11 +393,17 @@ function NewSessionDialog({ modal }: { modal: Extract<Modal, { type: 'newSession
           <span>Color</span>
           <Swatches value={color} onPick={setColor} />
         </div>
-        {kind === 'claude' && (
+        {kind === "claude" && (
           <div class="field-pair">
             <label class="field">
               <span>Modelo</span>
-              <input data-field="model" list="models" value={model} placeholder="El de mi configuración" onInput={(e) => setModel(e.currentTarget.value)} />
+              <input
+                data-field="model"
+                list="models"
+                value={model}
+                placeholder="El de mi configuración"
+                onInput={(e) => setModel(e.currentTarget.value)}
+              />
               <datalist id="models">
                 {MODELS.map((m) => (
                   <option key={m} value={m} />
@@ -292,7 +412,11 @@ function NewSessionDialog({ modal }: { modal: Extract<Modal, { type: 'newSession
             </label>
             <label class="field">
               <span>Esfuerzo</span>
-              <select data-field="effort" value={effort} onChange={(e) => setEffort(e.currentTarget.value)}>
+              <select
+                data-field="effort"
+                value={effort}
+                onChange={(e) => setEffort(e.currentTarget.value)}
+              >
                 <option value="">El de mi configuración</option>
                 {EFFORTS.map((m) => (
                   <option key={m} value={m}>
@@ -316,7 +440,11 @@ function NewSessionDialog({ modal }: { modal: Extract<Modal, { type: 'newSession
   );
 }
 
-function ConfirmDialog({ modal }: { modal: Extract<Modal, { type: 'confirm' }> }) {
+function ConfirmDialog({
+  modal,
+}: {
+  modal: Extract<Modal, { type: "confirm" }>;
+}) {
   const cancel = useRef<HTMLButtonElement>(null);
   useEffect(() => cancel.current?.focus(), []);
   const done = (ok: boolean) => {
@@ -338,7 +466,11 @@ function ConfirmDialog({ modal }: { modal: Extract<Modal, { type: 'confirm' }> }
         <button ref={cancel} onClick={() => done(false)}>
           Cancelar
         </button>
-        <button class={modal.danger ? 'danger' : 'primary'} data-confirm="ok" onClick={() => done(true)}>
+        <button
+          class={modal.danger ? "danger" : "primary"}
+          data-confirm="ok"
+          onClick={() => done(true)}
+        >
           {modal.ok}
         </button>
       </div>
@@ -347,11 +479,11 @@ function ConfirmDialog({ modal }: { modal: Extract<Modal, { type: 'confirm' }> }
 }
 
 /** Qué IDE abre este proyecto. Se recuerda por proyecto, y la ruta del programa la decide el proceso principal. */
-function IdeDialog({ modal }: { modal: Extract<Modal, { type: 'ide' }> }) {
+function IdeDialog({ modal }: { modal: Extract<Modal, { type: "ide" }> }) {
   const { state } = useStore(app);
   const project = state.projects.find((p) => p.id === modal.projectId);
   const [found, setFound] = useState<DetectedIde[] | null>(null);
-  const [problem, setProblem] = useState('');
+  const [problem, setProblem] = useState("");
   const first = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     void api.ideDetect().then(setFound, () => setFound([]));
@@ -362,16 +494,17 @@ function IdeDialog({ modal }: { modal: Extract<Modal, { type: 'ide' }> }) {
     view.set({ modal: null });
     focusActive();
     // Se venía a abrir algo, y ahora ya hay con qué. Cambiar de IDE no abre nada.
-    if (modal.file !== null || !project.ide) void openInIde(project.id, modal.file, modal.line);
+    if (modal.file !== null || !project.ide)
+      void openInIde(project.id, modal.file, modal.line);
   };
   const choose = (ide: DetectedIde) => {
     void api.ideChoose(project.id, ide.id).then((ok) => {
       if (ok) done();
-      else setProblem('No se pudo guardar esa elección. Prueba otra vez.');
+      else setProblem("No se pudo guardar esa elección. Prueba otra vez.");
     });
   };
   const browse = () => {
-    setProblem('');
+    setProblem("");
     void api.idePick(project.id).then((r) => {
       if (r.ok) done();
       else if (r.message) setProblem(r.message);
@@ -380,13 +513,29 @@ function IdeDialog({ modal }: { modal: Extract<Modal, { type: 'ide' }> }) {
   return (
     <Backdrop onClose={closeModal} labelledBy="ide-title">
       <h2 id="ide-title">¿Con qué abrir «{project.name}»?</h2>
-      <p class="dialog-body">Hilo lo recordará para este proyecto. Se abre en su propia ventana.</p>
-      {found === null && <p class="dialog-body">Buscando programas instalados…</p>}
-      {found && found.length === 0 && <p class="dialog-body">No se encontró ninguno en las carpetas habituales. Puedes buscar el .exe a mano.</p>}
+      <p class="dialog-body">
+        Hilo lo recordará para este proyecto. Se abre en su propia ventana.
+      </p>
+      {found === null && (
+        <p class="dialog-body">Buscando programas instalados…</p>
+      )}
+      {found && found.length === 0 && (
+        <p class="dialog-body">
+          No se encontró ninguno en las carpetas habituales. Puedes buscar el
+          .exe a mano.
+        </p>
+      )}
       {found && found.length > 0 && (
         <div class="ide-list">
           {found.map((ide, i) => (
-            <button key={ide.id} ref={i === 0 ? first : undefined} class={`ide-item${project.ide?.path === ide.path ? ' on' : ''}`} data-ide={ide.name} title={ide.path} onClick={() => choose(ide)}>
+            <button
+              key={ide.id}
+              ref={i === 0 ? first : undefined}
+              class={`ide-item${project.ide?.path === ide.path ? " on" : ""}`}
+              data-ide={ide.name}
+              title={ide.path}
+              onClick={() => choose(ide)}
+            >
               <span class="ide-name">{ide.name}</span>
               <span class="ide-path">{ide.path}</span>
             </button>
@@ -413,30 +562,41 @@ function Highlight({ text, positions }: { text: string; positions: number[] }) {
   const marks = new Set(positions);
   const chars = Array.from(text);
   return (
-    <>
-      {chars.map((c, i) => (marks.has(i) ? <mark key={i}>{c}</mark> : c))}
-    </>
+    <>{chars.map((c, i) => (marks.has(i) ? <mark key={i}>{c}</mark> : c))}</>
   );
 }
 
 function QuickOpen() {
   const { state } = useStore(app);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [at, setAt] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => input.current?.focus(), []);
 
   const results = useMemo(() => {
-    const items = allSessions(state).filter((s) => !view.get().closing.includes(s.id)).map((s) => {
-      const found = findSession(state, s.id)!;
-      const match = fuzzyMatch(query, s.name);
-      const projectMatch = match ? null : fuzzyMatch(query, found.project.name);
-      return { s, project: found.project.name, match, score: match?.score ?? (projectMatch ? projectMatch.score - 2 : null) };
-    });
+    const items = allSessions(state)
+      .filter((s) => !view.get().closing.includes(s.id))
+      .map((s) => {
+        const found = findSession(state, s.id)!;
+        const match = fuzzyMatch(query, s.name);
+        const projectMatch = match
+          ? null
+          : fuzzyMatch(query, found.project.name);
+        return {
+          s,
+          project: found.project.name,
+          match,
+          score: match?.score ?? (projectMatch ? projectMatch.score - 2 : null),
+        };
+      });
     return items
       .filter((i) => i.score !== null)
       .sort((a, b) => {
-        if (!query) return STATUS_PRIORITY[statusOf(a.s.id)] - STATUS_PRIORITY[statusOf(b.s.id)];
+        if (!query)
+          return (
+            STATUS_PRIORITY[statusOf(a.s.id)] -
+            STATUS_PRIORITY[statusOf(b.s.id)]
+          );
         return b.score! - a.score!;
       });
   }, [query, state]);
@@ -447,7 +607,9 @@ function QuickOpen() {
   };
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    list.current?.querySelector('.quick-item.on')?.scrollIntoView({ block: 'nearest' });
+    list.current
+      ?.querySelector(".quick-item.on")
+      ?.scrollIntoView({ block: "nearest" });
   }, [at, results]);
 
   return (
@@ -466,13 +628,13 @@ function QuickOpen() {
             setAt(0);
           }}
           onKeyDown={(e) => {
-            if (e.key === 'ArrowDown') {
+            if (e.key === "ArrowDown") {
               e.preventDefault();
               setAt((v) => Math.min(v + 1, results.length - 1));
-            } else if (e.key === 'ArrowUp') {
+            } else if (e.key === "ArrowUp") {
               e.preventDefault();
               setAt((v) => Math.max(v - 1, 0));
-            } else if (e.key === 'Enter' && results[at]) {
+            } else if (e.key === "Enter" && results[at]) {
               e.preventDefault();
               pick(results[at]!.s.id);
             }
@@ -480,16 +642,32 @@ function QuickOpen() {
         />
         <div ref={list} class="quick-list" role="listbox">
           {results.map((r, i) => (
-            <button key={r.s.id} role="option" aria-selected={i === at} class={`quick-item${i === at ? ' on' : ''}`} onMouseEnter={() => setAt(i)} onClick={() => pick(r.s.id)}>
+            <button
+              key={r.s.id}
+              role="option"
+              aria-selected={i === at}
+              class={`quick-item${i === at ? " on" : ""}`}
+              onMouseEnter={() => setAt(i)}
+              onClick={() => pick(r.s.id)}
+            >
               <StatusIcon status={statusOf(r.s.id)} />
               <span class="name">
-                <Highlight text={r.s.name} positions={r.match?.positions ?? []} />
+                <Highlight
+                  text={r.s.name}
+                  positions={r.match?.positions ?? []}
+                />
               </span>
               <span class="sub">{r.project}</span>
               <span class="quick-status">{STATUS_LABEL[statusOf(r.s.id)]}</span>
             </button>
           ))}
-          {results.length === 0 && <p class="quick-empty">{allSessions(state).length ? 'Ninguna sesión se llama así.' : 'Aún no hay sesiones.'}</p>}
+          {results.length === 0 && (
+            <p class="quick-empty">
+              {allSessions(state).length
+                ? "Ninguna sesión se llama así."
+                : "Aún no hay sesiones."}
+            </p>
+          )}
         </div>
       </div>
     </Backdrop>
@@ -499,7 +677,7 @@ function QuickOpen() {
 /** Campo de ajustes: confirma al salir o con Enter. Un repintado no pisa lo que se está escribiendo. */
 function DraftInput(props: {
   value: string | number;
-  type?: 'number';
+  type?: "number";
   min?: number;
   max?: number;
   step?: number;
@@ -530,7 +708,7 @@ function DraftInput(props: {
         commit();
       }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') {
+        if (e.key === "Enter") {
           e.preventDefault();
           commit();
         }
@@ -539,36 +717,50 @@ function DraftInput(props: {
   );
 }
 
-function ShortcutRow({ id, label, keys, note: outerNote, onSet }: { id: string; label: string; keys: string; note: string | undefined; onSet(id: string, keys: string | null): void }) {
+function ShortcutRow({
+  id,
+  label,
+  keys,
+  note: outerNote,
+  onSet,
+}: {
+  id: string;
+  label: string;
+  keys: string;
+  note: string | undefined;
+  onSet(id: string, keys: string | null): void;
+}) {
   const [capturing, setCapturing] = useState(false);
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState("");
   const def = SHORTCUTS.find((s) => s.id === id)!;
   return (
     <div class="shortcut">
       <span class="shortcut-label">{label}</span>
-      {(note || outerNote) && <span class="shortcut-note">{note || outerNote}</span>}
+      {(note || outerNote) && (
+        <span class="shortcut-note">{note || outerNote}</span>
+      )}
       <button
         type="button"
-        class={`keycap${capturing ? ' capturing' : ''}`}
+        class={`keycap${capturing ? " capturing" : ""}`}
         onClick={() => {
           setCapturing(true);
-          setNote('');
+          setNote("");
         }}
         onBlur={() => setCapturing(false)}
         onKeyDown={(e) => {
           if (!capturing) return;
-          if (e.key !== 'Tab') {
+          if (e.key !== "Tab") {
             e.preventDefault();
             e.stopPropagation();
           }
-          if (e.key === 'Escape') {
+          if (e.key === "Escape") {
             setCapturing(false);
-            setNote('');
+            setNote("");
             return;
           }
-          if (e.key === 'Tab') {
+          if (e.key === "Tab") {
             setCapturing(false);
-            setNote('');
+            setNote("");
             return;
           }
           if (isModifierOnly(e)) return;
@@ -578,12 +770,12 @@ function ShortcutRow({ id, label, keys, note: outerNote, onSet }: { id: string; 
             setNote(problem);
             return;
           }
-          setNote('');
+          setNote("");
           setCapturing(false);
           onSet(id, combo);
         }}
       >
-        {capturing ? 'Pulsa la combinación' : prettyKeys(keys)}
+        {capturing ? "Pulsa la combinación" : prettyKeys(keys)}
       </button>
       {keys !== def.defaultKeys && (
         <button type="button" class="link" onClick={() => onSet(id, null)}>
@@ -595,125 +787,219 @@ function ShortcutRow({ id, label, keys, note: outerNote, onSet }: { id: string; 
 }
 
 const SETTINGS_SECTIONS = [
-  ['look', 'Apariencia'],
-  ['terminal', 'Terminal'],
-  ['sessions', 'Sesiones'],
-  ['claude', 'Claude Code'],
-  ['updates', 'Actualizaciones'],
-  ['news', 'Novedades'],
-  ['changes', 'Cambios'],
-  ['shortcuts', 'Atajos'],
+  ["look", "Apariencia"],
+  ["terminal", "Terminal"],
+  ["sessions", "Sesiones"],
+  ["claude", "Claude Code"],
+  ["updates", "Actualizaciones"],
+  ["news", "Novedades"],
+  ["changes", "Cambios"],
+  ["shortcuts", "Atajos"],
 ] as const;
 
 /** "9 de noviembre de 2026", sin depender del idioma del sistema. */
 function formatDate(iso: string): string {
-  const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-  const [y, mo, d] = iso.split('-').map(Number);
+  const months = [
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
+  ];
+  const [y, mo, d] = iso.split("-").map(Number);
   return `${d} de ${months[(mo ?? 1) - 1]} de ${y}`;
 }
 
 function updateMessage(status: UpdateStatus): string {
   switch (status.state) {
-    case 'off':
-      return 'Esta copia es de desarrollo o de pruebas: no se conecta a nada.';
-    case 'idle':
-      return 'Todavía no se buscó desde que abriste Hilo.';
-    case 'checking':
-      return 'Buscando…';
-    case 'current':
-      return 'Estás al día: tienes la última versión.';
-    case 'available':
+    case "off":
+      return "Esta copia es de desarrollo o de pruebas: no se conecta a nada.";
+    case "idle":
+      return "Todavía no se buscó desde que abriste Hilo.";
+    case "checking":
+      return "Buscando…";
+    case "current":
+      return "Estás al día: tienes la última versión.";
+    case "available":
       return `Hay una versión nueva: ${status.version}. No se baja ni se instala nada hasta que lo pidas.`;
-    case 'downloading':
+    case "downloading":
       return `Bajando la versión ${status.version}: ${status.percent} %.`;
-    case 'ready':
+    case "ready":
       return `La versión ${status.version} está lista. Al instalarla, Hilo se cierra, se actualiza sin mostrar pantallas y vuelve a abrirse solo. Tus sesiones vuelven con su conversación.`;
-    case 'installing':
+    case "installing":
       return `Cerrando las sesiones para instalar la versión ${status.version}…`;
-    case 'error':
+    case "error":
       return status.message;
   }
 }
 
-function UpdatesSection({ version, checkOnStart, onCheckOnStart }: { version: string; checkOnStart: boolean; onCheckOnStart(on: boolean): void }) {
+function UpdatesSection({
+  version,
+  checkOnStart,
+  onCheckOnStart,
+}: {
+  version: string;
+  checkOnStart: boolean;
+  onCheckOnStart(on: boolean): void;
+}) {
   const status = useStore(view).update;
   const [confirming, setConfirming] = useState(false);
-  const install = (force: boolean) => void api.updateInstall(force).then((r) => setConfirming(r.needsConfirm));
-  const busy = status.state === 'off' || status.state === 'checking' || status.state === 'downloading' || status.state === 'ready' || status.state === 'installing';
+  const install = (force: boolean) =>
+    void api.updateInstall(force).then((r) => setConfirming(r.needsConfirm));
+  const busy =
+    status.state === "off" ||
+    status.state === "checking" ||
+    status.state === "downloading" ||
+    status.state === "ready" ||
+    status.state === "installing";
   return (
     <section class="settings-section" data-section="updates">
       <h3>Actualizaciones</h3>
       <p class="update-version">
-        Versión instalada: <strong data-field="current-version">{version}</strong>
+        Versión instalada:{" "}
+        <strong data-field="current-version">{version}</strong>
       </p>
       <label class="check">
-        <input type="checkbox" data-field="check-updates" checked={checkOnStart} onChange={(e) => onCheckOnStart(e.currentTarget.checked)} />
+        <input
+          type="checkbox"
+          data-field="check-updates"
+          checked={checkOnStart}
+          onChange={(e) => onCheckOnStart(e.currentTarget.checked)}
+        />
         Buscar una versión nueva cada vez que abro Hilo
       </label>
-      <p class={`update-status${status.state === 'error' ? ' warn' : ''}`} data-field="update-status" data-state={status.state} role="status">
+      <p
+        class={`update-status${status.state === "error" ? " warn" : ""}`}
+        data-field="update-status"
+        data-state={status.state}
+        role="status"
+      >
         {updateMessage(status)}
       </p>
-      {status.state === 'downloading' && <progress class="update-bar" max={100} value={status.percent} aria-label="Progreso de la descarga" />}
-      {confirming && status.state === 'ready' ? (
+      {status.state === "downloading" && (
+        <progress
+          class="update-bar"
+          max={100}
+          value={status.percent}
+          aria-label="Progreso de la descarga"
+        />
+      )}
+      {confirming && status.state === "ready" ? (
         <>
           <p class="update-status warn" data-field="update-working">
-            Hay sesiones trabajando. Si actualizas ahora se interrumpen; después vuelven con su conversación.
+            Hay sesiones trabajando. Si actualizas ahora se interrumpen; después
+            vuelven con su conversación.
           </p>
           <div class="actions update-actions">
-            <button type="button" class="danger" data-field="update-force" onClick={() => install(true)}>
+            <button
+              type="button"
+              class="danger"
+              data-field="update-force"
+              onClick={() => install(true)}
+            >
               Reiniciar de todos modos
             </button>
-            <button type="button" data-field="update-wait" onClick={() => setConfirming(false)}>
+            <button
+              type="button"
+              data-field="update-wait"
+              onClick={() => setConfirming(false)}
+            >
               Esperar
             </button>
           </div>
         </>
       ) : (
         <div class="actions update-actions">
-          {status.state === 'available' && (
-            <button type="button" class="primary" data-field="update-download" onClick={() => void api.updateDownload()}>
+          {status.state === "available" && (
+            <button
+              type="button"
+              class="primary"
+              data-field="update-download"
+              onClick={() => void api.updateDownload()}
+            >
               Bajar la versión {status.version}
             </button>
           )}
-          {status.state === 'ready' && (
-            <button type="button" class="primary" data-field="update-install" onClick={() => install(false)}>
+          {status.state === "ready" && (
+            <button
+              type="button"
+              class="primary"
+              data-field="update-install"
+              onClick={() => install(false)}
+            >
               Reiniciar e instalar
             </button>
           )}
-          {status.state === 'error' && status.phase === 'download' && (
-            <button type="button" class="primary" data-field="update-retry" onClick={() => void api.updateDownload()}>
+          {status.state === "error" && status.phase === "download" && (
+            <button
+              type="button"
+              class="primary"
+              data-field="update-retry"
+              onClick={() => void api.updateDownload()}
+            >
               Reintentar la descarga
             </button>
           )}
-          <button type="button" data-field="update-check" disabled={busy} onClick={() => void api.updateCheck()}>
+          <button
+            type="button"
+            data-field="update-check"
+            disabled={busy}
+            onClick={() => void api.updateCheck()}
+          >
             Buscar actualizaciones
           </button>
-          {status.state === 'error' && (
-            <button type="button" class="link" data-field="update-releases" onClick={() => api.openLink(RELEASES_URL)}>
+          {status.state === "error" && (
+            <button
+              type="button"
+              class="link"
+              data-field="update-releases"
+              onClick={() => api.openLink(RELEASES_URL)}
+            >
               Abrir la página de versiones
             </button>
           )}
         </div>
       )}
-      <small class="update-note">Es la única conexión de Hilo. Solo habla con GitHub para buscar y bajar versiones, no envía datos tuyos y nunca instala sin preguntarte.</small>
+      <small class="update-note">
+        Es la única conexión de Hilo. Solo habla con GitHub para buscar y bajar
+        versiones, no envía datos tuyos y nunca instala sin preguntarte.
+      </small>
     </section>
   );
 }
 
-function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }> }) {
+function SettingsDialog({
+  modal,
+}: {
+  modal: Extract<Modal, { type: "settings" }>;
+}) {
   const { state, info } = useStore(app);
   const s = state.settings;
-  const set = (patch: Partial<Settings>) => void dispatch({ type: 'settings/set', patch });
+  const set = (patch: Partial<Settings>) =>
+    void dispatch({ type: "settings/set", patch });
   const num = (value: string, min: number, max: number, fallback: number) => {
     const n = Number(value);
     return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : fallback;
   };
   const [conflicts, setConflicts] = useState<Record<string, string>>({});
   const [claudeMissing, setClaudeMissing] = useState(false);
+  const [previewing, setPreviewing] = useState<string | null>(null);
+  const preview = useRef<{ key: string; stop(): void } | null>(null);
+  useEffect(() => () => preview.current?.stop(), []);
   const [fontMissing, setFontMissing] = useState(false);
   useEffect(() => {
     let live = true;
-    if (s.claudePath) void api.pathExists(s.claudePath).then((ok) => live && setClaudeMissing(!ok));
+    if (s.claudePath)
+      void api
+        .pathExists(s.claudePath)
+        .then((ok) => live && setClaudeMissing(!ok));
     else setClaudeMissing(false);
     return () => {
       live = false;
@@ -730,7 +1016,7 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
       // Si otra acción la usaba, queda sin asignar y se avisa.
       for (const def of SHORTCUTS) {
         if (def.id !== id && (next[def.id] ?? def.defaultKeys) === keys) {
-          next[def.id] = '';
+          next[def.id] = "";
           notes[id] = `Se quitó de «${def.label}»`;
         }
       }
@@ -746,7 +1032,9 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
   useEffect(() => {
     if (!modal.section) return;
     setSection(modal.section);
-    bodyRef.current?.querySelector(`[data-section="${modal.section}"]`)?.scrollIntoView({ block: 'start' });
+    bodyRef.current
+      ?.querySelector(`[data-section="${modal.section}"]`)
+      ?.scrollIntoView({ block: "start" });
   }, [modal]);
 
   return (
@@ -756,7 +1044,11 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
           <h2 id="settings-title" ref={titleRef} tabIndex={-1}>
             Ajustes
           </h2>
-          <button class="icon-btn" aria-label="Cerrar ajustes" onClick={closeModal}>
+          <button
+            class="icon-btn"
+            aria-label="Cerrar ajustes"
+            onClick={closeModal}
+          >
             <CloseIcon />
           </button>
         </header>
@@ -766,11 +1058,13 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
               <button
                 key={id}
                 type="button"
-                class={section === id ? 'on' : ''}
-                aria-current={section === id ? 'true' : undefined}
+                class={section === id ? "on" : ""}
+                aria-current={section === id ? "true" : undefined}
                 onClick={() => {
                   setSection(id);
-                  bodyRef.current?.querySelector(`[data-section="${id}"]`)?.scrollIntoView({ block: 'start' });
+                  bodyRef.current
+                    ?.querySelector(`[data-section="${id}"]`)
+                    ?.scrollIntoView({ block: "start" });
                 }}
               >
                 {label}
@@ -789,62 +1083,140 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
                 if (el && el.getBoundingClientRect().top <= top) current = id;
               }
               // Al final de la lista, la última sección puede no llegar arriba.
-              if (area.scrollTop + area.clientHeight >= area.scrollHeight - 2) current = SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1]![0];
+              if (area.scrollTop + area.clientHeight >= area.scrollHeight - 2)
+                current = SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1]![0];
               setSection(current);
             }}
           >
             <section class="settings-section" data-section="look">
               <h3>Apariencia</h3>
               <div class="field">
-                <span id="font-size-label">Tamaño de la letra en las terminales</span>
+                <span id="font-size-label">
+                  Tamaño de la letra en las terminales
+                </span>
                 <div class="stepper">
-                  <button type="button" aria-label="Letra más chica" onClick={() => set({ fontSize: Math.max(9, s.fontSize - 1) })}>
+                  <button
+                    type="button"
+                    aria-label="Letra más chica"
+                    onClick={() =>
+                      set({ fontSize: Math.max(9, s.fontSize - 1) })
+                    }
+                  >
                     −
                   </button>
-                  <DraftInput field="font-size" aria-labelledby="font-size-label" type="number" min={9} max={32} value={s.fontSize} onCommit={(v) => set({ fontSize: num(v, 9, 32, s.fontSize) })} />
-                  <button type="button" aria-label="Letra más grande" onClick={() => set({ fontSize: Math.min(32, s.fontSize + 1) })}>
+                  <DraftInput
+                    field="font-size"
+                    aria-labelledby="font-size-label"
+                    type="number"
+                    min={9}
+                    max={32}
+                    value={s.fontSize}
+                    onCommit={(v) =>
+                      set({ fontSize: num(v, 9, 32, s.fontSize) })
+                    }
+                  />
+                  <button
+                    type="button"
+                    aria-label="Letra más grande"
+                    onClick={() =>
+                      set({ fontSize: Math.min(32, s.fontSize + 1) })
+                    }
+                  >
                     +
                   </button>
                 </div>
               </div>
-              <div class="font-preview" style={{ fontFamily: `"${s.fontFamily}", "Cascadia Mono", "Hilo Mono", monospace`, fontSize: `${s.fontSize}px`, lineHeight: s.lineHeight }}>
+              <div
+                class="font-preview"
+                style={{
+                  fontFamily: `"${s.fontFamily}", "Cascadia Mono", "Hilo Mono", monospace`,
+                  fontSize: `${s.fontSize}px`,
+                  lineHeight: s.lineHeight,
+                }}
+              >
                 Así se ve el texto. 0123456789
               </div>
               <label class="field">
                 <span>Tamaño de toda la ventana</span>
-                <select data-field="app-zoom" value={s.appZoom} onChange={(e) => set({ appZoom: Number(e.currentTarget.value) })}>
+                <select
+                  data-field="app-zoom"
+                  value={s.appZoom}
+                  onChange={(e) =>
+                    set({ appZoom: Number(e.currentTarget.value) })
+                  }
+                >
                   {[80, 90, 100, 110, 125, 150].map((z) => (
                     <option key={z} value={z}>
-                      {z} %{z === 100 ? ' (normal)' : ''}
+                      {z} %{z === 100 ? " (normal)" : ""}
                     </option>
                   ))}
                 </select>
-                <small>Agranda también la lista de sesiones, las pestañas y estos ajustes.</small>
+                <small>
+                  Agranda también la lista de sesiones, las pestañas y estos
+                  ajustes.
+                </small>
               </label>
               <div class="field-pair">
                 <label class="field">
                   <span>Fuente</span>
-                  <DraftInput field="font" value={s.fontFamily} onCommit={(v) => set({ fontFamily: v.trim() || 'Cascadia Mono' })} />
-                  {fontMissing && <small class="warn">No está instalada: se usa Cascadia Mono.</small>}
+                  <DraftInput
+                    field="font"
+                    value={s.fontFamily}
+                    onCommit={(v) =>
+                      set({ fontFamily: v.trim() || "Cascadia Mono" })
+                    }
+                  />
+                  {fontMissing && (
+                    <small class="warn">
+                      No está instalada: se usa Cascadia Mono.
+                    </small>
+                  )}
                 </label>
                 <label class="field">
                   <span>Interlineado</span>
-                  <DraftInput type="number" min={1} max={2} step={0.05} value={s.lineHeight} onCommit={(v) => set({ lineHeight: num(v, 1, 2, s.lineHeight) })} />
+                  <DraftInput
+                    type="number"
+                    min={1}
+                    max={2}
+                    step={0.05}
+                    value={s.lineHeight}
+                    onCommit={(v) =>
+                      set({ lineHeight: num(v, 1, 2, s.lineHeight) })
+                    }
+                  />
                 </label>
               </div>
               <div class="field-pair">
                 <label class="field">
                   <span>Tema</span>
-                  <select data-field="theme" value={s.theme} onChange={(e) => set({ theme: e.currentTarget.value as ThemeName })}>
+                  <select
+                    data-field="theme"
+                    value={s.theme}
+                    onChange={(e) =>
+                      set({ theme: e.currentTarget.value as ThemeName })
+                    }
+                  >
                     <option value="dark">Oscuro</option>
                     <option value="light">Claro</option>
                   </select>
                 </label>
                 <label class="field">
                   <span>Colores de la terminal</span>
-                  <select data-field="colors" value={s.terminalColors} onChange={(e) => set({ terminalColors: e.currentTarget.value as TerminalColors })}>
-                    <option value="hilo">Los de Hilo, con mejor contraste</option>
-                    <option value="campbell">Los de Windows Terminal (Campbell)</option>
+                  <select
+                    data-field="colors"
+                    value={s.terminalColors}
+                    onChange={(e) =>
+                      set({
+                        terminalColors: e.currentTarget.value as TerminalColors,
+                      })
+                    }
+                  >
+                    <option value="hilo">
+                      Los de Hilo, con mejor contraste
+                    </option>
+                    <option value="campbell">
+                      Los de Windows Terminal (Campbell)
+                    </option>
                   </select>
                 </label>
               </div>
@@ -853,32 +1225,85 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
             <section class="settings-section" data-section="terminal">
               <h3>Terminal y desplazamiento</h3>
               <label class="check">
-                <input type="checkbox" data-field="scrollbar-always" checked={s.scrollbarAlways} onChange={(e) => set({ scrollbarAlways: e.currentTarget.checked })} />
+                <input
+                  type="checkbox"
+                  data-field="scrollbar-always"
+                  checked={s.scrollbarAlways}
+                  onChange={(e) =>
+                    set({ scrollbarAlways: e.currentTarget.checked })
+                  }
+                />
                 Mostrar siempre la barra de desplazamiento, si hay historial
               </label>
               <label class="field">
                 <span>Velocidad con la rueda del ratón</span>
                 <div class="range-row">
-                  <input type="range" data-field="wheel-speed" min={25} max={300} step={25} value={s.wheelSpeed} onChange={(e) => set({ wheelSpeed: Number(e.currentTarget.value) })} />
+                  <input
+                    type="range"
+                    data-field="wheel-speed"
+                    min={25}
+                    max={300}
+                    step={25}
+                    value={s.wheelSpeed}
+                    onChange={(e) =>
+                      set({ wheelSpeed: Number(e.currentTarget.value) })
+                    }
+                  />
                   <output>{s.wheelSpeed} %</output>
                 </div>
               </label>
               <label class="field">
                 <span>Velocidad con dos dedos en el touchpad</span>
                 <div class="range-row">
-                  <input type="range" data-field="touchpad-speed" min={10} max={100} step={5} value={s.touchpadSpeed} onChange={(e) => set({ touchpadSpeed: Number(e.currentTarget.value) })} />
+                  <input
+                    type="range"
+                    data-field="touchpad-speed"
+                    min={10}
+                    max={100}
+                    step={5}
+                    value={s.touchpadSpeed}
+                    onChange={(e) =>
+                      set({ touchpadSpeed: Number(e.currentTarget.value) })
+                    }
+                  />
                   <output>{s.touchpadSpeed} %</output>
                 </div>
-                <small>Si baja muy rápido, reduce este valor. Vale al momento, sin reiniciar.</small>
+                <small>
+                  Si baja muy rápido, reduce este valor. Vale al momento, sin
+                  reiniciar.
+                </small>
               </label>
               <label class="field">
                 <span>Líneas de historial por terminal</span>
-                <DraftInput field="scrollback" type="number" min={500} max={100000} step={500} value={s.scrollback} onCommit={(v) => set({ scrollback: num(v, 500, 100000, s.scrollback) })} />
-                <small>Cada 3000 líneas usan unos 8 MB si la terminal está llena.{s.scrollback >= 20000 ? ` Con ${s.scrollback} líneas, unos ${Math.round((s.scrollback / 3000) * 8)} MB por terminal.` : ''}</small>
+                <DraftInput
+                  field="scrollback"
+                  type="number"
+                  min={500}
+                  max={100000}
+                  step={500}
+                  value={s.scrollback}
+                  onCommit={(v) =>
+                    set({ scrollback: num(v, 500, 100000, s.scrollback) })
+                  }
+                />
+                <small>
+                  Cada 3000 líneas usan unos 8 MB si la terminal está llena.
+                  {s.scrollback >= 20000
+                    ? ` Con ${s.scrollback} líneas, unos ${Math.round((s.scrollback / 3000) * 8)} MB por terminal.`
+                    : ""}
+                </small>
               </label>
               <label class="check">
-                <input type="checkbox" data-field="confirm-multiline" checked={s.confirmMultilinePaste} onChange={(e) => set({ confirmMultilinePaste: e.currentTarget.checked })} />
-                Avisar antes de pegar varias líneas en una terminal donde se ejecutarían, como PowerShell
+                <input
+                  type="checkbox"
+                  data-field="confirm-multiline"
+                  checked={s.confirmMultilinePaste}
+                  onChange={(e) =>
+                    set({ confirmMultilinePaste: e.currentTarget.checked })
+                  }
+                />
+                Avisar antes de pegar varias líneas en una terminal donde se
+                ejecutarían, como PowerShell
               </label>
             </section>
 
@@ -886,38 +1311,81 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
               <h3>Sesiones</h3>
               <label class="field">
                 <span>Al abrir Hilo</span>
-                <select data-field="startup" value={s.startup} onChange={(e) => set({ startup: e.currentTarget.value as StartupMode })}>
-                  <option value="restore">Encender las que dejé encendidas</option>
+                <select
+                  data-field="startup"
+                  value={s.startup}
+                  onChange={(e) =>
+                    set({ startup: e.currentTarget.value as StartupMode })
+                  }
+                >
+                  <option value="restore">
+                    Encender las que dejé encendidas
+                  </option>
                   <option value="asleep">Todas las sesiones dormidas</option>
                   <option value="wakeLast">Despertar la última que usé</option>
                   <option value="wakeAll">Despertar todas</option>
                 </select>
               </label>
               <label class="check">
-                <input type="checkbox" checked={s.wakeOnSelect} onChange={(e) => set({ wakeOnSelect: e.currentTarget.checked })} />
+                <input
+                  type="checkbox"
+                  checked={s.wakeOnSelect}
+                  onChange={(e) =>
+                    set({ wakeOnSelect: e.currentTarget.checked })
+                  }
+                />
                 Despertar una sesión al seleccionarla
               </label>
               <label class="field">
                 <span>Dormir tras estos minutos sin actividad (0 = nunca)</span>
-                <DraftInput field="autosleep" type="number" min={0} max={1440} value={s.autoSleepMinutes} onCommit={(v) => set({ autoSleepMinutes: num(v, 0, 1440, 0) })} />
-                <small>Nunca duerme una sesión que trabaja, que te espera, sin leer o con procesos en segundo plano.</small>
+                <DraftInput
+                  field="autosleep"
+                  type="number"
+                  min={0}
+                  max={1440}
+                  value={s.autoSleepMinutes}
+                  onCommit={(v) =>
+                    set({ autoSleepMinutes: num(v, 0, 1440, 0) })
+                  }
+                />
+                <small>
+                  Nunca duerme una sesión que trabaja, que te espera, sin leer o
+                  con procesos en segundo plano.
+                </small>
               </label>
               <label class="check">
-                <input type="checkbox" data-field="notifications" checked={s.notifications} onChange={(e) => set({ notifications: e.currentTarget.checked })} />
-                Avisar con una notificación de Windows si una sesión termina o me espera mientras no la miro
+                <input
+                  type="checkbox"
+                  data-field="notifications"
+                  checked={s.notifications}
+                  onChange={(e) =>
+                    set({ notifications: e.currentTarget.checked })
+                  }
+                />
+                Avisar con una notificación de Windows si una sesión termina o
+                me espera mientras no la miro
               </label>
               <h4 class="settings-sub">Sonidos</h4>
               {(
                 [
-                  ['soundDone', 'Cuando termina'],
-                  ['soundWaiting', 'Cuando te espera (un permiso o una pregunta)'],
-                  ['soundError', 'Cuando falla'],
+                  ["soundDone", "Cuando termina"],
+                  [
+                    "soundWaiting",
+                    "Cuando te espera (un permiso o una pregunta)",
+                  ],
+                  ["soundError", "Cuando falla"],
                 ] as const
               ).map(([key, label]) => (
                 <label class="field" key={key}>
                   <span>{label}</span>
                   <div class="field-row">
-                    <select data-field={key} value={s[key]} onChange={(e) => set({ [key]: e.currentTarget.value as SoundChoice })}>
+                    <select
+                      data-field={key}
+                      value={s[key]}
+                      onChange={(e) =>
+                        set({ [key]: e.currentTarget.value as SoundChoice })
+                      }
+                    >
                       <option value="none">Sin sonido</option>
                       {SOUNDS.map((o) => (
                         <option key={o.id} value={o.id}>
@@ -925,8 +1393,29 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
                         </option>
                       ))}
                     </select>
-                    <button type="button" data-action={`preview-${key}`} disabled={s[key] === 'none'} onClick={() => previewSound(s[key])}>
-                      Probar
+                    <button
+                      type="button"
+                      data-action={`preview-${key}`}
+                      disabled={s[key] === "none"}
+                      onClick={() => {
+                        // Se mira antes de detener: al detenerse, el aviso de fin ya vacía preview.
+                        const wasPlaying = preview.current?.key === key;
+                        preview.current?.stop();
+                        preview.current = null;
+                        setPreviewing(null);
+                        if (wasPlaying) return;
+                        const entry = { key, stop: () => undefined as void };
+                        preview.current = entry;
+                        setPreviewing(key);
+                        entry.stop = previewSound(s[key], () => {
+                          if (preview.current === entry) {
+                            preview.current = null;
+                            setPreviewing(null);
+                          }
+                        });
+                      }}
+                    >
+                      {previewing === key ? "Detener" : "Probar"}
                     </button>
                   </div>
                 </label>
@@ -943,29 +1432,81 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
                   value={s.soundVolume}
                   onChange={(e) => {
                     set({ soundVolume: Number(e.currentTarget.value) });
-                    const first = [s.soundDone, s.soundWaiting, s.soundError].find((x) => x !== 'none');
+                    const first = [
+                      s.soundDone,
+                      s.soundWaiting,
+                      s.soundError,
+                    ].find((x) => x !== "none");
                     if (first) setTimeout(() => previewSound(first), 50);
                   }}
                 />
               </label>
               <label class="field">
-                <span>Repetir</span>
-                <select data-field="sound-repeat" value={String(s.soundRepeat)} onChange={(e) => set({ soundRepeat: Number(e.currentTarget.value) })}>
-                  {SOUND_REPEATS.map((m) => (
-                    <option key={m} value={String(m)}>
-                      {m === 0 ? 'No repetir' : m === 1 ? 'Cada 1 minuto' : `Cada ${m} minutos`}
+                <span>Duración de cada aviso</span>
+                <select
+                  data-field="sound-duration"
+                  value={String(s.soundDuration)}
+                  onChange={(e) =>
+                    set({ soundDuration: Number(e.currentTarget.value) })
+                  }
+                >
+                  {SOUND_DURATIONS.map((d) => (
+                    <option key={d} value={String(d)}>
+                      {d === 0
+                        ? "Una vez"
+                        : `Repetirlo seguido durante ${d} segundos`}
                     </option>
                   ))}
                 </select>
-                <small>Vuelve a sonar mientras nadie la atienda: hasta que la abras o le respondas.</small>
+                <small>
+                  Se corta apenas abres la sesión o le respondes. "Probar" la
+                  usa, y con un segundo clic se detiene.
+                </small>
+              </label>
+              <label class="field">
+                <span>Repetir</span>
+                <select
+                  data-field="sound-repeat"
+                  value={String(s.soundRepeat)}
+                  onChange={(e) =>
+                    set({ soundRepeat: Number(e.currentTarget.value) })
+                  }
+                >
+                  {SOUND_REPEATS.map((m) => (
+                    <option key={m} value={String(m)}>
+                      {m === 0
+                        ? "No repetir"
+                        : m === 1
+                          ? "Cada 1 minuto"
+                          : `Cada ${m} minutos`}
+                    </option>
+                  ))}
+                </select>
+                <small>
+                  Vuelve a sonar mientras nadie la atienda: hasta que la abras o
+                  le respondas.
+                </small>
               </label>
               <label class="check">
-                <input type="checkbox" data-field="sound-always" checked={s.soundAlways} onChange={(e) => set({ soundAlways: e.currentTarget.checked })} />
+                <input
+                  type="checkbox"
+                  data-field="sound-always"
+                  checked={s.soundAlways}
+                  onChange={(e) =>
+                    set({ soundAlways: e.currentTarget.checked })
+                  }
+                />
                 Sonar también si estoy mirando esa sesión
               </label>
               <label class="check">
-                <input type="checkbox" data-field="stale-marks" checked={s.staleMarks} onChange={(e) => set({ staleMarks: e.currentTarget.checked })} />
-                Colorear las sesiones de Claude abiertas sin mensajes: amarillo a la hora, naranja a las 5 horas y rojo al día
+                <input
+                  type="checkbox"
+                  data-field="stale-marks"
+                  checked={s.staleMarks}
+                  onChange={(e) => set({ staleMarks: e.currentTarget.checked })}
+                />
+                Colorear las sesiones de Claude abiertas sin mensajes: amarillo
+                a la hora, naranja a las 5 horas y rojo al día
               </label>
             </section>
 
@@ -974,7 +1515,12 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
               <label class="field">
                 <span>Ruta de claude</span>
                 <div class="field-row">
-                  <DraftInput field="claude" value={s.claudePath} placeholder={info.claudePath ?? 'No se encontró en el PATH'} onCommit={(v) => set({ claudePath: v.trim() })} />
+                  <DraftInput
+                    field="claude"
+                    value={s.claudePath}
+                    placeholder={info.claudePath ?? "No se encontró en el PATH"}
+                    onCommit={(v) => set({ claudePath: v.trim() })}
+                  />
                   <button
                     type="button"
                     onClick={() =>
@@ -990,45 +1536,104 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
               </label>
               {claudePathProblem(s.claudePath) ? (
                 <small class="warn block" data-warn="claude-path">
-                  {claudePathProblem(s.claudePath)} Mientras tanto, Hilo la ignora y busca claude por su cuenta.{' '}
-                  <button type="button" class="link" onClick={() => set({ claudePath: '' })}>
+                  {claudePathProblem(s.claudePath)} Mientras tanto, Hilo la
+                  ignora y busca claude por su cuenta.{" "}
+                  <button
+                    type="button"
+                    class="link"
+                    onClick={() => set({ claudePath: "" })}
+                  >
                     Dejarla vacía
                   </button>
                 </small>
               ) : (
-                claudeMissing && <small class="warn block">No existe ese archivo.</small>
+                claudeMissing && (
+                  <small class="warn block">No existe ese archivo.</small>
+                )
               )}
               <div class="field-row setup-open">
-                <button type="button" onClick={() => void api.toolsCheck().then((tools) => view.set({ modal: { type: 'setup', tools } }))}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void api
+                      .toolsCheck()
+                      .then((tools) =>
+                        view.set({ modal: { type: "setup", tools } }),
+                      )
+                  }
+                >
                   Ver requisitos
                 </button>
               </div>
               <label class="check">
-                <input type="checkbox" checked={s.useHooks} onChange={(e) => set({ useHooks: e.currentTarget.checked })} />
-                Detectar el estado con hooks, solo en las sesiones de Hilo. Sin esto el amarillo llega hasta 2 segundos tarde.
+                <input
+                  type="checkbox"
+                  checked={s.useHooks}
+                  onChange={(e) => set({ useHooks: e.currentTarget.checked })}
+                />
+                Detectar el estado con hooks, solo en las sesiones de Hilo. Sin
+                esto el amarillo llega hasta 2 segundos tarde.
               </label>
               <label class="check">
-                <input type="checkbox" data-field="usage-meter" checked={s.usageMeter} disabled={!s.useHooks} onChange={(e) => set({ usageMeter: e.currentTarget.checked })} />
-                Mostrar cuánto llevas usado de tu plan, en la barra lateral y abajo en cada sesión. Reemplaza tu línea de estado de Claude, solo en las sesiones de Hilo. Necesita los hooks y vale desde el próximo despertar.
+                <input
+                  type="checkbox"
+                  data-field="usage-meter"
+                  checked={s.usageMeter}
+                  disabled={!s.useHooks}
+                  onChange={(e) => set({ usageMeter: e.currentTarget.checked })}
+                />
+                Mostrar cuánto llevas usado de tu plan, en la barra lateral y
+                abajo en cada sesión. Reemplaza tu línea de estado de Claude,
+                solo en las sesiones de Hilo. Necesita los hooks y vale desde el
+                próximo despertar.
               </label>
               <label class="check">
-                <input type="checkbox" data-field="classic-renderer" checked={s.classicRenderer} onChange={(e) => set({ classicRenderer: e.currentTarget.checked })} />
-                Usar la pantalla clásica de Claude (como /tui default), para que el historial se desplace con la rueda y la barra de Hilo. Vale desde el próximo despertar.
+                <input
+                  type="checkbox"
+                  data-field="classic-renderer"
+                  checked={s.classicRenderer}
+                  onChange={(e) =>
+                    set({ classicRenderer: e.currentTarget.checked })
+                  }
+                />
+                Usar la pantalla clásica de Claude (como /tui default), para que
+                el historial se desplace con la rueda y la barra de Hilo. Vale
+                desde el próximo despertar.
               </label>
               <label class="check">
-                <input type="checkbox" data-field="skip-permissions" checked={s.skipPermissions} onChange={(e) => set({ skipPermissions: e.currentTarget.checked })} />
-                Abrir Claude sin pedir permisos (--dangerously-skip-permissions). Claude ejecutaría todo sin preguntar: déjalo apagado si no sabes lo que hace. Vale desde el próximo despertar.
+                <input
+                  type="checkbox"
+                  data-field="skip-permissions"
+                  checked={s.skipPermissions}
+                  onChange={(e) =>
+                    set({ skipPermissions: e.currentTarget.checked })
+                  }
+                />
+                Abrir Claude sin pedir permisos
+                (--dangerously-skip-permissions). Claude ejecutaría todo sin
+                preguntar: déjalo apagado si no sabes lo que hace. Vale desde el
+                próximo despertar.
               </label>
             </section>
 
-            <UpdatesSection version={info.version} checkOnStart={s.checkUpdatesOnStart} onCheckOnStart={(on) => set({ checkUpdatesOnStart: on })} />
+            <UpdatesSection
+              version={info.version}
+              checkOnStart={s.checkUpdatesOnStart}
+              onCheckOnStart={(on) => set({ checkUpdatesOnStart: on })}
+            />
             <section class="settings-section" data-section="news">
               <h3>Novedades</h3>
               {CHANGELOG.map((entry) => (
-                <div class={`news-entry${entry.version === info.version ? ' current' : ''}`} key={entry.version} data-version={entry.version}>
+                <div
+                  class={`news-entry${entry.version === info.version ? " current" : ""}`}
+                  key={entry.version}
+                  data-version={entry.version}
+                >
                   <h4>
                     {entry.version}
-                    {entry.version === info.version && <span class="news-badge">la que tienes</span>}
+                    {entry.version === info.version && (
+                      <span class="news-badge">la que tienes</span>
+                    )}
                     <span class="news-date">{formatDate(entry.date)}</span>
                   </h4>
                   <ul>
@@ -1042,7 +1647,14 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
             <section class="settings-section" data-section="changes">
               <h3>Panel de cambios</h3>
               <label class="check">
-                <input type="checkbox" data-field="changes-signs" checked={s.changesShowSigns} onChange={(e) => set({ changesShowSigns: e.currentTarget.checked })} />
+                <input
+                  type="checkbox"
+                  data-field="changes-signs"
+                  checked={s.changesShowSigns}
+                  onChange={(e) =>
+                    set({ changesShowSigns: e.currentTarget.checked })
+                  }
+                />
                 Mostrar + y − en los cambios, además del color de fondo
               </label>
             </section>
@@ -1051,10 +1663,24 @@ function SettingsDialog({ modal }: { modal: Extract<Modal, { type: 'settings' }>
               <h3>Atajos</h3>
               <div class="shortcuts">
                 {SHORTCUTS.filter((d) => !/^go[2-9]$/.test(d.id)).map((d) => (
-                  <ShortcutRow key={d.id} id={d.id} label={d.id === 'go1' ? 'Ir a la sesión 1 (de la 2 a la 9, con Ctrl y su número)' : d.label} keys={s.shortcuts[d.id] ?? d.defaultKeys} note={conflicts[d.id]} onSet={setShortcut} />
+                  <ShortcutRow
+                    key={d.id}
+                    id={d.id}
+                    label={
+                      d.id === "go1"
+                        ? "Ir a la sesión 1 (de la 2 a la 9, con Ctrl y su número)"
+                        : d.label
+                    }
+                    keys={s.shortcuts[d.id] ?? d.defaultKeys}
+                    note={conflicts[d.id]}
+                    onSet={setShortcut}
+                  />
                 ))}
               </div>
-              <p class="about">Hilo {info.version}. Sin telemetría. Solo se conecta a GitHub para las actualizaciones.</p>
+              <p class="about">
+                Hilo {info.version}. Sin telemetría. Solo se conecta a GitHub
+                para las actualizaciones.
+              </p>
             </section>
           </div>
         </div>
@@ -1077,7 +1703,7 @@ function CopyCommand({ command }: { command: string }) {
           })
         }
       >
-        {copied ? 'Copiado' : 'Copiar'}
+        {copied ? "Copiado" : "Copiar"}
       </button>
     </div>
   );
@@ -1087,7 +1713,7 @@ function SetupGuide({ initial }: { initial: ToolCheck }) {
   const [tools, setTools] = useState(initial);
   const [checked, setChecked] = useState(false);
   const close = () => {
-    void dispatch({ type: 'settings/set', patch: { setupSeen: true } });
+    void dispatch({ type: "settings/set", patch: { setupSeen: true } });
     closeModal();
   };
   const recheck = () =>
@@ -1098,24 +1724,42 @@ function SetupGuide({ initial }: { initial: ToolCheck }) {
   const ready = !!tools.claude && !!tools.git;
   return (
     <Backdrop onClose={close} labelledBy="setup-title">
-      <h2 id="setup-title">{ready ? 'Todo listo para usar Hilo' : 'Lo que Hilo necesita en este PC'}</h2>
+      <h2 id="setup-title">
+        {ready
+          ? "Todo listo para usar Hilo"
+          : "Lo que Hilo necesita en este PC"}
+      </h2>
       <div class="setup-scroll">
         <section class="setup-tool" data-tool="claude">
           <h3>
-            Claude Code: <span class={tools.claude ? 'st-done' : 'warn'}>{tools.claude ? 'instalado' : 'falta instalarlo'}</span>
+            Claude Code:{" "}
+            <span class={tools.claude ? "st-done" : "warn"}>
+              {tools.claude ? "instalado" : "falta instalarlo"}
+            </span>
           </h3>
           {tools.claude ? (
-            <p>Si todavía no entras a tu cuenta, abre una sesión de Claude en Hilo y sigue lo que aparece en el navegador. Hilo no puede comprobarlo, porque no lee tus credenciales.</p>
+            <p>
+              Si todavía no entras a tu cuenta, abre una sesión de Claude en
+              Hilo y sigue lo que aparece en el navegador. Hilo no puede
+              comprobarlo, porque no lee tus credenciales.
+            </p>
           ) : (
             <>
-              <p>Hilo abre tus sesiones con este programa. Sin él solo funcionan las terminales de PowerShell. Necesitas una cuenta de Claude de pago: el plan gratis no incluye Claude Code.</p>
+              <p>
+                Hilo abre tus sesiones con este programa. Sin él solo funcionan
+                las terminales de PowerShell. Necesitas una cuenta de Claude de
+                pago: el plan gratis no incluye Claude Code.
+              </p>
               <ol>
                 <li>
-                  Abre PowerShell desde el menú Inicio, pega esto y presiona Enter:
+                  Abre PowerShell desde el menú Inicio, pega esto y presiona
+                  Enter:
                   <CopyCommand command="irm https://claude.ai/install.ps1 | iex" />
                 </li>
                 <li>
-                  Cuando termine, abre otra ventana de PowerShell, escribe <code>claude</code> y sigue lo que aparece en el navegador para entrar a tu cuenta.
+                  Cuando termine, abre otra ventana de PowerShell, escribe{" "}
+                  <code>claude</code> y sigue lo que aparece en el navegador
+                  para entrar a tu cuenta.
                 </li>
                 <li>Vuelve aquí y presiona "Comprobar de nuevo".</li>
               </ol>
@@ -1124,13 +1768,26 @@ function SetupGuide({ initial }: { initial: ToolCheck }) {
         </section>
         <section class="setup-tool" data-tool="git">
           <h3>
-            Git: <span class={tools.git ? 'st-done' : 'warn'}>{tools.git ? 'instalado' : 'falta instalarlo'}</span>
+            Git:{" "}
+            <span class={tools.git ? "st-done" : "warn"}>
+              {tools.git ? "instalado" : "falta instalarlo"}
+            </span>
           </h3>
           {!tools.git && (
             <>
-              <p>Es opcional, pero conviene tenerlo: con él, Claude Code puede usar Git Bash, y el panel Cambios lo necesita para mostrar lo que cambió. Descárgalo desde su página o pega este comando en PowerShell:</p>
+              <p>
+                Es opcional, pero conviene tenerlo: con él, Claude Code puede
+                usar Git Bash, y el panel Cambios lo necesita para mostrar lo
+                que cambió. Descárgalo desde su página o pega este comando en
+                PowerShell:
+              </p>
               <div class="setup-links">
-                <button type="button" onClick={() => api.openLink('https://git-scm.com/downloads/win')}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    api.openLink("https://git-scm.com/downloads/win")
+                  }
+                >
                   Abrir la página de descarga
                 </button>
               </div>
@@ -1138,12 +1795,17 @@ function SetupGuide({ initial }: { initial: ToolCheck }) {
             </>
           )}
         </section>
-        {checked && !ready && <p class="warn setup-note">Sigue faltando algo. Si ya lo instalaste, cierra y vuelve a abrir Hilo.</p>}
+        {checked && !ready && (
+          <p class="warn setup-note">
+            Sigue faltando algo. Si ya lo instalaste, cierra y vuelve a abrir
+            Hilo.
+          </p>
+        )}
       </div>
       <div class="actions">
         {!ready && <button onClick={recheck}>Comprobar de nuevo</button>}
         <button class="primary" data-confirm="ok" onClick={close}>
-          {ready ? 'Empezar' : 'Seguir sin esto por ahora'}
+          {ready ? "Empezar" : "Seguir sin esto por ahora"}
         </button>
       </div>
     </Backdrop>
@@ -1155,24 +1817,24 @@ export function Modals() {
   const m = v.modal;
   if (!m) return null;
   switch (m.type) {
-    case 'newSession':
+    case "newSession":
       return <NewSessionDialog modal={m} />;
-    case 'confirm':
+    case "confirm":
       // Con clave propia: otro diálogo no hereda el foco en el botón de confirmar del anterior.
       return <ConfirmDialog key={m.title} modal={m} />;
-    case 'quick':
+    case "quick":
       return <QuickOpen />;
-    case 'setup':
+    case "setup":
       return <SetupGuide initial={m.tools} />;
-    case 'ide':
+    case "ide":
       return <IdeDialog modal={m} />;
-    case 'settings':
+    case "settings":
       return <SettingsDialog modal={m} />;
-    case 'color':
+    case "color":
       return <ColorDialog modal={m} />;
-    case 'note':
+    case "note":
       return <NoteDialog modal={m} />;
-    case 'mark':
+    case "mark":
       return <MarkDialog modal={m} />;
   }
 }
@@ -1194,20 +1856,27 @@ export function ContextMenu() {
     if (!m) return;
     const close = () => view.set({ menu: null });
     const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' || e.key === 'Tab') {
+      if (e.key === "Escape" || e.key === "Tab") {
         e.preventDefault();
         e.stopPropagation();
         close();
         focusActive();
         return;
       }
-      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
       e.preventDefault();
       e.stopPropagation();
-      const items = [...(ref.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])];
+      const items = [
+        ...(ref.current?.querySelectorAll<HTMLButtonElement>(
+          "button:not(:disabled)",
+        ) ?? []),
+      ];
       if (!items.length) return;
       const at = items.indexOf(document.activeElement as HTMLButtonElement);
-      const next = e.key === 'ArrowDown' ? (at + 1) % items.length : (at - 1 + items.length) % items.length;
+      const next =
+        e.key === "ArrowDown"
+          ? (at + 1) % items.length
+          : (at - 1 + items.length) % items.length;
       items[next]!.focus();
     };
     // En captura: la terminal corta el evento, y un clic en ella también tiene que cerrar el menú.
@@ -1215,12 +1884,12 @@ export function ContextMenu() {
       if (ref.current?.contains(e.target as Node)) return;
       close();
     };
-    window.addEventListener('mousedown', down, true);
-    window.addEventListener('keydown', key, true);
-    ref.current?.querySelector('button')?.focus();
+    window.addEventListener("mousedown", down, true);
+    window.addEventListener("keydown", key, true);
+    ref.current?.querySelector("button")?.focus();
     return () => {
-      window.removeEventListener('mousedown', down, true);
-      window.removeEventListener('keydown', key, true);
+      window.removeEventListener("mousedown", down, true);
+      window.removeEventListener("keydown", key, true);
     };
   }, [m]);
 
@@ -1234,50 +1903,107 @@ export function ContextMenu() {
   // Se mide en useLayoutEffect si no cabe: con muchos proyectos el menú es más alto.
   const top = m.y;
 
-  if (m.target.type === 'session') {
+  if (m.target.type === "session") {
     const found = findSession(state, m.target.id);
     if (!found) return null;
     const { session, project } = found;
     const status = statusOf(session.id);
     return (
-      <div ref={ref} class="menu" role="menu" style={{ left: `${left}px`, top: `${Math.max(4, top)}px` }} onMouseDown={stop}>
-        <button role="menuitem" onClick={() => { view.set({ menu: null }); startRename(session.id); }}>
-          Renombrar <kbd>{keysOf('rename')}</kbd>
+      <div
+        ref={ref}
+        class="menu"
+        role="menu"
+        style={{ left: `${left}px`, top: `${Math.max(4, top)}px` }}
+        onMouseDown={stop}
+      >
+        <button
+          role="menuitem"
+          onClick={() => {
+            view.set({ menu: null });
+            startRename(session.id);
+          }}
+        >
+          Renombrar <kbd>{keysOf("rename")}</kbd>
         </button>
-        {session.kind === 'claude' && (
-          <button role="menuitem" onClick={() => { close(); void copyLastMessage(session.id); }}>
-            Copiar el último mensaje <kbd>{keysOf('copyLastMessage')}</kbd>
+        {session.kind === "claude" && (
+          <button
+            role="menuitem"
+            onClick={() => {
+              close();
+              void copyLastMessage(session.id);
+            }}
+          >
+            Copiar el último mensaje <kbd>{keysOf("copyLastMessage")}</kbd>
           </button>
         )}
         {isUnread(session) ? (
-          <button role="menuitem" data-action="mark-read" onClick={() => { close(); void markRead(session.id); }}>
+          <button
+            role="menuitem"
+            data-action="mark-read"
+            onClick={() => {
+              close();
+              void markRead(session.id);
+            }}
+          >
             Marcar como leída
-          </button>
-        ) : (
-          <button role="menuitem" data-action="mark-unread" onClick={() => { close(); void markUnread(session.id); }}>
-            Marcar como no leída
-          </button>
-        )}
-        <button role="menuitem" data-action="note" onClick={() => view.set({ menu: null, modal: { type: 'note', id: session.id } })}>
-          {session.note ? 'Editar la nota…' : 'Dejar una nota…'}
-        </button>
-        {status === 'asleep' ? (
-          <button role="menuitem" onClick={() => { close(); void wakeSession(session.id); }}>
-            Despertar <kbd>{keysOf('toggleSleep')}</kbd>
           </button>
         ) : (
           <button
             role="menuitem"
-            disabled={status === 'working'}
-            title={status === 'working' ? 'Está trabajando: podrás dormirla cuando termine' : undefined}
-            onClick={() => { close(); void sleepSession(session.id); }}
+            data-action="mark-unread"
+            onClick={() => {
+              close();
+              void markUnread(session.id);
+            }}
           >
-            Dormir <kbd>{keysOf('toggleSleep')}</kbd>
+            Marcar como no leída
           </button>
         )}
-        {status !== 'asleep' && (
-          <button role="menuitem" onClick={() => { view.set({ menu: null }); void selectSession(session.id).then(() => runCommand('search')); }}>
-            Buscar <kbd>{keysOf('search')}</kbd>
+        <button
+          role="menuitem"
+          data-action="note"
+          onClick={() =>
+            view.set({ menu: null, modal: { type: "note", id: session.id } })
+          }
+        >
+          {session.note ? "Editar la nota…" : "Dejar una nota…"}
+        </button>
+        {status === "asleep" ? (
+          <button
+            role="menuitem"
+            onClick={() => {
+              close();
+              void wakeSession(session.id);
+            }}
+          >
+            Despertar <kbd>{keysOf("toggleSleep")}</kbd>
+          </button>
+        ) : (
+          <button
+            role="menuitem"
+            disabled={status === "working"}
+            title={
+              status === "working"
+                ? "Está trabajando: podrás dormirla cuando termine"
+                : undefined
+            }
+            onClick={() => {
+              close();
+              void sleepSession(session.id);
+            }}
+          >
+            Dormir <kbd>{keysOf("toggleSleep")}</kbd>
+          </button>
+        )}
+        {status !== "asleep" && (
+          <button
+            role="menuitem"
+            onClick={() => {
+              view.set({ menu: null });
+              void selectSession(session.id).then(() => runCommand("search"));
+            }}
+          >
+            Buscar <kbd>{keysOf("search")}</kbd>
           </button>
         )}
         {state.ui.activeSessionId !== session.id && (
@@ -1287,10 +2013,17 @@ export function ContextMenu() {
               close();
               void (async () => {
                 const { ui } = app.get().state;
-                if (ui.layout === 1) await dispatch({ type: 'ui/layout', layout: 2 });
+                if (ui.layout === 1)
+                  await dispatch({ type: "ui/layout", layout: 2 });
                 const panes = app.get().state.ui.panes;
-                const other = panes.findIndex((_, i) => i !== app.get().state.ui.activePane);
-                await dispatch({ type: 'ui/pane', pane: other, sessionId: session.id });
+                const other = panes.findIndex(
+                  (_, i) => i !== app.get().state.ui.activePane,
+                );
+                await dispatch({
+                  type: "ui/pane",
+                  pane: other,
+                  sessionId: session.id,
+                });
                 await selectSession(session.id);
               })();
             }}
@@ -1302,11 +2035,30 @@ export function ContextMenu() {
         <div class="menu-label">Marca</div>
         <div class="menu-marks" role="group" aria-label="Marca">
           {QUICK_MARKS.map((mark) => (
-            <button key={mark} class={`mark-pick${session.mark === mark ? ' on' : ''}`} title={session.mark === mark ? 'Quitar la marca' : undefined} onClick={() => { close(); void dispatch({ type: 'session/mark', id: session.id, mark: session.mark === mark ? null : mark }); }}>
+            <button
+              key={mark}
+              class={`mark-pick${session.mark === mark ? " on" : ""}`}
+              title={session.mark === mark ? "Quitar la marca" : undefined}
+              onClick={() => {
+                close();
+                void dispatch({
+                  type: "session/mark",
+                  id: session.id,
+                  mark: session.mark === mark ? null : mark,
+                });
+              }}
+            >
               {mark}
             </button>
           ))}
-          <button class="mark-pick more" title="Más marcas, o una propia" aria-label="Más marcas" onClick={() => view.set({ menu: null, modal: { type: 'mark', id: session.id } })}>
+          <button
+            class="mark-pick more"
+            title="Más marcas, o una propia"
+            aria-label="Más marcas"
+            onClick={() =>
+              view.set({ menu: null, modal: { type: "mark", id: session.id } })
+            }
+          >
             …
           </button>
         </div>
@@ -1314,8 +2066,19 @@ export function ContextMenu() {
         <div class="menu-swatches">
           <Swatches
             value={session.color}
-            onPick={(color) => { close(); void applyColor({ type: 'session', id: session.id }, color); }}
-            onMore={() => view.set({ menu: null, modal: { type: 'color', target: { type: 'session', id: session.id } } })}
+            onPick={(color) => {
+              close();
+              void applyColor({ type: "session", id: session.id }, color);
+            }}
+            onMore={() =>
+              view.set({
+                menu: null,
+                modal: {
+                  type: "color",
+                  target: { type: "session", id: session.id },
+                },
+              })
+            }
           />
         </div>
         {state.projects.length > 1 && (
@@ -1330,7 +2093,12 @@ export function ContextMenu() {
                   role="menuitem"
                   onClick={() => {
                     close();
-                    void dispatch({ type: 'session/move', id: session.id, toProjectId: p.id, toIndex: p.sessions.length });
+                    void dispatch({
+                      type: "session/move",
+                      id: session.id,
+                      toProjectId: p.id,
+                      toIndex: p.sessions.length,
+                    });
                     moveToast(session, p, false);
                   }}
                 >
@@ -1340,35 +2108,105 @@ export function ContextMenu() {
           </>
         )}
         <div class="menu-sep" />
-        <button role="menuitem" class="danger-item" onClick={() => { close(); void confirmCloseSession(session.id); }}>
-          Cerrar esta sesión <kbd>{keysOf('closeSession')}</kbd>
+        <button
+          role="menuitem"
+          class="danger-item"
+          onClick={() => {
+            close();
+            void confirmCloseSession(session.id);
+          }}
+        >
+          Cerrar esta sesión <kbd>{keysOf("closeSession")}</kbd>
         </button>
       </div>
     );
   }
 
-  const project = state.projects.find((p) => p.id === (m.target as { id: string }).id);
+  const project = state.projects.find(
+    (p) => p.id === (m.target as { id: string }).id,
+  );
   if (!project) return null;
   return (
-    <div ref={ref} class="menu" role="menu" style={{ left: `${left}px`, top: `${Math.max(4, top)}px` }} onMouseDown={stop}>
-      <button role="menuitem" onClick={() => { view.set({ menu: null, modal: { type: 'newSession', kind: 'claude', projectId: project.id } }); }}>
+    <div
+      ref={ref}
+      class="menu"
+      role="menu"
+      style={{ left: `${left}px`, top: `${Math.max(4, top)}px` }}
+      onMouseDown={stop}
+    >
+      <button
+        role="menuitem"
+        onClick={() => {
+          view.set({
+            menu: null,
+            modal: {
+              type: "newSession",
+              kind: "claude",
+              projectId: project.id,
+            },
+          });
+        }}
+      >
         Nueva sesión
       </button>
-      <button role="menuitem" onClick={() => { view.set({ menu: null, renaming: project.id }); }}>
+      <button
+        role="menuitem"
+        onClick={() => {
+          view.set({ menu: null, renaming: project.id });
+        }}
+      >
         Renombrar
       </button>
       <div class="menu-sep" />
-      <button role="menuitem" data-action="menu-changes" onClick={() => { close(); void toggleChanges(project.id); }}>
-        {state.ui.panes.includes(changesPaneId(project.id)) ? 'Quitar los cambios' : 'Ver los cambios'} <kbd>{keysOf('toggleChanges')}</kbd>
+      <button
+        role="menuitem"
+        data-action="menu-changes"
+        onClick={() => {
+          close();
+          void toggleChanges(project.id);
+        }}
+      >
+        {state.ui.panes.includes(changesPaneId(project.id))
+          ? "Quitar los cambios"
+          : "Ver los cambios"}{" "}
+        <kbd>{keysOf("toggleChanges")}</kbd>
       </button>
-      <button role="menuitem" data-action="menu-folder" onClick={() => { close(); void openProjectFolder(project.id); }}>
+      <button
+        role="menuitem"
+        data-action="menu-folder"
+        onClick={() => {
+          close();
+          void openProjectFolder(project.id);
+        }}
+      >
         Abrir la carpeta
       </button>
-      <button role="menuitem" data-action="menu-ide" onClick={() => { view.set({ menu: null }); void openInIde(project.id); }}>
-        {project.ide ? `Abrir en ${project.ide.name}` : 'Abrir en un IDE…'}
+      <button
+        role="menuitem"
+        data-action="menu-ide"
+        onClick={() => {
+          view.set({ menu: null });
+          void openInIde(project.id);
+        }}
+      >
+        {project.ide ? `Abrir en ${project.ide.name}` : "Abrir en un IDE…"}
       </button>
       {project.ide && (
-        <button role="menuitem" data-action="menu-ide-change" onClick={() => view.set({ menu: null, modal: { type: 'ide', projectId: project.id, file: null, line: null } })}>
+        <button
+          role="menuitem"
+          data-action="menu-ide-change"
+          onClick={() =>
+            view.set({
+              menu: null,
+              modal: {
+                type: "ide",
+                projectId: project.id,
+                file: null,
+                line: null,
+              },
+            })
+          }
+        >
           Cambiar de IDE…
         </button>
       )}
@@ -1377,8 +2215,19 @@ export function ContextMenu() {
       <div class="menu-swatches">
         <Swatches
           value={project.color}
-          onPick={(color) => { close(); void applyColor({ type: 'project', id: project.id }, color); }}
-          onMore={() => view.set({ menu: null, modal: { type: 'color', target: { type: 'project', id: project.id } } })}
+          onPick={(color) => {
+            close();
+            void applyColor({ type: "project", id: project.id }, color);
+          }}
+          onMore={() =>
+            view.set({
+              menu: null,
+              modal: {
+                type: "color",
+                target: { type: "project", id: project.id },
+              },
+            })
+          }
         />
       </div>
       <div class="menu-sep" />
@@ -1389,13 +2238,13 @@ export function ContextMenu() {
           view.set({ menu: null });
           const count = project.sessions.length;
           void (async () => {
-            const { confirmDialog } = await import('../controller');
+            const { confirmDialog } = await import("../controller");
             const ok = await confirmDialog({
               title: `Quitar «${project.name}» de Hilo`,
               body: count
-                ? `${count === 1 ? 'Se cierra su sesión' : `Se cierran sus ${count} sesiones`}. Los archivos de la carpeta y las conversaciones de Claude no se tocan.`
-                : 'Los archivos de la carpeta no se tocan.',
-              ok: 'Quitar proyecto',
+                ? `${count === 1 ? "Se cierra su sesión" : `Se cierran sus ${count} sesiones`}. Los archivos de la carpeta y las conversaciones de Claude no se tocan.`
+                : "Los archivos de la carpeta no se tocan.",
+              ok: "Quitar proyecto",
               danger: true,
             });
             focusActive();

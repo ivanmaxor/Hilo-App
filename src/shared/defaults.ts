@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS: Settings = {
   soundError: 'grave',
   soundVolume: 60,
   soundRepeat: 0,
+  soundDuration: 0,
   soundAlways: false,
   useHooks: true,
   // Quien lo quiera lo enciende en Ajustes: Claude ejecutaría todo sin preguntar.

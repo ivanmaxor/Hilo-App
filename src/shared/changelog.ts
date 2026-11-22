@@ -11,6 +11,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.3.9",
+    date: "2026-11-22",
+    items: [
+      "Cuatro sonidos más largos: Timbre, Melodía, Alarma suave y Ola.",
+      "Duración de cada aviso: una vez, o repetir el sonido seguido durante 3, 5, 10, 20 o 30 segundos. Se corta apenas abres la sesión o le respondes.",
+      "El botón Probar usa la duración elegida, y con un segundo clic se detiene.",
+    ],
+  },
+  {
     version: "1.3.8",
     date: "2026-11-21",
     items: [

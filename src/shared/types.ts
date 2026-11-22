@@ -75,6 +75,8 @@ export interface Settings {
   soundVolume: number;
   /** Minutos entre repeticiones mientras nadie la atiende; 0 = una vez. */
   soundRepeat: number;
+  /** Segundos que suena cada aviso, repitiendo el sonido seguido; 0 = una pasada. */
+  soundDuration: number;
   /** Sonar también si la sesión está a la vista. */
   soundAlways: boolean;
   useHooks: boolean;

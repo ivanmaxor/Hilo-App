@@ -1,4 +1,4 @@
-import { isSoundChoice, SOUND_REPEATS } from './sounds';
+import { isSoundChoice, SOUND_DURATIONS, SOUND_REPEATS } from './sounds';
 import { isValidTree } from './paneLayout';
 import { DEFAULT_SETTINGS, EFFORTS } from './defaults';
 import { changesProjectOf } from './paneContent';
@@ -167,6 +167,7 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     soundVolume: Math.round(clamp(r.soundVolume, 0, 100, base.soundVolume)),
     soundRepeat: (SOUND_REPEATS as readonly number[]).includes(r.soundRepeat as number) ? (r.soundRepeat as number) : base.soundRepeat,
     soundAlways: typeof r.soundAlways === 'boolean' ? r.soundAlways : base.soundAlways,
+    soundDuration: (SOUND_DURATIONS as readonly number[]).includes(r.soundDuration as number) ? (r.soundDuration as number) : base.soundDuration,
     useHooks: typeof r.useHooks === 'boolean' ? r.useHooks : base.useHooks,
     skipPermissions: typeof r.skipPermissions === 'boolean' ? r.skipPermissions : base.skipPermissions,
     confirmMultilinePaste: typeof r.confirmMultilinePaste === 'boolean' ? r.confirmMultilinePaste : base.confirmMultilinePaste,

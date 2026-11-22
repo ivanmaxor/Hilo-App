@@ -1,4 +1,4 @@
-import { soundFor } from '../../src/shared/sounds';
+import { soundFor, soundPasses } from '../../src/shared/sounds';
 import { claudePathProblem } from '../../src/shared/claudePath';
 import { addRecentColor, hexToHsv, hsvToHex, normalizeHex } from '../../src/shared/color';
 import { mergeUsage, parseUsage } from '../../src/shared/usage';
@@ -635,5 +635,16 @@ describe('sonidos', () => {
     expect(soundFor(s, 'idle')).toBe('none');
     expect(s.soundVolume).toBe(100);
     expect(s.soundRepeat).toBe(0);
+  });
+});
+
+describe('duración de los sonidos', () => {
+  it('repite el sonido seguido hasta llenar la duración, y al menos suena una vez', () => {
+    expect(soundPasses('gota', 0)).toBe(1);
+    expect(soundPasses('gota', 10)).toBe(14);
+    expect(soundPasses('ola', 3)).toBe(1);
+    expect(soundPasses('ola', 10)).toBe(3);
+    expect(sanitizeSettings({ soundDuration: 7 }).soundDuration).toBe(0);
+    expect(sanitizeSettings({ soundDuration: 20 }).soundDuration).toBe(20);
   });
 });
