@@ -233,6 +233,9 @@ export function reduce(state: PersistedState, action: Action): PersistedState {
       // Una PowerShell donde se abrió Claude: la misma fila pasa a ser esa sesión de Claude, en su carpeta.
       return mapSession(state, action.id, (s) => ({ ...s, kind: 'claude', claudeId: action.claudeId, cwd: action.cwd }));
 
+    case 'session/cwd':
+      return mapSession(state, action.id, (s) => (s.cwd === action.cwd ? s : { ...s, cwd: action.cwd }));
+
     case 'session/active':
       return mapSession(state, action.id, (s) => (action.at > (s.lastActiveAt ?? 0) ? { ...s, lastActiveAt: action.at } : s));
 

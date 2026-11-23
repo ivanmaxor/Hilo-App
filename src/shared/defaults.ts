@@ -22,6 +22,12 @@ export const DEFAULT_SETTINGS: Settings = {
   soundRepeat: 0,
   soundDuration: 0,
   soundAlways: false,
+  customSoundName: '',
+  usageAlerts: true,
+  usageAlertSession: [80, 95],
+  usageAlertWeek: [80, 95],
+  usageAlertNotify: true,
+  usageAlertSound: 'campana',
   useHooks: true,
   // Quien lo quiera lo enciende en Ajustes: Claude ejecutaría todo sin preguntar.
   skipPermissions: false,
