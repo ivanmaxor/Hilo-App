@@ -665,6 +665,12 @@ function Pane({ index, content, rect, zoom }: { index: number; content: string |
         <div
           class="pane-head"
           draggable={!!session || !!changesProject}
+          // Doble clic en la cabecera = el botón de agrandar (decisión del dueño, #13). Uno que viene de un botón es de ese botón:
+          // si no, sus dos clics y este cambio dejarían el panel en el estado contrario.
+          onDblClick={(e) => {
+            if (!zoomControls || (e.target as Element).closest('button')) return;
+            zoom.toggle();
+          }}
           onDragStart={(e) => {
             if (session) startDraggingSession(e, session);
             else if (content && changesProject) startDraggingPane(e, content, 'Cambios');

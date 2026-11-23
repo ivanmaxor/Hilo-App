@@ -163,3 +163,48 @@ test('con un solo panel no hay botón de agrandar', async () => {
     cleanup(run.dataDir);
   }
 });
+
+test('el doble clic en la cabecera agranda y devuelve, y el de un botón de la cabecera no cuenta', async () => {
+  const run = await launch({ state: fresh(), width: 1200, height: 760 });
+  try {
+    const { page } = run;
+    await wakeAll(page);
+
+    // Doble clic en el nombre de la cabecera del panel 0: lo agranda.
+    await page.locator('[data-pane="0"] .pane-head .pane-name').dblclick();
+    await expect(page.locator('.panes.zoomed')).toHaveCount(1);
+    await expect(page.locator('[data-pane="1"]')).toBeHidden();
+    await expect(page.locator('[data-pane="0"] [data-zoom-note]')).toHaveText('2 paneles ocultos');
+
+    // Otro doble clic en la cabecera lo devuelve a su lugar.
+    await page.locator('[data-pane="0"] .pane-head .pane-name').dblclick();
+    await expect(page.locator('.panes.zoomed')).toHaveCount(0);
+    await expect(page.locator('[data-pane="1"]')).toBeVisible();
+
+    // Un `dblclick` que viene de un botón de la cabecera es de ese botón: la cabecera no lo toma como suyo. (Se dispara
+    // el evento solo, sin los dos clics, porque al agrandar el botón se mueve y el segundo clic caería en otro sitio.)
+    await page.evaluate(() => {
+      const botones = ['[data-pane="0"] [data-action="zoom-pane"]', '[data-pane="0"] .pane-close'];
+      for (const css of botones) document.querySelector(css)!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    });
+    await settle(300);
+    await expect(page.locator('.panes.zoomed')).toHaveCount(0);
+    await expect(page.locator('[data-pane="1"]')).toBeVisible();
+    // Y un `dblclick` en la cabecera, fuera de los botones, sí lo cambia.
+    await page.evaluate(() => document.querySelector('[data-pane="0"] .pane-name')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })));
+    await expect(page.locator('.panes.zoomed')).toHaveCount(1);
+    await page.evaluate(() => document.querySelector('[data-pane="0"] .pane-name')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })));
+    await expect(page.locator('.panes.zoomed')).toHaveCount(0);
+
+    // Con un solo panel no hay nada que agrandar: el doble clic en la cabecera no hace nada.
+    await page.evaluate(() => (window as any).__hiloTest.runCommand('layout1'));
+    await settle(500);
+    if ((await page.locator('.pane-head').count()) > 0) {
+      await page.locator('.pane-head').first().dblclick();
+      await expect(page.locator('.panes.zoomed')).toHaveCount(0);
+    }
+  } finally {
+    await run.close();
+    cleanup(run.dataDir);
+  }
+});
