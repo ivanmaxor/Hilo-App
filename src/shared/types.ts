@@ -148,6 +148,12 @@ export interface PersistedState {
   window: WindowBounds;
 }
 
+/** Dónde está parada la carpeta de una sesión: en una rama, o en un commit suelto (primeros 7 del hash). */
+export interface GitHead {
+  kind: 'branch' | 'detached';
+  name: string;
+}
+
 export interface SessionRuntime {
   status: SessionStatus;
   /** Subagentes de esta sesión que siguen corriendo. */
@@ -155,6 +161,10 @@ export interface SessionRuntime {
   exitCode?: number;
   /** Mensaje de error para mostrar en el panel, si no pudo arrancar. */
   message?: string;
+  /** Rama de la carpeta de la sesión, si es un repositorio y está encendida. */
+  branch?: GitHead;
+  /** Desde cuándo (ms) está en este estado. Solo desde que Hilo la encendió: una dormida no lo tiene. */
+  since?: number;
 }
 
 export type RuntimeMap = Record<string, SessionRuntime>;

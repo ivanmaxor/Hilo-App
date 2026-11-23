@@ -4,7 +4,9 @@ import { copyFile, lstat, mkdtemp, open, realpath, rm, stat } from 'node:fs/prom
 import { tmpdir } from 'node:os';
 import { delimiter, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { MAX_DIFF_BYTES, MAX_LISTED_FILES, parseRawNumstat, type ChangesList, type FileChange, type FileDiffRequest, type FileDiffResult } from '../shared/diff';
+import { readBranch, type GitHeadFs } from '../shared/gitHead';
 import { checkRelativePath } from '../shared/safePath';
+import type { GitHead } from '../shared/types';
 
 /**
  * Git, solo para leer. Un repositorio puede venir de cualquier parte, y su `.git/config` puede pedir que
@@ -381,4 +383,60 @@ export async function fileDiff(projectPath: string, req: FileDiffRequest): Promi
   if (out.timedOut) return { status: 'error', message: 'git tardó demasiado en comparar este archivo.' };
   if (out.failed || out.code !== 0) return { status: 'error', message: shortError(out) };
   return { status: 'patch', text: decodeText(out.stdout) };
+}
+
+const BRANCH_TIMEOUT_MS = 1500;
+/** Una carpeta sin repositorio, o que no contestó, no se vuelve a mirar durante este rato. */
+const BRANCH_MISS_MS = 30_000;
+const branchMisses = new Map<string, number>();
+
+const branchFs: GitHeadFs = {
+  async lstat(path) {
+    try {
+      const info = await lstat(path);
+      return { file: info.isFile(), dir: info.isDirectory(), link: info.isSymbolicLink() };
+    } catch {
+      return null;
+    }
+  },
+  async readText(path, max) {
+    let handle;
+    try {
+      handle = await open(path, 'r');
+      const buffer = Buffer.alloc(max + 1);
+      const { bytesRead } = await handle.read(buffer, 0, max + 1, 0);
+      return bytesRead > max ? null : buffer.toString('utf8', 0, bytesRead);
+    } catch {
+      return null;
+    } finally {
+      await handle?.close().catch(() => undefined);
+    }
+  },
+};
+
+/**
+ * La rama de una carpeta, leyendo `.git/HEAD` (nunca ejecuta git). Solo para la carpeta de una sesión que
+ * sale del store: la ruta jamás viene del renderer. Una ruta de red se salta, y una carpeta sin repositorio o
+ * que tarda más de 1,5 s no se vuelve a mirar por un rato.
+ */
+export async function branchOf(cwd: string, now = Date.now()): Promise<GitHead | null> {
+  if (cwd.startsWith('\\\\') || cwd.startsWith('//')) return null;
+  const missedAt = branchMisses.get(cwd);
+  if (missedAt !== undefined && now - missedAt < BRANCH_MISS_MS) return null;
+  let expired = false;
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => {
+      expired = true;
+      resolve(null);
+    }, BRANCH_TIMEOUT_MS);
+    timer.unref();
+  });
+  const head = await Promise.race([readBranch(cwd, branchFs, { cancelled: () => expired }), timeout]).finally(() => clearTimeout(timer));
+  if (head) branchMisses.delete(cwd);
+  else {
+    if (branchMisses.size > 200) branchMisses.clear();
+    branchMisses.set(cwd, now);
+  }
+  return head;
 }
