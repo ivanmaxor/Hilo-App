@@ -2,13 +2,13 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, screen, shell,
 import { checkTools } from './tools';
 import type { ToolCheck } from '../shared/types';
 import { mkdirSync } from 'node:fs';
-import { access } from 'node:fs/promises';
+import { access, stat } from 'node:fs/promises';
 import { release } from 'node:os';
 import { join } from 'node:path';
 import { STATUS_LABEL } from '../shared/statusMachine';
 import { soundFor } from '../shared/sounds';
 import { findSession } from '../shared/reducer';
-import { isSafeId, isValidAction, sanitizeSettings } from '../shared/validate';
+import { isPath, isSafeId, isValidAction, sanitizeSettings } from '../shared/validate';
 import { ideName, isValidIdePath, type DetectedIde, type IdeOpenResult } from '../shared/ide';
 import type { Action, AppInfo, PersistedState, SessionRecord, SessionStatus, WindowBounds } from '../shared/types';
 import { resolveClaude } from './claude';
@@ -420,6 +420,30 @@ function registerIpc(): void {
     if (!win) return null;
     const result = await dialog.showOpenDialog(win, { properties: ['openDirectory'], title: 'Elige la carpeta del proyecto' });
     return result.canceled ? null : (result.filePaths[0] ?? null);
+  });
+  // La carpeta de una sesión ya no existe (#6). La ruta nunca viene del renderer: sale del diálogo de Windows
+  // o del proyecto guardado. La conversación no se toca: se retoma por su id desde la carpeta nueva.
+  handle('session:fixFolder', async (id: unknown, mode: unknown): Promise<{ ok: boolean; message?: string }> => {
+    if (!isSafeId(id) || (mode !== 'pick' && mode !== 'project')) return { ok: false };
+    const found = findSession(store.get(), id);
+    if (!found) return { ok: false };
+    let cwd: string | null;
+    if (mode === 'project') {
+      cwd = found.project.path;
+    } else {
+      if (!win) return { ok: false };
+      const result = await dialog.showOpenDialog(win, {
+        properties: ['openDirectory'],
+        title: `Elige dónde está ahora la carpeta de «${found.session.name}»`,
+      });
+      cwd = result.canceled ? null : (result.filePaths[0] ?? null);
+    }
+    if (!cwd) return { ok: false };
+    if (!isPath(cwd)) return { ok: false, message: 'Esa ruta no sirve.' };
+    const isDir = await stat(cwd).then((s) => s.isDirectory(), () => false);
+    if (!isDir) return { ok: false, message: mode === 'project' ? 'La carpeta del proyecto tampoco existe.' : 'Esa carpeta no existe.' };
+    store.dispatch({ type: 'session/cwd', id, cwd });
+    return { ok: true };
   });
   handle('dialog:pickFile', async () => {
     if (!win) return null;

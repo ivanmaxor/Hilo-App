@@ -20,6 +20,8 @@ export interface HiloApi {
   clipWrite(text: string): Promise<void>;
   pickFolder(): Promise<string | null>;
   pickFile(): Promise<string | null>;
+  /** La carpeta de una sesión ya no existe: 'pick' abre el diálogo de Windows, 'project' usa la carpeta del proyecto. */
+  fixFolder(id: string, mode: 'pick' | 'project'): Promise<{ ok: boolean; message?: string }>;
   pathExists(path: string): Promise<boolean>;
   toolsCheck(): Promise<ToolCheck>;
   usageGet(): Promise<PlanUsage | null>;

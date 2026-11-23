@@ -1,9 +1,9 @@
 import { open } from 'node:fs/promises';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import type { SessionRecord } from '../shared/types';
-import { isValidEffort, isValidModel } from '../shared/validate';
+import { isClaudeId, isValidEffort, isValidModel } from '../shared/validate';
 import { claudePathProblem } from '../shared/claudePath';
 
 /**
@@ -33,18 +33,44 @@ function transcriptPath(cwd: string, claudeId: string): string {
   return join(claudeConfigDir(), 'projects', slug, `${claudeId}.jsonl`);
 }
 
+/**
+ * Dónde está la conversación. Claude la guarda en la carpeta donde empezó, y `--resume <id>` la encuentra
+ * aunque se abra desde otra (o si la original ya no existe): por eso, si no está en la carpeta de la sesión,
+ * se busca el mismo id en las demás carpetas de `projects`. Solo se comprueba que el archivo exista: no se
+ * lee, no se copia y no se cambia (#6).
+ */
+function locateTranscript(cwd: string, claudeId: string): string | null {
+  if (!isClaudeId(claudeId)) return null;
+  const own = transcriptPath(cwd, claudeId);
+  if (existsSync(own)) return own;
+  const root = join(claudeConfigDir(), 'projects');
+  let folders: string[];
+  try {
+    folders = readdirSync(root);
+  } catch {
+    return null;
+  }
+  for (const folder of folders) {
+    const candidate = join(root, folder, `${claudeId}.jsonl`);
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
 /** Cuándo se escribió por última vez la conversación: el último mensaje. null si no existe. */
 export function transcriptMtime(cwd: string, claudeId: string): number | null {
+  const found = locateTranscript(cwd, claudeId);
+  if (!found) return null;
   try {
-    return statSync(transcriptPath(cwd, claudeId)).mtimeMs;
+    return statSync(found).mtimeMs;
   } catch {
     return null;
   }
 }
 
-/** Solo comprueba si existe. */
+/** Solo comprueba si existe, en la carpeta de la sesión o en cualquier otra. */
 export function transcriptExists(cwd: string, claudeId: string): boolean {
-  return existsSync(transcriptPath(cwd, claudeId));
+  return locateTranscript(cwd, claudeId) !== null;
 }
 
 /** Lo que se lee de una conversación: el final, para el último mensaje de Claude, y solo cuando el usuario pide copiarlo (D26). */
@@ -52,9 +78,11 @@ const TRANSCRIPT_TAIL = 4 * 1024 * 1024;
 
 export async function readTranscriptTail(cwd: string, claudeId: string): Promise<string | null> {
   if (!/^[0-9a-f-]{36}$/i.test(claudeId)) return null;
+  const found = locateTranscript(cwd, claudeId);
+  if (!found) return null;
   let handle: Awaited<ReturnType<typeof open>> | null = null;
   try {
-    handle = await open(transcriptPath(cwd, claudeId), 'r');
+    handle = await open(found, 'r');
     const { size } = await handle.stat();
     const length = Math.min(size, TRANSCRIPT_TAIL);
     const buffer = Buffer.alloc(length);

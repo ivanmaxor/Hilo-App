@@ -155,6 +155,8 @@ export interface SessionRuntime {
   exitCode?: number;
   /** Mensaje de error para mostrar en el panel, si no pudo arrancar. */
   message?: string;
+  /** La carpeta de la sesión ya no existe: es la ruta que falta. El panel deja elegir otra. */
+  missingCwd?: string;
 }
 
 export type RuntimeMap = Record<string, SessionRuntime>;
@@ -195,6 +197,8 @@ export type Action =
   /** Solo las dispara el proceso principal: no están en la lista blanca del IPC. */
   | { type: 'session/adopt'; id: string; claudeId: string; cwd: string }
   | { type: 'session/active'; id: string; at: number }
+  /** Solo la dispara el proceso principal, con la carpeta que eligió la persona: no está en la lista blanca del IPC. */
+  | { type: 'session/cwd'; id: string; cwd: string }
   | { type: 'session/remove'; id: string }
   | { type: 'session/claudeId'; id: string; claudeId: string }
   | { type: 'session/awake'; id: string; awake: boolean }

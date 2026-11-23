@@ -25,6 +25,7 @@ const api = {
   clipWrite: (text: string) => ipcRenderer.invoke('clip:write', text),
   pickFolder: () => ipcRenderer.invoke('dialog:pickFolder'),
   pickFile: () => ipcRenderer.invoke('dialog:pickFile'),
+  fixFolder: (id: string, mode: 'pick' | 'project') => ipcRenderer.invoke('session:fixFolder', id, mode),
   pathExists: (p: string) => ipcRenderer.invoke('path:exists', p),
   toolsCheck: () => ipcRenderer.invoke('tools:check'),
   usageGet: () => ipcRenderer.invoke('usage:get'),

@@ -218,6 +218,18 @@ export async function wakeSession(id: string): Promise<void> {
   await terminals.wake(id, found.session.kind);
 }
 
+/** La carpeta de la sesión ya no existe: se cambia por otra y se despierta. La conversación se conserva (#6). */
+export async function fixSessionFolder(id: string, mode: 'pick' | 'project'): Promise<void> {
+  const result = await api.fixFolder(id, mode).catch(() => ({ ok: false, message: 'No se pudo cambiar la carpeta.' }));
+  if (!result.ok) {
+    if (result.message) toast(result.message);
+    return;
+  }
+  await wakeSession(id);
+  if (statusOf(id) === 'error') toast('Sigue sin poder arrancar.');
+  focusActive();
+}
+
 let pendingWake: { timer: ReturnType<typeof setTimeout>; id: string } | null = null;
 
 /** Un doble clic para renombrar no debe arrancar un Claude. */

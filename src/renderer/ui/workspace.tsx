@@ -24,6 +24,7 @@ import {
   toast,
   toggleChanges,
   copyLastMessage,
+  fixSessionFolder,
   useStore,
   view,
   wakeSession,
@@ -288,6 +289,29 @@ function Overlay({ sessionId, name, active }: { sessionId: string; name: string;
             </button>
           </div>
         )}
+      </div>
+    );
+  }
+  // La carpeta ya no existe (por ejemplo, el proyecto se movió): se elige otra y la conversación se conserva.
+  const missingCwd = runtime[sessionId]?.missingCwd;
+  if (blocking && missingCwd) {
+    return (
+      <div class="overlay center" role="alert" data-missing-cwd={sessionId}>
+        <StatusIcon status="error" size={28} />
+        <p class="overlay-title">{name}</p>
+        <p class="overlay-sub pre">{`La carpeta de esta sesión ya no existe:\n${missingCwd}`}</p>
+        <p class="overlay-hint">La conversación se conserva: se retoma desde la carpeta que elijas.</p>
+        <div class="overlay-actions">
+          <button ref={btn} class="primary" onClick={() => void fixSessionFolder(sessionId, 'pick')}>
+            Elegir dónde está ahora
+          </button>
+          <button class="secondary" onClick={() => void fixSessionFolder(sessionId, 'project')}>
+            Abrirla en la carpeta del proyecto
+          </button>
+          <button class="secondary" onClick={() => void confirmCloseSession(sessionId)}>
+            Cerrar esta sesión
+          </button>
+        </div>
       </div>
     );
   }
