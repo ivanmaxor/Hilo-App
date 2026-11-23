@@ -27,3 +27,4 @@ Trampas ya resueltas: lo que costó descubrir y no hay que volver a pisar. Se su
 - **Las pruebas no deben sonar:** en modo prueba Hilo anota los sonidos en `__hiloTest.playedSounds` en vez de tocarlos. El botón Probar de Ajustes sí suena: las pruebas que lo usan bajan el volumen.
 - **`.playwright-mcp/`** aparece si un Claude usa el navegador de Playwright: está en `.gitignore`, no se sube.
 - **Al leer resultados de Playwright, no filtrar líneas:** un filtro escondió fallas una vez.
+- **Texto de Hilo a una sesión:** `terminals.pasteTextInto(id, texto)` (los comentarios del diff). Pasa por `paste()` con `sanitizePaste` y `term.paste()`, igual que Ctrl+V, así que respeta el bracketed paste y la confirmación de varias líneas; devuelve si se pegó, y solo entonces se quitan los comentarios enviados. Ctrl+Intro es un atajo de Claude Code: Hilo solo lo escucha dentro del panel Cambios.
