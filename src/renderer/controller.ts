@@ -1,7 +1,7 @@
 import type { PlanUsage } from '../shared/usage';
 import { addRecentColor } from '../shared/color';
 import { soundFor, type SoundChoice } from '../shared/sounds';
-import { playSound } from './sound';
+import { loadCustomSound, playSound } from './sound';
 import type { ToolCheck } from '../shared/types';
 import { changesPaneId, sessionInPane } from '../shared/paneContent';
 import { MAX_PANES, paneInDirection, presetTree } from '../shared/paneLayout';
@@ -842,6 +842,47 @@ export function previewSound(sound: SoundChoice, onEnd: () => void = () => undef
   return playSound(sound, soundVolume, soundDuration, () => true, onEnd);
 }
 
+/** El sonido propio (#12): se carga al abrir y cada vez que cambia. */
+let loadedSoundName: string | null = null;
+
+async function syncCustomSound(): Promise<void> {
+  const name = app.get().state.settings.customSoundName;
+  if (name === loadedSoundName) return;
+  loadedSoundName = name;
+  const bytes = name ? await api.soundRead().catch(() => null) : null;
+  if (app.get().info.isTest) return;
+  const ok = await loadCustomSound(bytes);
+  if (!ok) toast(`No se pudo reproducir «${name}». Mientras tanto suena la gota: prueba con otro audio.`);
+}
+
+/** Elegir el sonido propio con el diálogo de Windows. Devuelve el problema, o '' si quedó guardado. */
+export async function pickCustomSound(): Promise<string> {
+  const result = await api.soundPick().catch(() => ({ ok: false as const, message: 'No se pudo abrir el archivo.' }));
+  if (!result) return '';
+  if (!result.ok) return result.message;
+  loadedSoundName = null;
+  await syncCustomSound();
+  return '';
+}
+
+export async function clearCustomSound(): Promise<void> {
+  await api.soundClear();
+  await syncCustomSound();
+}
+
+/** Aviso de uso del plan (#8): un aviso en pantalla y el sonido elegido, una vez. */
+function onUsageAlert(alert: { window: 'session' | 'week'; threshold: number; used: number; body: string }): void {
+  toast(alert.body);
+  const settings = app.get().state.settings;
+  const sound = settings.usageAlertSound;
+  if (sound === 'none') return;
+  if (app.get().info.isTest) {
+    playedSounds.push({ id: `uso-${alert.window}`, sound, duration: 0 });
+    return;
+  }
+  playSound(sound, settings.soundVolume);
+}
+
 const soundRepeats = new Map<string, ReturnType<typeof setInterval>>();
 
 /** ¿La estás mirando ahora? */
@@ -1229,6 +1270,9 @@ export async function initController(): Promise<void> {
   api.onSessionFocus((id) => void selectSession(id));
   api.onAutoSlept((id) => disposeIfAsleep(id));
   api.onAlert(onAlert);
+  api.onUsageAlert(onUsageAlert);
+  void syncCustomSound();
+  app.subscribe(() => void syncCustomSound());
   api.onNotice((message) => toast(message));
   api.onUpdateStatus(onUpdateStatus);
   void api.updateGet().then(onUpdateStatus);

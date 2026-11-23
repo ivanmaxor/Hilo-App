@@ -209,6 +209,7 @@ test('dormir, despertar, cerrar con deshacer, selector, búsqueda, zoom y ajuste
     await page.keyboard.press('Control+,');
     await expect(page.locator('.settings h2')).toHaveText('Ajustes');
     await page.screenshot({ path: join(SHOTS, 'ajustes.png') });
+    await page.locator('.settings-nav button', { hasText: 'Terminal' }).click();
     await page.locator('input[data-field="scrollback"]').fill('5000');
     await page.locator('input[data-field="scrollback"]').blur();
     await expect.poll(async () => (await appState(page)).state.settings.scrollback).toBe(5000);

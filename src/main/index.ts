@@ -6,11 +6,15 @@ import { access } from 'node:fs/promises';
 import { release } from 'node:os';
 import { join } from 'node:path';
 import { STATUS_LABEL } from '../shared/statusMachine';
-import { soundFor } from '../shared/sounds';
+import { CUSTOM_SOUND, soundFor } from '../shared/sounds';
+import { DEFAULT_SETTINGS } from '../shared/defaults';
+import { formatSpan, type PlanUsage } from '../shared/usage';
+import { CustomSound } from './customSound';
+import { UsageAlerter } from './usageAlerter';
 import { findSession } from '../shared/reducer';
 import { isSafeId, isValidAction, sanitizeSettings } from '../shared/validate';
 import { ideName, isValidIdePath, type DetectedIde, type IdeOpenResult } from '../shared/ide';
-import type { Action, AppInfo, PersistedState, SessionRecord, SessionStatus, WindowBounds } from '../shared/types';
+import type { Action, AppInfo, PersistedState, SessionRecord, SessionStatus, Settings, WindowBounds } from '../shared/types';
 import { resolveClaude } from './claude';
 import { createClipboard } from './clipboard';
 import { fileDiff, listChanges, resolveInside } from './git';
@@ -60,7 +64,7 @@ const NOTIFY_TEXT: Partial<Record<SessionStatus, string>> = {
   error: 'Terminó con error',
 };
 
-const sentNotifications: { id: string; name: string; status: SessionStatus; shown?: boolean; failed?: string }[] = [];
+const sentNotifications: { id: string; name: string; status: SessionStatus | 'usage'; body?: string; shown?: boolean; failed?: string }[] = [];
 
 /** Sin una referencia, el recolector puede llevarse la notificación y su clic. */
 const liveNotifications = new Set<Notification>();
@@ -74,8 +78,46 @@ function focusSession(id: string): void {
   send('session:focus', id);
 }
 
+function showWindow(): void {
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+
+/** Cambiar ajustes desde el proceso principal, con la misma limpieza que los del renderer. */
+function patchSettings(patch: Partial<Settings>): void {
+  const current = store.get().settings;
+  store.dispatch({ type: 'settings/set', patch: sanitizeSettings({ ...current, ...patch }, current) });
+}
+
+const customSound = new CustomSound(dataDir);
+
+/** Avisos de uso del plan (#8): la notificación sale de aquí, y el sonido y el aviso en pantalla, del renderer. */
+const usageAlerter = new UsageAlerter(dataDir, () => store.get().settings, (alert) => {
+  const settings = store.get().settings;
+  const what = alert.window === 'session' ? 'de tu sesión de 5 horas' : 'de tu semana';
+  const body = `Llevas el ${Math.round(alert.used)} % ${what}. Se renueva en ${formatSpan(alert.resetsAt - Date.now())}.`;
+  send('usage:alert', { window: alert.window, threshold: alert.threshold, used: alert.used, body });
+  if (!settings.usageAlertNotify) return;
+  const record: (typeof sentNotifications)[number] = { id: alert.window, name: 'Uso del plan', status: 'usage', body };
+  if (isTest) sentNotifications.push(record);
+  if ((isTest && process.env.HILO_TEST_REAL_NOTIFY !== '1') || !Notification.isSupported()) return;
+  const n = new Notification({ title: 'Uso del plan', body, silent: settings.usageAlertSound !== 'none' });
+  liveNotifications.add(n);
+  n.on('click', () => {
+    liveNotifications.delete(n);
+    showWindow();
+  });
+  n.on('close', () => liveNotifications.delete(n));
+  n.show();
+});
+
 const sessions = new SessionController(store, dataDir, {
-  send,
+  send(channel: string, ...args: unknown[]) {
+    send(channel, ...args);
+    if (channel === 'usage:update') usageAlerter.check(args[0] as PlanUsage | null);
+  },
   statusChanged: updateWindowTitle,
   notify(session: SessionRecord, status: SessionStatus) {
     if (!store.get().settings.notifications) return;
@@ -432,6 +474,33 @@ function registerIpc(): void {
   });
 
   handle('usage:get', () => sessions.planUsage());
+  // Sonido propio (#12): la ruta sale del diálogo nativo y nunca del renderer, que solo recibe los bytes.
+  handle('sound:pick', async () => {
+    let source = isTest ? process.env.HILO_TEST_SOUND_FILE : undefined;
+    if (!source) {
+      if (!win) return null;
+      const r = await dialog.showOpenDialog(win, {
+        properties: ['openFile'],
+        title: 'Elige un audio para los avisos',
+        filters: [{ name: 'Audio', extensions: ['mp3', 'wav', 'ogg'] }],
+      });
+      if (r.canceled || !r.filePaths[0]) return null;
+      source = r.filePaths[0];
+    }
+    const result = customSound.adopt(source);
+    if (result.ok) patchSettings({ customSoundName: result.name });
+    return result;
+  });
+  handle('sound:read', () => customSound.read());
+  handle('sound:clear', () => {
+    customSound.clear();
+    const current = store.get().settings;
+    const patch: Partial<Settings> = { customSoundName: '' };
+    for (const key of ['soundDone', 'soundWaiting', 'soundError', 'usageAlertSound'] as const) {
+      if (current[key] === CUSTOM_SOUND) patch[key] = DEFAULT_SETTINGS[key];
+    }
+    patchSettings(patch);
+  });
   handle('session:lastMessage', (id: unknown) => (isStr(id) ? sessions.lastMessage(id) : null));
   handle('session:markRead', (id: unknown) => (isStr(id) ? sessions.markRead(id) : undefined));
   // La ruta sale del estado guardado, nunca del renderer.

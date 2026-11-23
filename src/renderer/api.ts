@@ -54,6 +54,13 @@ export interface HiloApi {
   onAutoSlept(cb: (id: string) => void): () => void;
   /** Una sesión terminó, te espera o falló. `unseen`: no la estabas mirando. */
   onAlert(cb: (id: string, status: SessionStatus, unseen: boolean) => void): () => void;
+  /** Una ventana de uso del plan cruzó un umbral (#8). */
+  onUsageAlert(cb: (alert: { window: 'session' | 'week'; threshold: number; used: number; body: string }) => void): () => void;
+  /** Elegir el sonido propio con el diálogo nativo (#12). null si se canceló. */
+  soundPick(): Promise<{ ok: true; name: string } | { ok: false; message: string } | null>;
+  /** Los bytes del sonido propio, o null si no hay. */
+  soundRead(): Promise<Uint8Array | null>;
+  soundClear(): Promise<void>;
   onNotice(cb: (message: string) => void): () => void;
 }
 

@@ -54,6 +54,10 @@ const api = {
   onSessionFocus: (cb: Listener) => subscribe('session:focus', cb),
   onAutoSlept: (cb: Listener) => subscribe('session:autoSlept', cb),
   onAlert: (cb: Listener) => subscribe('session:alert', cb),
+  onUsageAlert: (cb: Listener) => subscribe('usage:alert', cb),
+  soundPick: () => ipcRenderer.invoke('sound:pick'),
+  soundRead: () => ipcRenderer.invoke('sound:read'),
+  soundClear: () => ipcRenderer.invoke('sound:clear'),
   onNotice: (cb: Listener) => subscribe('app:notice', cb),
 };
 

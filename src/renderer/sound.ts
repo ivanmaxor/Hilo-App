@@ -1,21 +1,78 @@
 import {
+  CUSTOM_SOUND,
+  CUSTOM_SOUND_MAX_SECONDS,
   SOUND_GAP,
-  soundPasses,
   soundSeconds,
   type SoundId,
 } from "../shared/sounds";
 
 let ctx: AudioContext | null = null;
 
-/** Toca una pasada de un sonido sintetizado. `volume` de 0 a 100. Devuelve con qué cortarla. */
-function playOnce(id: SoundId, volume: number): () => void {
+/** Lo que suena: uno de los sintetizados o el audio propio (#12). */
+export type PlayableSound = SoundId | typeof CUSTOM_SOUND;
+
+/** El audio propio ya decodificado. Si no hay, o no se pudo leer, suena la gota. */
+let custom: AudioBuffer | null = null;
+
+function audio(): AudioContext {
   ctx ??= new AudioContext();
   if (ctx.state === "suspended") void ctx.resume();
-  const ac = ctx;
+  return ctx;
+}
+
+/** Carga el audio propio. false si no se pudo decodificar: no es un audio que el sistema sepa leer. */
+export async function loadCustomSound(bytes: Uint8Array | null): Promise<boolean> {
+  custom = null;
+  if (!bytes || !bytes.length) return true;
+  try {
+    const copy = bytes.slice().buffer;
+    custom = await audio().decodeAudioData(copy);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function hasCustomSound(): boolean {
+  return custom !== null;
+}
+
+function secondsOf(id: PlayableSound): number {
+  if (id === CUSTOM_SOUND) return custom ? Math.min(custom.duration, CUSTOM_SOUND_MAX_SECONDS) : soundSeconds("gota");
+  return soundSeconds(id);
+}
+
+/** Toca una pasada de un sonido sintetizado. `volume` de 0 a 100. Devuelve con qué cortarla. */
+function playOnce(requested: PlayableSound, volume: number): () => void {
+  const ac = audio();
   const master = ac.createGain();
   master.gain.value = (Math.min(100, volume) / 100) * 0.5;
   master.connect(ac.destination);
   const t = ac.currentTime + 0.02;
+  // Sin audio propio cargado suena la gota, para no quedar en silencio.
+  const id: SoundId = requested === CUSTOM_SOUND ? "gota" : requested;
+  if (requested === CUSTOM_SOUND && custom) {
+    const src = ac.createBufferSource();
+    src.buffer = custom;
+    // El audio propio va más fuerte: los sintetizados están pensados para no sonar a todo volumen.
+    master.gain.value = Math.min(100, volume) / 100;
+    src.connect(master);
+    src.start(t);
+    src.stop(t + secondsOf(CUSTOM_SOUND));
+    let done = false;
+    const stop = () => {
+      if (done) return;
+      done = true;
+      try {
+        src.stop();
+      } catch {
+        // Ya había terminado.
+      }
+      master.disconnect();
+    };
+    setTimeout(stop, (secondsOf(CUSTOM_SOUND) + 0.5) * 1000);
+    return stop;
+  }
   const tone = (
     freq: number,
     start: number,
@@ -122,7 +179,7 @@ function playOnce(id: SoundId, volume: number): () => void {
  * qué detenerlo.
  */
 export function playSound(
-  id: SoundId,
+  id: PlayableSound,
   volume: number,
   duration = 0,
   keepGoing: () => boolean = () => true,
@@ -132,8 +189,9 @@ export function playSound(
     onEnd();
     return () => undefined;
   }
-  const passes = soundPasses(id, duration);
-  const step = (soundSeconds(id) + SOUND_GAP) * 1000;
+  const seconds = secondsOf(id);
+  const passes = duration <= 0 ? 1 : Math.max(1, Math.floor((duration + SOUND_GAP) / (seconds + SOUND_GAP)));
+  const step = (seconds + SOUND_GAP) * 1000;
   let current: (() => void) | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let left = passes;
