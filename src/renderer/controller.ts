@@ -906,6 +906,31 @@ export async function openProjectFolder(id: string): Promise<void> {
   if (problem) toast(problem);
 }
 
+/** La carpeta donde trabaja una sesión, que puede no ser la del proyecto. */
+export async function openSessionFolder(id: string): Promise<void> {
+  const problem = await api.openSessionFolder(id).catch(() => 'No se pudo abrir la carpeta.');
+  if (problem) toast(problem);
+}
+
+/**
+ * Una ruta que se vio en la terminal (#10, D35). Clic: se muestra en el Explorador. Ctrl+clic: se abre en el IDE
+ * del proyecto, en su línea si venía; si queda fuera del proyecto, se muestra en el Explorador.
+ */
+export async function openTerminalPath(id: string, path: string, line: number | null, ide: boolean): Promise<void> {
+  const found = findSession(app.get().state, id);
+  if (!found) return;
+  if (ide) {
+    const [target] = await api.pathResolve(id, [path]).catch(() => [null]);
+    if (target && !target.dir && target.rel !== null) {
+      await openInIde(found.project.id, target.rel, line);
+      return;
+    }
+    if (target && !target.dir) toast('Ese archivo queda fuera del proyecto: se muestra en el Explorador.');
+  }
+  const problem = await api.pathReveal(id, path).catch(() => 'No se pudo abrir el Explorador.');
+  if (problem) toast(problem);
+}
+
 /** Copia el último mensaje de Claude con el nombre de la sesión delante (D26). */
 export async function copyLastMessage(id: string): Promise<void> {
   const found = findSession(app.get().state, id);
@@ -1185,6 +1210,7 @@ export async function initController(): Promise<void> {
 
   terminals = new TerminalManager(initial.state.settings, {
     toast: (text) => toast(text),
+    openPath: (id, path, line, ide) => void openTerminalPath(id, path, line, ide),
     windowFocused: () => view.get().focused,
     statusOf: (id) => statusOf(id),
     activate: (id) => {

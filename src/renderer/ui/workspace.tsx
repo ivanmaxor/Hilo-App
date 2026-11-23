@@ -5,6 +5,7 @@ import { changesPaneId, changesProjectOf, sessionInPane } from '../../shared/pan
 import { ChangesPanel } from './changes';
 import {
   activeProject,
+  openSessionFolder,
   app,
   cancelPendingWake,
   closeTab,
@@ -29,7 +30,7 @@ import {
   wakeSession,
   subagentsOf,
 } from '../controller';
-import { CloseIcon, CopyMessageIcon, DiffIcon, LayoutIcon, PlusIcon, SearchIcon, ShellMark, StatusIcon, subagentsLabel } from './icons';
+import { CloseIcon, CopyMessageIcon, DiffIcon, FolderIcon, LayoutIcon, PlusIcon, SearchIcon, ShellMark, StatusIcon, subagentsLabel } from './icons';
 import { draggedPaneContent, endDragging, InlineRename, startDraggingPane, startDraggingSession } from './sidebar';
 import { MAX_PANES, moveDivider, paneDividers, paneRects, presetTree, resetDivider, type PaneDivider, type PaneEdge, type PaneNode, type PaneRect } from '../../shared/paneLayout';
 import type { SessionRecord } from '../../shared/types';
@@ -173,6 +174,17 @@ export function Tabs() {
             <DiffIcon />
             <span>Cambios</span>
           </button>
+          {activeFound && (
+            <button
+              class="icon-btn"
+              data-action="open-session-folder"
+              title={`Abrir la carpeta de «${activeFound.session.name}» en el Explorador\n${activeFound.session.cwd}`}
+              aria-label={`Abrir la carpeta de ${activeFound.session.name}`}
+              onClick={() => void openSessionFolder(activeFound.session.id)}
+            >
+              <FolderIcon />
+            </button>
+          )}
           <button
             class="icon-btn"
             title={`Buscar en la terminal (${keysOf('search')})`}

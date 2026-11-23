@@ -339,3 +339,13 @@ Por eso **este repo es la única fuente de verdad**, y el historial privado qued
 - **Versiones de prueba:** `x.y.z-rc.N` se publica como pre-release. El actualizador no la ofrece (`allowPrerelease = false`) ni la instala (`isStableVersion`), así que a los usuarios no les llega.
 - **Riesgo que queda:** en un repo de cuenta personal, un colaborador tiene escritura completa, y eso incluye editar los archivos de una Release ya publicada. Las actualizaciones no van firmadas: la protección es la confianza hasta que se firme `latest.yml` (ver `docs/memoria/roadmap.md`).
 - **Commits sin firmas de IA:** por decisión del dueño, desde esta fecha.
+
+## D35. Rutas clicables en la terminal
+
+Pedido del dueño (#10): las rutas que escribe Claude se subrayan; un clic las muestra en el Explorador y Ctrl+clic las abre en el IDE del proyecto. Además, cada sesión tiene su botón para abrir su carpeta.
+
+- **Qué se detecta** (`src/shared/pathLinks.ts`): rutas relativas con `/` o `\`, absolutas con letra de unidad (también `/c/...`), nombres sueltos con extensión y la mención `@ruta` de Claude, con `:línea` o `#Llínea` detrás. Una ruta absoluta puede tener espacios: se prueban las palabras siguientes y gana la más larga que existe. No se toman enlaces web, rutas de red, opciones ni versiones. Se unen las filas que xterm partió por ancho; si un programa parte la ruta en dos líneas por su cuenta, no se une.
+- **Quién decide** (`src/main/pathOpen.ts`): el renderer manda el texto y el id de la sesión. El proceso principal resuelve desde la carpeta guardada de la sesión y solo mira si existe y si es carpeta (`stat`, con 1,5 s de tope); no lee el archivo. Rechaza rutas de red (`\\servidor`, `//`, `\\?\`), dispositivos (`CON`, `NUL`…), flujos alternativos (`a.txt:x`) y las rutas relativas de una sesión que trabaja en una carpeta de red: mirarlas sería una conexión. Una unidad de red con letra se mira como cualquier disco, porque la configuró la persona.
+- **Qué abre**: una carpeta, con `openPath`; un archivo se marca con `showItemInFolder` y nunca se abre con `openPath`, que ejecutaría un `.exe` o un `.bat`. Ctrl+clic usa el camino del panel Cambios: la ruta relativa al proyecto, validada con `checkRelativePath` y `resolveInside`. Fuera del proyecto, se muestra en el Explorador.
+- **Enlaces `file://`** (OSC 8) van por el mismo camino. Los enlaces web siguen pidiendo Ctrl+clic.
+- **Sin red ni lecturas nuevas**: solo `stat` sobre rutas locales que ya están en la pantalla. Lo preguntado se recuerda 15 s en el renderer, porque el ratón pasa muchas veces por la misma línea.

@@ -1,4 +1,5 @@
 import type { PlanUsage } from '../shared/usage';
+import type { TerminalPath } from '../shared/pathLinks';
 import type { Action, AppInfo, BackgroundProcess, PersistedState, RuntimeMap, SessionRuntime, SessionStatus, ToolCheck } from '../shared/types';
 import type { UpdateStatus } from '../shared/updates';
 import type { ChangesList, FileDiffRequest, FileDiffResult } from '../shared/diff';
@@ -29,6 +30,11 @@ export interface HiloApi {
   markRead(id: string): Promise<void>;
   /** Abre la carpeta del proyecto en el Explorador. Devuelve el problema, o '' si se abrió. */
   openProjectFolder(id: string): Promise<string>;
+  /** Qué rutas escritas en la terminal existen, vistas desde la carpeta de la sesión (#10). null: no existe. */
+  pathResolve(id: string, paths: string[]): Promise<(TerminalPath | null)[]>;
+  /** Muestra la ruta en el Explorador. Devuelve el problema, o vacío. */
+  pathReveal(id: string, path: string): Promise<string>;
+  openSessionFolder(id: string): Promise<string>;
   onUsage(cb: (usage: PlanUsage) => void): () => void;
   changesList(projectId: string): Promise<ChangesList>;
   changesDiff(projectId: string, request: FileDiffRequest): Promise<FileDiffResult>;
