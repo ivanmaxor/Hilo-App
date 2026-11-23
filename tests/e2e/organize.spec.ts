@@ -34,6 +34,9 @@ test('crear, renombrar, colorear, mover, reordenar, colapsar, y sobrevive a rein
   // Encender lo que quedó encendido se prueba en restore.spec.ts.
   const empty = defaultState();
   empty.settings.startup = 'asleep';
+  // Sin esto, en un PC sin Claude (como el runner del CI) sale el diálogo de requisitos y tapa los clics (#3).
+  // Ese diálogo se prueba en requisitos.spec.ts, igual que hace makeState.
+  empty.settings.setupSeen = true;
   let ctx = await launch({ dataDir, state: empty });
   try {
     let { page } = ctx;
