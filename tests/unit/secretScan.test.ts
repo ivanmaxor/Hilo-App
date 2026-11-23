@@ -6,6 +6,11 @@ const ANTHROPIC = ['sk-', 'ant-', 'x'.repeat(30)].join('');
 const GITHUB = 'gh' + 'p_' + 'a'.repeat(36);
 const GITHUB_PAT = 'github_' + 'pat_' + 'A1'.repeat(20);
 const AWS = 'AK' + 'IA' + 'A'.repeat(16);
+const SLACK_BOT = 'xo' + 'xb-' + '1234567890-' + 'abcdefghijklmnop';
+const SLACK_APP = 'xa' + 'pp-' + '1-A0123456789-' + '9876543210-' + 'abcdef0123';
+const STRIPE_LIVE = 'sk' + '_live_' + 'a1B2c3D4e5F6g7H8i9J0k1L2';
+const STRIPE_TEST = 'sk' + '_test_' + 'a1B2c3D4e5F6g7H8i9J0k1L2';
+const STRIPE_RESTRICTED = 'rk' + '_live_' + 'a1B2c3D4e5F6g7H8i9J0k1L2';
 const PEM = '-----BEGIN ' + 'OPENSSH PRIVATE ' + 'KEY-----';
 
 describe('scanSecrets', () => {
@@ -31,6 +36,24 @@ describe('scanSecrets', () => {
     expect(scanSecrets('ASIA' + 'B'.repeat(16))).toEqual(['aws']);
     expect(scanSecrets('xx' + AWS + 'yy')).toEqual([]);
     expect(scanSecrets('AK' + 'IA' + 'A'.repeat(15))).toEqual([]);
+  });
+
+  it('Slack: tokens xox… y xapp-…; cortos o pegados a letras: no', () => {
+    expect(scanSecrets(`SLACK_BOT_TOKEN ${SLACK_BOT}`)).toEqual(['slack']);
+    expect(scanSecrets(SLACK_APP)).toEqual(['slack']);
+    expect(scanSecrets('xo' + 'xb-' + '123')).toEqual([]);
+    expect(scanSecrets('p' + SLACK_BOT)).toEqual([]);
+    expect(scanSecrets('box-' + '1234567890-' + 'abcdefghijklmnop')).toEqual([]);
+  });
+
+  it('Stripe: claves secretas y restringidas, de producción y de prueba; cortas o pegadas a letras: no', () => {
+    expect(scanSecrets(STRIPE_LIVE)).toEqual(['stripe']);
+    expect(scanSecrets(`STRIPE=${STRIPE_TEST}`)).toEqual(['stripe']);
+    expect(scanSecrets(STRIPE_RESTRICTED)).toEqual(['stripe']);
+    expect(scanSecrets('sk' + '_live_' + 'corta')).toEqual([]);
+    expect(scanSecrets('ta' + STRIPE_LIVE)).toEqual([]);
+    // La clave publicable (pk_) es pública por diseño: no avisa.
+    expect(scanSecrets('pk' + '_live_' + 'a1B2c3D4e5F6g7H8i9J0k1L2')).toEqual([]);
   });
 
   it('clave privada: PEM sí, certificado no', () => {
@@ -64,7 +87,7 @@ describe('scanSecrets', () => {
   });
 
   it('nunca devuelve el valor: solo tipos conocidos', () => {
-    for (const k of scanSecrets(`${ANTHROPIC} ${GITHUB} ${AWS} ${PEM}\nTOKEN=abcdefghijk`)) expect(SECRET_LABELS[k]).toBeTruthy();
+    for (const k of scanSecrets(`${ANTHROPIC} ${GITHUB} ${AWS} ${SLACK_BOT} ${STRIPE_LIVE} ${PEM}\nTOKEN=abcdefghijk`)) expect(SECRET_LABELS[k]).toBeTruthy();
   });
 
   it('5 MB sin claves, y con la clave al final, en menos de 150 ms', () => {

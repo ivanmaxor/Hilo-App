@@ -4,13 +4,15 @@
  * Lista corta y de señal alta, para no molestar. Todo ocurre en memoria; nada se guarda ni se envía.
  */
 
-export type SecretKind = 'anthropic' | 'github' | 'aws' | 'privateKey' | 'envVar';
+export type SecretKind = 'anthropic' | 'github' | 'aws' | 'slack' | 'stripe' | 'privateKey' | 'envVar';
 
 /** Cómo se nombra cada tipo en el diálogo. */
 export const SECRET_LABELS: Record<SecretKind, string> = {
   anthropic: 'Clave de Anthropic (sk-ant-…)',
   github: 'Token de GitHub (ghp_…, github_pat_…)',
   aws: 'Clave de acceso de AWS (AKIA…)',
+  slack: 'Token de Slack (xoxb-…, xoxp-…, xapp-…)',
+  stripe: 'Clave secreta de Stripe (sk_live_…, sk_test_…, rk_…)',
   privateKey: 'Clave privada (BEGIN … PRIVATE KEY)',
   envVar: 'Línea de .env con una clave, token o contraseña',
 };
@@ -24,6 +26,9 @@ const PATTERNS: [SecretKind, RegExp][] = [
   ['anthropic', /(?<![A-Za-z0-9])sk-ant-[A-Za-z0-9_-]{20,}/],
   ['github', /(?<![A-Za-z0-9])(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,})/],
   ['aws', /(?<![A-Za-z0-9])(?:AKIA|ASIA)[0-9A-Z]{16}(?![A-Za-z0-9])/],
+  // Slack y Stripe se añadieron por decisión del dueño (#13): sus prefijos son claros. JWT queda para después.
+  ['slack', /(?<![A-Za-z0-9])(?:xox[abprs]-[A-Za-z0-9-]{10,}|xapp-[A-Za-z0-9-]{20,})/],
+  ['stripe', /(?<![A-Za-z0-9])(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}/],
   ['privateKey', /-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----/],
 ];
 
