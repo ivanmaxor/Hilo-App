@@ -79,6 +79,14 @@ export interface Settings {
   soundDuration: number;
   /** Sonar también si la sesión está a la vista. */
   soundAlways: boolean;
+  /** Nombre del archivo del sonido propio (#12); vacío si no hay. El audio se guarda en la carpeta de datos. */
+  customSoundName: string;
+  /** Avisos de uso del plan (#8): umbrales en % para la sesión de 5 horas y para la semana. */
+  usageAlerts: boolean;
+  usageAlertSession: number[];
+  usageAlertWeek: number[];
+  usageAlertNotify: boolean;
+  usageAlertSound: SoundChoice;
   useHooks: boolean;
   /** Lanza Claude con --dangerously-skip-permissions: decisión del dueño, ver docs/DECISIONES.md. */
   skipPermissions: boolean;

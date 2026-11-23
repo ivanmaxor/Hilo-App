@@ -27,7 +27,7 @@ test('suena según el estado y los ajustes, y Ajustes deja elegir y probar', asy
     expect(await page.evaluate(() => (window as any).__hiloTest.playedSounds.map((p: any) => p.duration))).toEqual([10, 10]);
 
     await page.evaluate(() => (window as any).__hiloTest.runCommand('settings'));
-    await page.locator('.settings-nav button', { hasText: 'Sesiones' }).click();
+    await page.locator('.settings-nav button', { hasText: 'Avisos' }).click();
     await expect(page.locator('select[data-field="soundDone"]')).toHaveValue('campana');
     await expect(page.locator('[data-action="preview-soundWaiting"]')).toBeDisabled();
     await page.locator('select[data-field="soundWaiting"]').selectOption('cristal');
@@ -42,7 +42,7 @@ test('suena según el estado y los ajustes, y Ajustes deja elegir y probar', asy
     await probar.click();
     await expect(probar).toHaveText('Probar');
     expect(errors).toEqual([]);
-    await page.locator('.settings-section[data-section="sessions"]').screenshot({ path: 'test-results/sonidos-ajustes.png' });
+    await page.locator('.set-module[data-section="alerts"]').screenshot({ path: 'test-results/sonidos-ajustes.png' });
   } finally {
     await ctx.close();
     cleanup(ctx.dataDir);

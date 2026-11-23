@@ -56,6 +56,15 @@ const api = {
   onSessionFocus: (cb: Listener) => subscribe('session:focus', cb),
   onAutoSlept: (cb: Listener) => subscribe('session:autoSlept', cb),
   onAlert: (cb: Listener) => subscribe('session:alert', cb),
+  // Al suscribirse avisa que escucha: recién entonces el proceso principal marca un aviso como avisado.
+  onUsageAlert: (cb: Listener) => {
+    const off = subscribe('usage:alert', cb);
+    void ipcRenderer.invoke('usage:listen');
+    return off;
+  },
+  soundPick: () => ipcRenderer.invoke('sound:pick'),
+  soundRead: () => ipcRenderer.invoke('sound:read'),
+  soundClear: () => ipcRenderer.invoke('sound:clear'),
   onNotice: (cb: Listener) => subscribe('app:notice', cb),
 };
 
