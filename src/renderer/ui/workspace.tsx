@@ -25,6 +25,7 @@ import {
   toggleChanges,
   copyLastMessage,
   fixSessionFolder,
+  startFreshConversation,
   useStore,
   view,
   wakeSession,
@@ -341,6 +342,11 @@ function Overlay({ sessionId, name, active }: { sessionId: string; name: string;
           >
             Reintentar
           </button>
+          {runtime[sessionId]?.unresumable && (
+            <button class="secondary" data-fresh-conversation={sessionId} onClick={() => void startFreshConversation(sessionId)}>
+              Empezar una conversación nueva
+            </button>
+          )}
           <button class="secondary" onClick={() => void confirmCloseSession(sessionId)}>
             Cerrar esta sesión
           </button>

@@ -22,6 +22,8 @@ export interface HiloApi {
   pickFile(): Promise<string | null>;
   /** La carpeta de una sesión ya no existe: 'pick' abre el diálogo de Windows, 'project' usa la carpeta del proyecto. */
   fixFolder(id: string, mode: 'pick' | 'project'): Promise<{ ok: boolean; message?: string }>;
+  /** Su historial existe pero Claude no lo retoma: empieza una conversación nueva en esta sesión. El historial viejo no se toca. */
+  freshConversation(id: string): Promise<boolean>;
   pathExists(path: string): Promise<boolean>;
   toolsCheck(): Promise<ToolCheck>;
   usageGet(): Promise<PlanUsage | null>;

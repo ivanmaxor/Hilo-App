@@ -230,6 +230,28 @@ export async function fixSessionFolder(id: string, mode: 'pick' | 'project'): Pr
   focusActive();
 }
 
+/**
+ * Claude no pudo retomar una conversación cuyo historial existe. Reintentar repetiría lo mismo: se ofrece, a
+ * elección de la persona, empezar una nueva. El historial viejo queda guardado por Claude (#6).
+ */
+export async function startFreshConversation(id: string): Promise<void> {
+  const found = findSession(app.get().state, id);
+  if (!found) return;
+  const ok = await confirmDialog({
+    title: `¿Empezar una conversación nueva en «${found.session.name}»?`,
+    body: 'Claude no pudo retomar la anterior. Su historial queda guardado por Claude, pero esta sesión empezará una conversación vacía.',
+    ok: 'Empezar una nueva',
+  });
+  if (!ok) return;
+  if (!(await api.freshConversation(id).catch(() => false))) {
+    toast('No se pudo empezar una conversación nueva.');
+    return;
+  }
+  await wakeSession(id);
+  if (statusOf(id) === 'error') toast('Sigue sin poder arrancar.');
+  focusActive();
+}
+
 let pendingWake: { timer: ReturnType<typeof setTimeout>; id: string } | null = null;
 
 /** Un doble clic para renombrar no debe arrancar un Claude. */

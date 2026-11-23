@@ -39,10 +39,12 @@ function transcriptPath(cwd: string, claudeId: string): string {
  * se busca el mismo id en las demás carpetas de `projects`. Solo se comprueba que el archivo exista: no se
  * lee, no se copia y no se cambia (#6).
  */
-function locateTranscript(cwd: string, claudeId: string): string | null {
+function locateTranscript(cwd: string, claudeId: string, scan = true): string | null {
   if (!isClaudeId(claudeId)) return null;
   const own = transcriptPath(cwd, claudeId);
   if (existsSync(own)) return own;
+  // Sin `scan` solo se mira la carpeta de la sesión: para el arranque, que no debe recorrer todo `projects`.
+  if (!scan) return null;
   const root = join(claudeConfigDir(), 'projects');
   let folders: string[];
   try {
@@ -58,8 +60,8 @@ function locateTranscript(cwd: string, claudeId: string): string | null {
 }
 
 /** Cuándo se escribió por última vez la conversación: el último mensaje. null si no existe. */
-export function transcriptMtime(cwd: string, claudeId: string): number | null {
-  const found = locateTranscript(cwd, claudeId);
+export function transcriptMtime(cwd: string, claudeId: string, scan = true): number | null {
+  const found = locateTranscript(cwd, claudeId, scan);
   if (!found) return null;
   try {
     return statSync(found).mtimeMs;

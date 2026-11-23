@@ -157,6 +157,8 @@ export interface SessionRuntime {
   message?: string;
   /** La carpeta de la sesión ya no existe: es la ruta que falta. El panel deja elegir otra. */
   missingCwd?: string;
+  /** Su historial existe pero Claude no pudo retomarlo: el panel deja empezar una conversación nueva, a elección de la persona. */
+  unresumable?: boolean;
 }
 
 export type RuntimeMap = Record<string, SessionRuntime>;

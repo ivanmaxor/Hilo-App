@@ -82,6 +82,8 @@ export class SessionController {
   private readonly messages = new Map<string, string>();
   /** Sesiones que no arrancaron porque su carpeta ya no existe: el panel ofrece elegir otra (#6). */
   private readonly missingCwd = new Map<string, string>();
+  /** Sesiones cuyo historial existe pero Claude no pudo retomar: el panel deja empezar una conversación nueva (#6). */
+  private readonly unresumable = new Set<string>();
   private readonly live = new Map<string, Live>();
   private readonly pty: PtyManager;
   private readonly hooks: HookChannel;
@@ -112,7 +114,8 @@ export class SessionController {
     // Las sesiones de antes de la 1.3.5 no saben cuándo fue su último mensaje: lo dice la fecha de su conversación.
     for (const s of allSessions(store.get())) {
       if (s.kind !== 'claude' || s.lastActiveAt) continue;
-      const at = transcriptMtime(s.cwd, s.claudeId);
+      // Solo la carpeta de la sesión: al arrancar no se recorre todo `projects` por cada sesión antigua.
+      const at = transcriptMtime(s.cwd, s.claudeId, false);
       if (at) store.dispatch({ type: 'session/active', id: s.id, at });
     }
     setConoutLostHandler(() => console.error('[sesiones] se perdió el proceso auxiliar de terminales'));
@@ -193,7 +196,26 @@ export class SessionController {
     if (message) runtime.message = message;
     const missing = this.missingCwd.get(id);
     if (missing) runtime.missingCwd = missing;
+    if (this.unresumable.has(id)) runtime.unresumable = true;
     return runtime;
+  }
+
+  /** La carpeta de esta sesión no existía al despertarla: solo entonces se deja elegir otra (#6). */
+  hasMissingCwd(id: string): boolean {
+    return this.missingCwd.has(id);
+  }
+
+  /**
+   * Salida explícita cuando el historial existe pero Claude no lo retoma: la persona elige empezar una conversación
+   * nueva. El historial viejo no se toca ni se borra: sigue guardado por Claude. Hilo nunca lo hace por su cuenta.
+   */
+  startFreshConversation(id: string): boolean {
+    if (!this.unresumable.has(id) || this.live.has(id)) return false;
+    if (!findSession(this.store.get(), id)) return false;
+    this.store.dispatch({ type: 'session/claudeId', id, claudeId: randomUUID() });
+    this.unresumable.delete(id);
+    this.messages.delete(id);
+    return true;
   }
 
   private publish(id: string): void {
@@ -330,6 +352,7 @@ export class SessionController {
     const id = session.id;
     this.messages.delete(id);
     this.missingCwd.delete(id);
+    this.unresumable.delete(id);
     if (!this.machines.has(id)) this.machines.set(id, initialState(session.kind));
 
     // Una ruta de red caída bloquearía el proceso principal 20 s: que falle al lanzar.
@@ -466,11 +489,13 @@ export class SessionController {
     if (!missing && !inUse) return false;
 
     // El historial existe pero Claude no lo retomó: no se cambia el id ni se empieza una conversación vacía
-    // por nuestra cuenta (#6). Se avisa en el panel y la conversación sigue en su id.
+    // por nuestra cuenta (#6). Se avisa en el panel y la conversación sigue en su id. Reintentar repetiría lo mismo,
+    // así que el panel ofrece una salida explícita: empezar una conversación nueva, si la persona lo decide.
     if (missing && transcriptExists(session.cwd, session.claudeId)) {
+      this.unresumable.add(session.id);
       this.messages.set(
         session.id,
-        `Esta conversación no se pudo retomar, aunque su historial existe.\nHilo no empieza una conversación nueva por su cuenta. Prueba Reintentar. Si sigue igual, su id es:\n${session.claudeId}`,
+        `Esta conversación no se pudo retomar, aunque su historial existe.\nHilo no empieza una conversación nueva por su cuenta. Su id es:\n${session.claudeId}`,
       );
       return false;
     }
@@ -577,6 +602,8 @@ export class SessionController {
     }
     this.machines.delete(id);
     this.messages.delete(id);
+    this.missingCwd.delete(id);
+    this.unresumable.delete(id);
   }
 
   /** Registra una sesión nueva o restaurada. */

@@ -46,6 +46,12 @@ describe('historial buscado por id en todas las carpetas', () => {
     expect(transcriptExists('D:\\Proyectos\\Nuevo', id)).toBe(true);
   });
 
+  it('al arrancar (sin escanear) solo mira la carpeta de la sesión', () => {
+    saveTranscript('D:\\Proyectos\\Viejo');
+    expect(transcriptMtime('D:\\Proyectos\\Nuevo', id, false)).toBeNull();
+    expect(transcriptMtime('D:\\Proyectos\\Viejo', id, false)).toBeTypeOf('number');
+  });
+
   it('no lo confunde con la conversación de otro id', () => {
     saveTranscript('D:\\Proyectos\\Viejo', '11111111-2222-4333-8444-555555555555');
     expect(transcriptExists('D:\\Proyectos\\Nuevo', id)).toBe(false);

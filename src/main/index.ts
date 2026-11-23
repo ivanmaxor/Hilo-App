@@ -427,6 +427,8 @@ function registerIpc(): void {
     if (!isSafeId(id) || (mode !== 'pick' && mode !== 'project')) return { ok: false };
     const found = findSession(store.get(), id);
     if (!found) return { ok: false };
+    // Solo si la carpeta de la sesión faltaba de verdad al despertarla: no se cambia la de una sesión sana.
+    if (!sessions.hasMissingCwd(id)) return { ok: false, message: 'La carpeta de esta sesión sí existe.' };
     let cwd: string | null;
     if (mode === 'project') {
       cwd = found.project.path;
@@ -445,6 +447,8 @@ function registerIpc(): void {
     store.dispatch({ type: 'session/cwd', id, cwd });
     return { ok: true };
   });
+  // Salida explícita cuando el historial existe pero Claude no lo retoma (#6): la persona decide empezar de nuevo.
+  handle('session:freshConversation', (id: unknown) => (isSafeId(id) ? sessions.startFreshConversation(id) : false));
   handle('dialog:pickFile', async () => {
     if (!win) return null;
     const result = await dialog.showOpenDialog(win, {
