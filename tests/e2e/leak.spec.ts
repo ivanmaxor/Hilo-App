@@ -39,10 +39,15 @@ test('cerrar con el foco en la terminal libera la terminal', async () => {
       await page.evaluate((sid) => (window as any).__hiloTest.terminals.focus(sid), id);
       await page.waitForTimeout(100);
       await page.keyboard.press('Control+Shift+W');
-      // Con un shell puede pedir confirmación: el botón principal la acepta.
-      const confirm = page.locator('.dialog button.danger, .dialog button.primary').first();
-      if (await confirm.isVisible().catch(() => false)) await confirm.click();
-      await expect.poll(() => page.evaluate((sid) => !(window as any).__hiloTest.terminals.debugEntry(sid), id)).toBe(true);
+      // Con un shell pide confirmación, pero tarda en dibujarse: mirar una sola vez si ya está la dejaba sin
+      // aceptar y la sesión nunca se cerraba (#3). Se acepta en cuanto aparece, hasta que la terminal se libere.
+      await expect
+        .poll(async () => {
+          const confirm = page.locator('.dialog [data-confirm="ok"]');
+          if (await confirm.isVisible().catch(() => false)) await confirm.click().catch(() => undefined);
+          return page.evaluate((sid) => !(window as any).__hiloTest.terminals.debugEntry(sid), id);
+        })
+        .toBe(true);
     }
     // Las entradas siguen en el controlador solo mientras viven: las 5 cerradas no deben quedar en memoria.
     await page.waitForTimeout(800);
