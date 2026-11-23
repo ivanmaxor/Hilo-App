@@ -70,3 +70,12 @@ export function classifyTitle(title: string): TitleKind {
   if (first === 0x2733) return 'ready';
   return 'other';
 }
+
+/**
+ * ¿El título dice que Claude corre en esa terminal? Desde Claude Code 2.1.330, al arrancar pone `claude` y
+ * el ✳ llega recién con la primera respuesta (#14). Solo dispara la búsqueda del proceso en una PowerShell:
+ * la confirmación es la foto de procesos y el archivo de sesión, así que un título parecido no basta.
+ */
+export function isClaudeTitle(title: string): boolean {
+  return classifyTitle(title) !== 'other' || /^\s*claude(\s|$)/i.test(title);
+}

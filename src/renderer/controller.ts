@@ -1,7 +1,7 @@
 import type { PlanUsage } from '../shared/usage';
 import { addRecentColor } from '../shared/color';
 import { soundFor, type SoundChoice } from '../shared/sounds';
-import { playSound } from './sound';
+import { loadCustomSound, playSound } from './sound';
 import type { ToolCheck } from '../shared/types';
 import { changesPaneId, sessionInPane } from '../shared/paneContent';
 import { MAX_PANES, paneInDirection, presetTree } from '../shared/paneLayout';
@@ -217,6 +217,40 @@ export async function wakeSession(id: string): Promise<void> {
   const status = statusOf(id);
   if (status === 'error' || status === 'exited') terminals.dispose(id);
   await terminals.wake(id, found.session.kind);
+}
+
+/** La carpeta de la sesión ya no existe: se cambia por otra y se despierta. La conversación se conserva (#6). */
+export async function fixSessionFolder(id: string, mode: 'pick' | 'project'): Promise<void> {
+  const result = await api.fixFolder(id, mode).catch(() => ({ ok: false, message: 'No se pudo cambiar la carpeta.' }));
+  if (!result.ok) {
+    if (result.message) toast(result.message);
+    return;
+  }
+  await wakeSession(id);
+  if (statusOf(id) === 'error') toast('Sigue sin poder arrancar.');
+  focusActive();
+}
+
+/**
+ * Claude no pudo retomar una conversación cuyo historial existe. Reintentar repetiría lo mismo: se ofrece, a
+ * elección de la persona, empezar una nueva. El historial viejo queda guardado por Claude (#6).
+ */
+export async function startFreshConversation(id: string): Promise<void> {
+  const found = findSession(app.get().state, id);
+  if (!found) return;
+  const ok = await confirmDialog({
+    title: `¿Empezar una conversación nueva en «${found.session.name}»?`,
+    body: 'Claude no pudo retomar la anterior. Su historial queda guardado por Claude, pero esta sesión empezará una conversación vacía.',
+    ok: 'Empezar una nueva',
+  });
+  if (!ok) return;
+  if (!(await api.freshConversation(id).catch(() => false))) {
+    toast('No se pudo empezar una conversación nueva.');
+    return;
+  }
+  await wakeSession(id);
+  if (statusOf(id) === 'error') toast('Sigue sin poder arrancar.');
+  focusActive();
 }
 
 let pendingWake: { timer: ReturnType<typeof setTimeout>; id: string } | null = null;
@@ -843,6 +877,47 @@ export function previewSound(sound: SoundChoice, onEnd: () => void = () => undef
   return playSound(sound, soundVolume, soundDuration, () => true, onEnd);
 }
 
+/** El sonido propio (#12): se carga al abrir y cada vez que cambia. */
+let loadedSoundName: string | null = null;
+
+async function syncCustomSound(): Promise<void> {
+  const name = app.get().state.settings.customSoundName;
+  if (name === loadedSoundName) return;
+  loadedSoundName = name;
+  const bytes = name ? await api.soundRead().catch(() => null) : null;
+  if (app.get().info.isTest) return;
+  const ok = await loadCustomSound(bytes);
+  if (!ok) toast(`No se pudo reproducir «${name}». Mientras tanto suena la gota: prueba con otro audio.`);
+}
+
+/** Elegir el sonido propio con el diálogo de Windows. Devuelve el problema, o '' si quedó guardado. */
+export async function pickCustomSound(): Promise<string> {
+  const result = await api.soundPick().catch(() => ({ ok: false as const, message: 'No se pudo abrir el archivo.' }));
+  if (!result) return '';
+  if (!result.ok) return result.message;
+  loadedSoundName = null;
+  await syncCustomSound();
+  return '';
+}
+
+export async function clearCustomSound(): Promise<void> {
+  await api.soundClear();
+  await syncCustomSound();
+}
+
+/** Aviso de uso del plan (#8): un aviso en pantalla y el sonido elegido, una vez. */
+function onUsageAlert(alert: { window: 'session' | 'week'; threshold: number; used: number; body: string }): void {
+  toast(alert.body);
+  const settings = app.get().state.settings;
+  const sound = settings.usageAlertSound;
+  if (sound === 'none') return;
+  if (app.get().info.isTest) {
+    playedSounds.push({ id: `uso-${alert.window}`, sound, duration: 0 });
+    return;
+  }
+  playSound(sound, settings.soundVolume);
+}
+
 const soundRepeats = new Map<string, ReturnType<typeof setInterval>>();
 
 /** ¿La estás mirando ahora? */
@@ -904,6 +979,31 @@ export function rememberColor(color: string): void {
 
 export async function openProjectFolder(id: string): Promise<void> {
   const problem = await api.openProjectFolder(id).catch(() => 'No se pudo abrir la carpeta.');
+  if (problem) toast(problem);
+}
+
+/** La carpeta donde trabaja una sesión, que puede no ser la del proyecto. */
+export async function openSessionFolder(id: string): Promise<void> {
+  const problem = await api.openSessionFolder(id).catch(() => 'No se pudo abrir la carpeta.');
+  if (problem) toast(problem);
+}
+
+/**
+ * Una ruta que se vio en la terminal (#10, D35). Clic: se muestra en el Explorador. Ctrl+clic: se abre en el IDE
+ * del proyecto, en su línea si venía; si queda fuera del proyecto, se muestra en el Explorador.
+ */
+export async function openTerminalPath(id: string, path: string, line: number | null, ide: boolean): Promise<void> {
+  const found = findSession(app.get().state, id);
+  if (!found) return;
+  if (ide) {
+    const [target] = await api.pathResolve(id, [path]).catch(() => [null]);
+    if (target && !target.dir && target.rel !== null) {
+      await openInIde(found.project.id, target.rel, line);
+      return;
+    }
+    if (target && !target.dir) toast('Ese archivo queda fuera del proyecto: se muestra en el Explorador.');
+  }
+  const problem = await api.pathReveal(id, path).catch(() => 'No se pudo abrir el Explorador.');
   if (problem) toast(problem);
 }
 
@@ -1186,6 +1286,7 @@ export async function initController(): Promise<void> {
 
   terminals = new TerminalManager(initial.state.settings, {
     toast: (text) => toast(text),
+    openPath: (id, path, line, ide) => void openTerminalPath(id, path, line, ide),
     windowFocused: () => view.get().focused,
     statusOf: (id) => statusOf(id),
     activate: (id) => {
@@ -1239,6 +1340,9 @@ export async function initController(): Promise<void> {
   api.onSessionFocus((id) => void selectSession(id));
   api.onAutoSlept((id) => disposeIfAsleep(id));
   api.onAlert(onAlert);
+  api.onUsageAlert(onUsageAlert);
+  void syncCustomSound();
+  app.subscribe(() => void syncCustomSound());
   api.onNotice((message) => toast(message));
   api.onUpdateStatus(onUpdateStatus);
   void api.updateGet().then(onUpdateStatus);

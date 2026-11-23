@@ -79,6 +79,14 @@ export interface Settings {
   soundDuration: number;
   /** Sonar también si la sesión está a la vista. */
   soundAlways: boolean;
+  /** Nombre del archivo del sonido propio (#12); vacío si no hay. El audio se guarda en la carpeta de datos. */
+  customSoundName: string;
+  /** Avisos de uso del plan (#8): umbrales en % para la sesión de 5 horas y para la semana. */
+  usageAlerts: boolean;
+  usageAlertSession: number[];
+  usageAlertWeek: number[];
+  usageAlertNotify: boolean;
+  usageAlertSound: SoundChoice;
   useHooks: boolean;
   /** Lanza Claude con --dangerously-skip-permissions: decisión del dueño, ver docs/DECISIONES.md. */
   skipPermissions: boolean;
@@ -155,6 +163,10 @@ export interface SessionRuntime {
   exitCode?: number;
   /** Mensaje de error para mostrar en el panel, si no pudo arrancar. */
   message?: string;
+  /** La carpeta de la sesión ya no existe: es la ruta que falta. El panel deja elegir otra. */
+  missingCwd?: string;
+  /** Su historial existe pero Claude no pudo retomarlo: el panel deja empezar una conversación nueva, a elección de la persona. */
+  unresumable?: boolean;
 }
 
 export type RuntimeMap = Record<string, SessionRuntime>;
@@ -195,6 +207,8 @@ export type Action =
   /** Solo las dispara el proceso principal: no están en la lista blanca del IPC. */
   | { type: 'session/adopt'; id: string; claudeId: string; cwd: string }
   | { type: 'session/active'; id: string; at: number }
+  /** Solo la dispara el proceso principal, con la carpeta que eligió la persona: no está en la lista blanca del IPC. */
+  | { type: 'session/cwd'; id: string; cwd: string }
   | { type: 'session/remove'; id: string }
   | { type: 'session/claudeId'; id: string; claudeId: string }
   | { type: 'session/awake'; id: string; awake: boolean }

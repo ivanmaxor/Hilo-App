@@ -5,6 +5,7 @@ import { changesPaneId, changesProjectOf, sessionInPane } from '../../shared/pan
 import { ChangesPanel } from './changes';
 import {
   activeProject,
+  openSessionFolder,
   app,
   cancelPendingWake,
   closeTab,
@@ -24,12 +25,14 @@ import {
   toast,
   toggleChanges,
   copyLastMessage,
+  fixSessionFolder,
+  startFreshConversation,
   useStore,
   view,
   wakeSession,
   subagentsOf,
 } from '../controller';
-import { CloseIcon, CopyMessageIcon, DiffIcon, LayoutIcon, PlusIcon, SearchIcon, ShellMark, StatusIcon, subagentsLabel } from './icons';
+import { CloseIcon, CopyMessageIcon, DiffIcon, FolderIcon, LayoutIcon, PlusIcon, SearchIcon, ShellMark, StatusIcon, subagentsLabel } from './icons';
 import { draggedPaneContent, endDragging, InlineRename, startDraggingPane, startDraggingSession } from './sidebar';
 import { MAX_PANES, moveDivider, paneDividers, paneRects, presetTree, resetDivider, type PaneDivider, type PaneEdge, type PaneNode, type PaneRect } from '../../shared/paneLayout';
 import type { SessionRecord } from '../../shared/types';
@@ -173,6 +176,17 @@ export function Tabs() {
             <DiffIcon />
             <span>Cambios</span>
           </button>
+          {activeFound && (
+            <button
+              class="icon-btn"
+              data-action="open-session-folder"
+              title={`Abrir la carpeta de «${activeFound.session.name}» en el Explorador\n${activeFound.session.cwd}`}
+              aria-label={`Abrir la carpeta de ${activeFound.session.name}`}
+              onClick={() => void openSessionFolder(activeFound.session.id)}
+            >
+              <FolderIcon />
+            </button>
+          )}
           <button
             class="icon-btn"
             title={`Buscar en la terminal (${keysOf('search')})`}
@@ -291,6 +305,29 @@ function Overlay({ sessionId, name, active }: { sessionId: string; name: string;
       </div>
     );
   }
+  // La carpeta ya no existe (por ejemplo, el proyecto se movió): se elige otra y la conversación se conserva.
+  const missingCwd = runtime[sessionId]?.missingCwd;
+  if (blocking && missingCwd) {
+    return (
+      <div class="overlay center" role="alert" data-missing-cwd={sessionId}>
+        <StatusIcon status="error" size={28} />
+        <p class="overlay-title">{name}</p>
+        <p class="overlay-sub pre">{`La carpeta de esta sesión ya no existe:\n${missingCwd}`}</p>
+        <p class="overlay-hint">La conversación se conserva: se retoma desde la carpeta que elijas.</p>
+        <div class="overlay-actions">
+          <button ref={btn} class="primary" onClick={() => void fixSessionFolder(sessionId, 'pick')}>
+            Elegir dónde está ahora
+          </button>
+          <button class="secondary" onClick={() => void fixSessionFolder(sessionId, 'project')}>
+            Abrirla en la carpeta del proyecto
+          </button>
+          <button class="secondary" onClick={() => void confirmCloseSession(sessionId)}>
+            Cerrar esta sesión
+          </button>
+        </div>
+      </div>
+    );
+  }
   // No llegó a arrancar: no hay salida que mostrar, y el mensaje dice qué hacer.
   if (blocking) {
     const isClaude = message!.includes('claude');
@@ -317,6 +354,11 @@ function Overlay({ sessionId, name, active }: { sessionId: string; name: string;
           >
             Reintentar
           </button>
+          {runtime[sessionId]?.unresumable && (
+            <button class="secondary" data-fresh-conversation={sessionId} onClick={() => void startFreshConversation(sessionId)}>
+              Empezar una conversación nueva
+            </button>
+          )}
           <button class="secondary" onClick={() => void confirmCloseSession(sessionId)}>
             Cerrar esta sesión
           </button>

@@ -50,6 +50,7 @@ test('la barra se ve sin tocar nada, y se puede apagar', async () => {
     await page.screenshot({ path: join(SHOTS, 'barra.png') });
 
     await page.evaluate(() => (window as any).__hiloTest.runCommand('settings'));
+    await page.locator('.settings-nav button', { hasText: 'Terminal' }).click();
     await page.locator('[data-field="scrollbar-always"]').uncheck();
     await page.keyboard.press('Escape');
     // Con el ratón encima, xterm la sigue mostrando.
@@ -93,6 +94,7 @@ test('el touchpad se calma según el ajuste, y la rueda no cambia', async () => 
     await page.evaluate((id) => (window as any).__hiloTest.terminals.debugEntry(id).term.scrollToBottom(), A);
     await page.waitForTimeout(150);
     await page.evaluate(() => (window as any).__hiloTest.runCommand('settings'));
+    await page.locator('.settings-nav button', { hasText: 'Terminal' }).click();
     await page.locator('[data-field="touchpad-speed"]').fill('100');
     await page.keyboard.press('Escape');
     await page.waitForTimeout(150);
@@ -144,7 +146,7 @@ test('ajustes: secciones, tamaño de letra y de ventana; arrastrar el divisor ca
     // Ajustes.
     await page.evaluate(() => (window as any).__hiloTest.runCommand('settings'));
     await page.screenshot({ path: join(SHOTS, 'ajustes-1.png') });
-    await expect(page.locator('.settings-nav button')).toHaveText(['Apariencia', 'Terminal', 'Sesiones', 'Claude Code', 'Actualizaciones', 'Novedades', 'Cambios', 'Atajos']);
+    await expect(page.locator('.settings-nav button')).toHaveText(['Apariencia', 'Terminal', 'Sesiones', 'Avisos', 'Claude Code', 'Cambios', 'Atajos', 'Actualizaciones', 'Novedades']);
     await page.getByRole('button', { name: 'Letra más grande' }).click();
     await page.getByRole('button', { name: 'Letra más grande' }).click();
     expect((await settings(page)).fontSize).toBe(18);

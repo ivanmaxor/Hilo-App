@@ -1,4 +1,5 @@
 import type { PlanUsage } from '../shared/usage';
+import type { TerminalPath } from '../shared/pathLinks';
 import type { Action, AppInfo, BackgroundProcess, PersistedState, RuntimeMap, SessionRuntime, SessionStatus, ToolCheck } from '../shared/types';
 import type { UpdateStatus } from '../shared/updates';
 import type { ChangesList, FileDiffRequest, FileDiffResult } from '../shared/diff';
@@ -20,6 +21,10 @@ export interface HiloApi {
   clipWrite(text: string): Promise<void>;
   pickFolder(): Promise<string | null>;
   pickFile(): Promise<string | null>;
+  /** La carpeta de una sesión ya no existe: 'pick' abre el diálogo de Windows, 'project' usa la carpeta del proyecto. */
+  fixFolder(id: string, mode: 'pick' | 'project'): Promise<{ ok: boolean; message?: string }>;
+  /** Su historial existe pero Claude no lo retoma: empieza una conversación nueva en esta sesión. El historial viejo no se toca. */
+  freshConversation(id: string): Promise<boolean>;
   pathExists(path: string): Promise<boolean>;
   toolsCheck(): Promise<ToolCheck>;
   usageGet(): Promise<PlanUsage | null>;
@@ -29,6 +34,11 @@ export interface HiloApi {
   markRead(id: string): Promise<void>;
   /** Abre la carpeta del proyecto en el Explorador. Devuelve el problema, o '' si se abrió. */
   openProjectFolder(id: string): Promise<string>;
+  /** Qué rutas escritas en la terminal existen, vistas desde la carpeta de la sesión (#10). null: no existe. */
+  pathResolve(id: string, paths: string[]): Promise<(TerminalPath | null)[]>;
+  /** Muestra la ruta en el Explorador. Devuelve el problema, o vacío. */
+  pathReveal(id: string, path: string): Promise<string>;
+  openSessionFolder(id: string): Promise<string>;
   onUsage(cb: (usage: PlanUsage) => void): () => void;
   changesList(projectId: string): Promise<ChangesList>;
   changesDiff(projectId: string, request: FileDiffRequest): Promise<FileDiffResult>;
@@ -54,6 +64,13 @@ export interface HiloApi {
   onAutoSlept(cb: (id: string) => void): () => void;
   /** Una sesión terminó, te espera o falló. `unseen`: no la estabas mirando. */
   onAlert(cb: (id: string, status: SessionStatus, unseen: boolean) => void): () => void;
+  /** Una ventana de uso del plan cruzó un umbral (#8). */
+  onUsageAlert(cb: (alert: { window: 'session' | 'week'; threshold: number; used: number; body: string }) => void): () => void;
+  /** Elegir el sonido propio con el diálogo nativo (#12). null si se canceló. */
+  soundPick(): Promise<{ ok: true; name: string } | { ok: false; message: string } | null>;
+  /** Los bytes del sonido propio, o null si no hay. */
+  soundRead(): Promise<Uint8Array | null>;
+  soundClear(): Promise<void>;
   onNotice(cb: (message: string) => void): () => void;
 }
 

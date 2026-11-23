@@ -20,7 +20,13 @@ export const SOUNDS = [
 ] as const;
 
 export type SoundId = (typeof SOUNDS)[number]["id"];
-export type SoundChoice = SoundId | "none";
+/** "propio": el audio que eligió la persona (#12), guardado en la carpeta de datos de Hilo. */
+export const CUSTOM_SOUND = "propio";
+export type SoundChoice = SoundId | "none" | typeof CUSTOM_SOUND;
+
+/** Tope del audio propio: lo que pesa y lo que suena cada pasada. */
+export const CUSTOM_SOUND_MAX_BYTES = 2 * 1024 * 1024;
+export const CUSTOM_SOUND_MAX_SECONDS = 15;
 
 /** Minutos entre repeticiones mientras nadie la atiende. 0 = una sola vez. */
 export const SOUND_REPEATS = [0, 1, 2, 5, 10] as const;
@@ -32,7 +38,7 @@ export const SOUND_DURATIONS = [0, 3, 5, 10, 20, 30] as const;
 export const SOUND_GAP = 0.35;
 
 export const isSoundChoice = (v: unknown): v is SoundChoice =>
-  v === "none" || SOUNDS.some((s) => s.id === v);
+  v === "none" || v === CUSTOM_SOUND || SOUNDS.some((s) => s.id === v);
 
 export function soundSeconds(id: SoundId): number {
   return SOUNDS.find((s) => s.id === id)?.seconds ?? 1;

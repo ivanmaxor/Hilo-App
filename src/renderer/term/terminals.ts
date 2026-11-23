@@ -3,8 +3,9 @@ import { SearchAddon } from '@xterm/addon-search';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
+import { fileUriToPath, findPathCandidates, pickLinks, type TerminalPath } from '../../shared/pathLinks';
 import { WheelThinner, type WheelLike } from '../../shared/wheel';
-import { Terminal, type ITheme } from '@xterm/xterm';
+import { Terminal, type ILink, type ITheme } from '@xterm/xterm';
 import { cleanCopy, isBlankSelection, joinHardWrapped, sanitizePaste } from '../../shared/paste';
 import { scanSecrets, type SecretKind } from '../../shared/secretScan';
 import { eventToKeys } from '../../shared/shortcuts';
@@ -156,6 +157,8 @@ interface Entry {
 
 export interface TerminalCallbacks {
   toast(message: string): void;
+  /** Una ruta de la terminal. `ide`: Ctrl+clic, abrirla en el IDE del proyecto; si no, mostrarla en el Explorador (#10). */
+  openPath(id: string, path: string, line: number | null, ide: boolean): void;
   /** Un clic derecho en un panel lo activa, igual que el izquierdo. */
   activate(id: string): void;
   /** Antes de pegar: `lines` > 0 si cada salto se ejecutaría, `secrets` con los tipos de clave detectados (nunca el valor). */
@@ -163,6 +166,46 @@ export interface TerminalCallbacks {
   windowFocused(): boolean;
   /** En qué anda el proceso. "waiting": está preguntando algo, como el diálogo de confianza. */
   statusOf(id: string): string;
+}
+
+/** Cuánto se recuerda si una ruta existe: lo bastante para no preguntar en cada movimiento del ratón. */
+const PATH_CACHE_MS = 15_000;
+
+interface CellPos {
+  /** Columna, desde 1. */
+  x: number;
+  /** Fila del búfer, desde 1. */
+  y: number;
+  /** Cuántas celdas ocupa la letra. */
+  w: number;
+}
+
+/**
+ * Una línea como la ve la persona: une las filas que xterm partió por ancho. Cada letra del texto sabe en qué
+ * celda está, para subrayar justo la ruta aunque haya letras anchas antes.
+ */
+function logicalLine(term: Terminal, y: number): { text: string; cells: CellPos[] } | null {
+  const buffer = term.buffer.active;
+  let first = y - 1;
+  while (first > 0 && y - 1 - first < 8 && buffer.getLine(first)?.isWrapped) first--;
+  let last = y - 1;
+  while (last - first < 16 && buffer.getLine(last + 1)?.isWrapped) last++;
+  let text = '';
+  const cells: CellPos[] = [];
+  const cell = buffer.getNullCell();
+  for (let row = first; row <= last; row++) {
+    const line = buffer.getLine(row);
+    if (!line) return null;
+    for (let x = 0; x < line.length; x++) {
+      line.getCell(x, cell);
+      const w = cell.getWidth();
+      if (w === 0) continue;
+      const chars = cell.getChars() || ' ';
+      for (let k = 0; k < chars.length; k++) cells.push({ x: x + 1, y: row + 1, w });
+      text += chars;
+    }
+  }
+  return { text, cells };
 }
 
 /** Cada cuánto se confirma la salida procesada, para el control de flujo. */
@@ -277,10 +320,13 @@ export class TerminalManager {
       windowsPty: { backend: 'conpty', buildNumber: this.windowsBuild },
       linkHandler: {
         activate: (event, uri) => {
-          if (event.ctrlKey) api.openLink(uri);
+          // Un enlace a un archivo (`file:///C:/...`) se trata como las rutas: va al Explorador, nunca al navegador.
+          const file = fileUriToPath(uri);
+          if (file !== null) this.callbacks.openPath(id, file, null, event.ctrlKey);
+          else if (event.ctrlKey) api.openLink(uri);
         },
         // El texto de un enlace puede decir otra cosa: se muestra el destino real.
-        hover: (_event, uri) => this.showLinkTip(uri),
+        hover: (_event, uri) => (fileUriToPath(uri) !== null ? this.showPathTip(null) : this.showLinkTip(uri)),
         leave: () => this.showLinkTip(null),
       },
     });
@@ -301,6 +347,7 @@ export class TerminalManager {
       ),
     );
     term.unicode.activeVersion = '11';
+    this.watchPathLinks(id, term);
 
     const el = document.createElement('div');
     el.className = 'term-host';
@@ -705,6 +752,70 @@ export class TerminalManager {
     if (uri !== null) this.linkTip.textContent = `Ctrl+clic abre ${uri}`;
   }
 
+  /** Qué hace el clic sobre una ruta. null: un enlace `file://`, del que no se sabe más. */
+  private showPathTip(path: TerminalPath | null): void {
+    this.linkTip.hidden = false;
+    if (path?.dir) this.linkTip.textContent = 'Clic: abrir la carpeta en el Explorador';
+    else if (path?.rel != null) this.linkTip.textContent = 'Clic: mostrar en el Explorador · Ctrl+clic: abrir en el IDE del proyecto';
+    else this.linkTip.textContent = 'Clic: mostrar en el Explorador';
+  }
+
+  /**
+   * Las rutas que se escriben en la terminal se subrayan si existen (#10, D35). El proceso principal dice cuáles
+   * existen, vistas desde la carpeta de la sesión; lo ya preguntado se recuerda un rato, porque el ratón pasa
+   * muchas veces por la misma línea.
+   */
+  private watchPathLinks(id: string, term: Terminal): void {
+    term.registerLinkProvider({
+      provideLinks: (y, callback) => {
+        const line = logicalLine(term, y);
+        const candidates = line ? findPathCandidates(line.text) : [];
+        if (!line || candidates.length === 0) {
+          callback(undefined);
+          return;
+        }
+        this.resolvePaths(id, candidates.map((c) => c.path)).then(
+          (found) => {
+            const links: ILink[] = [];
+            for (const candidate of pickLinks(candidates, found.map((f) => f !== null))) {
+              const path = found[candidates.indexOf(candidate)]!;
+              const first = line.cells[candidate.start];
+              const last = line.cells[candidate.end - 1];
+              if (!first || !last || first.y > y || last.y < y) continue;
+              links.push({
+                range: { start: { x: first.x, y: first.y }, end: { x: last.x + last.w - 1, y: last.y } },
+                text: line.text.slice(candidate.start, candidate.end),
+                decorations: { underline: true, pointerCursor: true },
+                activate: (event) => this.callbacks.openPath(id, candidate.path, candidate.line, event.ctrlKey),
+                hover: () => this.showPathTip(path),
+                leave: () => this.showLinkTip(null),
+              });
+            }
+            callback(links.length > 0 ? links : undefined);
+          },
+          () => callback(undefined),
+        );
+      },
+    });
+  }
+
+  private readonly pathCache = new Map<string, { at: number; value: TerminalPath | null }>();
+
+  private async resolvePaths(id: string, paths: string[]): Promise<(TerminalPath | null)[]> {
+    const now = Date.now();
+    const key = (path: string) => `${id}\n${path}`;
+    const missing = [...new Set(paths)].filter((path) => {
+      const hit = this.pathCache.get(key(path));
+      return !hit || now - hit.at > PATH_CACHE_MS;
+    });
+    if (missing.length > 0) {
+      const found = await api.pathResolve(id, missing).catch(() => [] as (TerminalPath | null)[]);
+      if (this.pathCache.size > 2000) this.pathCache.clear();
+      missing.forEach((path, i) => this.pathCache.set(key(path), { at: now, value: found[i] ?? null }));
+    }
+    return paths.map((path) => this.pathCache.get(key(path))?.value ?? null);
+  }
+
   /** Mover la ventana a una pantalla con otra escala cambia el tamaño de la celda. */
   private watchDpi(): void {
     matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener(
@@ -932,6 +1043,11 @@ export class TerminalManager {
     const prev = this.settings;
     this.settings = next;
     document.documentElement.classList.toggle('scrollbar-always', next.scrollbarAlways);
+    const sizeChanged =
+      prev.fontFamily !== next.fontFamily ||
+      prev.fontSize !== next.fontSize ||
+      prev.lineHeight !== next.lineHeight ||
+      prev.scrollbarAlways !== next.scrollbarAlways;
     for (const entry of this.entries.values()) {
       const opts = entry.term.options;
       if (prev.fontFamily !== next.fontFamily) {
@@ -946,8 +1062,12 @@ export class TerminalManager {
         if (this.searchListener?.id === entry.id) this.searchHighlight(entry.id, true);
         opts.minimumContrastRatio = contrastFor(next);
       }
-      // Oculta o no, el proceso tiene que conocer el tamaño nuevo.
-      this.fitEntry(entry, true);
+      // Solo se reajusta si cambió algo que altera cuántas columnas caben, y solo una terminal que está en un panel.
+      // Antes se hacía en cada actualización del estado (el objeto `settings` llega nuevo cada vez) y también con las
+      // terminales estacionadas, que miden otro ancho: xterm con `windowsPty: conpty` recorta las columnas que sobran,
+      // así que cada línea completa perdía su final al cambiar de sesión y no volvía a aparecer (#11). Una terminal
+      // estacionada se ajusta y avisa al proceso al engancharla (`attach`).
+      if (sizeChanged && entry.host) this.fitEntry(entry, true);
     }
   }
 
