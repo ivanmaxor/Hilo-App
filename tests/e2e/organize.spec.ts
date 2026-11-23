@@ -206,7 +206,10 @@ test('dormir, despertar, cerrar con deshacer, selector, búsqueda, zoom y ajuste
     await expect(page.locator(`.row[data-session="${b}"]`)).toHaveCount(0);
     await page.locator('.toast .link').click();
     await expect(page.locator(`.row[data-session="${b}"]`)).toBeVisible();
-    expect(await status(page, b)).toBe('asleep');
+    // Vuelve sin su proceso viejo y, como era la activa, se vuelve a seleccionar: eso la despierta (wakeOnSelect).
+    // Mirar 'asleep' aquí era una carrera con ese despertar.
+    await expect.poll(async () => (await appState(page)).state.ui.activeSessionId).toBe(b);
+    await expect.poll(() => status(page, b), { timeout: 15_000 }).toBe('idle');
 
     // Ajustes: abrir, cambiar el historial, y que los atajos no se disparen dentro.
     await page.keyboard.press('Control+,');

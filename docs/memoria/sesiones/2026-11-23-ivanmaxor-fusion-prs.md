@@ -12,3 +12,6 @@
 - **Probado:** las cinco ramas del dueño juntas sobre `main` (ya con #21, #20 y #23), en local: typecheck, 317 unitarias, privacidad y las e2e completas (97 pasan, 18 se omiten). El árbol de #24 es el mismo que se probó.
 - **Sin verificar:** las ideas de @dedalexcr7 sobre el `main` nuevo; las trae él al abrir cada PR.
 - **Queda pendiente:** el #7 (de @dedalexcr7), del que depende la 1.4.0, y el #9, que espera sus datos.
+- **Después: `main` quedó en rojo y se arregló.** Se fusionaron #18 y #24 con bypass sin mirar su CI, que fallaba:
+  - `rutas.spec.ts`: en el runner, la línea con la ruta se partía dentro de "mi informe.md" y la prueba no la encontraba. Ahora la prueba parte la línea ahí a propósito, y `pointAt` une las filas. La versión vieja falla así en local; la nueva pasa.
+  - `organize.spec.ts`, "cerrar con deshacer": al deshacer, la sesión vuelve a quedar activa y despierta (`wakeOnSelect`), y mirar `asleep` justo ahí era una carrera. Ahora espera que quede activa y en `idle`. Pasó 4 de 4 sin Claude ni Git, como en el CI.
