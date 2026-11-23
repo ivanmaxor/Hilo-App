@@ -27,3 +27,4 @@ Trampas ya resueltas: lo que costó descubrir y no hay que volver a pisar. Se su
 - **Las pruebas no deben sonar:** en modo prueba Hilo anota los sonidos en `__hiloTest.playedSounds` en vez de tocarlos. El botón Probar de Ajustes sí suena: las pruebas que lo usan bajan el volumen.
 - **`.playwright-mcp/`** aparece si un Claude usa el navegador de Playwright: está en `.gitignore`, no se sube.
 - **Al leer resultados de Playwright, no filtrar líneas:** un filtro escondió fallas una vez.
+- **El título de Claude cambia entre versiones.** Desde Claude Code 2.1.330 pone `claude` al arrancar, y el ✳ llega recién con la primera respuesta. La búsqueda de Claude dentro de una PowerShell usa `isClaudeTitle` (#14). Antes de suponer un título, mirarlo con `term.onTitleChange` en una e2e con Claude real.

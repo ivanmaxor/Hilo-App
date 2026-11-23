@@ -6,19 +6,19 @@
 const MAX_OSC = 4096;
 
 export class OscTitleScanner {
-  private pending = '';
+  private pending = "";
 
   /** Devuelve los títulos completos encontrados en este trozo, en orden. */
   feed(chunk: string): string[] {
     const titles: string[] = [];
     let data = this.pending ? this.pending + chunk : chunk;
-    this.pending = '';
+    this.pending = "";
     let pos = 0;
     for (;;) {
-      const start = data.indexOf('\x1b]', pos);
+      const start = data.indexOf("\x1b]", pos);
       if (start < 0) {
         // Un ESC al final puede ser el inicio de un OSC partido.
-        if (data.endsWith('\x1b')) this.pending = '\x1b';
+        if (data.endsWith("\x1b")) this.pending = "\x1b";
         return titles;
       }
       const end = findTerminator(data, start + 2);
@@ -28,14 +28,19 @@ export class OscTitleScanner {
         if (rest.length <= MAX_OSC) this.pending = rest;
         return titles;
       }
-      const title = end.aborted ? null : parseTitle(data.slice(start + 2, end.index));
+      const title = end.aborted
+        ? null
+        : parseTitle(data.slice(start + 2, end.index));
       if (title !== null) titles.push(title);
       pos = end.next;
     }
   }
 }
 
-function findTerminator(data: string, from: number): { index: number; next: number; aborted?: boolean } | null {
+function findTerminator(
+  data: string,
+  from: number,
+): { index: number; next: number; aborted?: boolean } | null {
   for (let i = from; i < data.length; i++) {
     const c = data.charCodeAt(i);
     if (c === 0x07) return { index: i, next: i + 1 };
@@ -50,13 +55,13 @@ function findTerminator(data: string, from: number): { index: number; next: numb
 }
 
 function parseTitle(body: string): string | null {
-  const semi = body.indexOf(';');
+  const semi = body.indexOf(";");
   if (semi < 0) return null;
   const code = body.slice(0, semi);
-  return code === '0' || code === '2' ? body.slice(semi + 1) : null;
+  return code === "0" || code === "2" ? body.slice(semi + 1) : null;
 }
 
-export type TitleKind = 'working' | 'ready' | 'other';
+export type TitleKind = "working" | "ready" | "other";
 
 /**
  * Observado en Claude Code 2.1.316: `◐ ◑` (U+25D0, U+25D1) mientras trabaja y
@@ -64,9 +69,21 @@ export type TitleKind = 'working' | 'ready' | 'other';
  */
 export function classifyTitle(title: string): TitleKind {
   const first = title.codePointAt(0);
-  if (first === undefined) return 'other';
-  if (first === 0x25d0 || first === 0x25d1) return 'working';
-  if (first >= 0x2801 && first <= 0x28ff) return 'working';
-  if (first === 0x2733) return 'ready';
-  return 'other';
+  if (first === undefined) return "other";
+  if (first === 0x25d0 || first === 0x25d1) return "working";
+  if (first >= 0x2801 && first <= 0x28ff) return "working";
+  if (first === 0x2733) return "ready";
+  return "other";
+}
+
+/**
+ * ¿El título dice que Claude corre en esa terminal? Desde Claude Code 2.1.330, al arrancar pone `claude` y
+ * el ✳ llega recién con la primera respuesta (#14). Solo dispara la búsqueda del proceso en una PowerShell:
+ * la confirmación es la foto de procesos y el archivo de sesión, así que un título parecido no basta.
+ */
+export function isClaudeTitle(title: string): boolean {
+  return (
+    classifyTitle(title) !== "other" ||
+    /^\s*claude(\s|$)|claude code/i.test(title)
+  );
 }

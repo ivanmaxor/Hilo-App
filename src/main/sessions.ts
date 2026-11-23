@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, promises as fsp } from 'node:fs';
 import { join } from 'node:path';
-import { OscTitleScanner, classifyTitle } from '../shared/oscScanner';
+import { OscTitleScanner, classifyTitle, isClaudeTitle } from '../shared/oscScanner';
 import { findSession, allSessions } from '../shared/reducer';
 import { initialState, transition, type MachineEvent, type MachineState } from '../shared/statusMachine';
 import type { BackgroundProcess, RuntimeMap, SessionRecord, SessionRuntime, SessionStatus } from '../shared/types';
@@ -273,7 +273,7 @@ export class SessionController {
     if (live.session.kind !== 'claude') {
       // Una PowerShell donde se abrió Claude: su título lo delata (D30).
       for (const title of live.scanner.feed(data)) {
-        if (classifyTitle(title) !== 'other') void this.detectClaudeInShell(id, live);
+        if (isClaudeTitle(title)) void this.detectClaudeInShell(id, live);
       }
       return;
     }

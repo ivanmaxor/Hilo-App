@@ -1,3 +1,4 @@
+import { isClaudeTitle } from '../../src/shared/oscScanner';
 import { soundFor, soundPasses } from '../../src/shared/sounds';
 import { claudePathProblem } from '../../src/shared/claudePath';
 import { addRecentColor, hexToHsv, hsvToHex, normalizeHex } from '../../src/shared/color';
@@ -647,5 +648,12 @@ describe('duración de los sonidos', () => {
     expect(soundPasses('ola', 10)).toBe(3);
     expect(sanitizeSettings({ soundDuration: 7 }).soundDuration).toBe(0);
     expect(sanitizeSettings({ soundDuration: 20 }).soundDuration).toBe(20);
+  });
+});
+
+describe('Claude dentro de una PowerShell (#14)', () => {
+  it('reconoce el título de arranque de Claude Code 2.1.330 y los de trabajo, y no otros', () => {
+    for (const t of ['claude', 'Claude', '✳ Claude Code', '◐ Arreglando el login', 'claude --resume']) expect(isClaudeTitle(t)).toBe(true);
+    for (const t of ['Windows PowerShell', 'C:\Users\dev\app', 'npm run claudette', 'Administrador: PowerShell']) expect(isClaudeTitle(t)).toBe(false);
   });
 });
