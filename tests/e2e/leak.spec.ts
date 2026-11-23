@@ -33,19 +33,21 @@ test('cerrar con el foco en la terminal libera la terminal', async () => {
     const before = await liveTerminals();
     expect(before).toBe(ids.length);
 
+    const CLOSE_DOUBLE_PRESS_MS = 800;
+    let lastClosePress = 0;
     for (const id of ids.slice(0, 5)) {
       await page.evaluate((sid) => (window as any).__hiloTest.selectSession(sid), id);
       await page.waitForTimeout(250);
       await page.evaluate((sid) => (window as any).__hiloTest.terminals.focus(sid), id);
       await page.waitForTimeout(100);
+      // El atajo de cerrar ignora una pulsación que llega antes de 800 ms de la anterior (CLOSE_DOUBLE_PRESS_MS en
+      // controller.ts): así una tecla mantenida no cierra varias sesiones. Esta prueba pulsaba el atajo unos 450 a
+      // 700 ms después de la vuelta anterior: si esa sesión se había cerrado rápido, la pulsación se descartaba sin
+      // abrir diálogo ni aviso y la sesión nunca se cerraba (#3, visto en el diagnóstico de abajo).
+      const wait = CLOSE_DOUBLE_PRESS_MS + 100 - (Date.now() - lastClosePress);
+      if (wait > 0) await page.waitForTimeout(wait);
+      lastClosePress = Date.now();
       await page.keyboard.press('Control+Shift+W');
-      // Cerrar una PowerShell puede acabar de tres formas (#3), y la prueba tiene que aceptar las tres:
-      //  1. se cierra sola, porque no tiene nada corriendo;
-      //  2. pide confirmación, que tarda en dibujarse: se acepta en cuanto aparece, sin mirar una sola vez;
-      //  3. la comprobación de procesos falla o tarda (bajo carga) y la app avisa "sigue abierta… <atajo> otra vez
-      //     la termina": se repite el atajo una vez, pasada la ventana que ignora pulsaciones seguidas (800 ms),
-      //     con el foco aún en la terminal, que es justo lo que esta prueba mide.
-      let repeated = false;
       // Si aun así no se cierra, deja el estado de la app a la vista: es lo que falta para entender la falla.
       const diagnostico = () =>
         page
@@ -72,13 +74,6 @@ test('cerrar con el foco en la terminal libera la terminal', async () => {
           async () => {
             const confirm = page.locator('.dialog [data-confirm="ok"]');
             if (await confirm.isVisible().catch(() => false)) await confirm.click().catch(() => undefined);
-            const warning = page.locator('.toast', { hasText: 'otra vez la termina' });
-            if (!repeated && (await warning.isVisible().catch(() => false))) {
-              repeated = true;
-              console.log('Aviso al cerrar:', ((await warning.first().innerText().catch(() => '')) || '').replace(/\s+/g, ' '));
-              await page.waitForTimeout(900);
-              await page.keyboard.press('Control+Shift+W');
-            }
             return page.evaluate((sid) => !(window as any).__hiloTest.terminals.debugEntry(sid), id);
           },
           { timeout: 25_000 },
