@@ -1933,7 +1933,7 @@ export function ContextMenu() {
               void copyLastMessage(session.id);
             }}
           >
-            Copiar el último mensaje <kbd>{keysOf("copyLastMessage")}</kbd>
+            Copiar respuesta <kbd>{keysOf("copyLastMessage")}</kbd>
           </button>
         )}
         {isUnread(session) ? (

@@ -55,7 +55,7 @@ Si tenías un hook de sonido propio en la configuración de Claude Code, sigue s
 | Pegar imagen | Alt+V, como en tu terminal. Si solo hay imagen en el portapapeles, Ctrl+V también funciona |
 | Salto de línea sin enviar | Shift+Enter |
 | Copiar uniendo líneas que cortó Claude | Ctrl+Shift+J |
-| Copiar el último mensaje de Claude, con el nombre de la sesión delante | Ctrl+Shift+L, el botón **Copiar respuesta** o clic derecho en la sesión |
+| Copiar el último mensaje de Claude, con el nombre de la sesión delante | Ctrl+Shift+L, el botón **Copiar respuesta** o clic derecho en la sesión, **Copiar respuesta** |
 
 ## Dormir sesiones
 
