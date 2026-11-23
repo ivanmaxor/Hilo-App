@@ -25,12 +25,17 @@ const api = {
   clipWrite: (text: string) => ipcRenderer.invoke('clip:write', text),
   pickFolder: () => ipcRenderer.invoke('dialog:pickFolder'),
   pickFile: () => ipcRenderer.invoke('dialog:pickFile'),
+  fixFolder: (id: string, mode: 'pick' | 'project') => ipcRenderer.invoke('session:fixFolder', id, mode),
+  freshConversation: (id: string) => ipcRenderer.invoke('session:freshConversation', id),
   pathExists: (p: string) => ipcRenderer.invoke('path:exists', p),
   toolsCheck: () => ipcRenderer.invoke('tools:check'),
   usageGet: () => ipcRenderer.invoke('usage:get'),
   lastMessage: (id: string) => ipcRenderer.invoke('session:lastMessage', id),
   markRead: (id: string) => ipcRenderer.invoke('session:markRead', id),
   openProjectFolder: (id: string) => ipcRenderer.invoke('project:openFolder', id),
+  pathResolve: (id: string, paths: string[]) => ipcRenderer.invoke('path:resolve', id, paths),
+  pathReveal: (id: string, path: string) => ipcRenderer.invoke('path:reveal', id, path),
+  openSessionFolder: (id: string) => ipcRenderer.invoke('session:openFolder', id),
   onUsage: (cb: Listener) => subscribe('usage:update', cb),
   changesList: (projectId: string) => ipcRenderer.invoke('changes:list', projectId),
   changesDiff: (projectId: string, request: unknown) => ipcRenderer.invoke('changes:diff', projectId, request),
@@ -54,6 +59,15 @@ const api = {
   onSessionFocus: (cb: Listener) => subscribe('session:focus', cb),
   onAutoSlept: (cb: Listener) => subscribe('session:autoSlept', cb),
   onAlert: (cb: Listener) => subscribe('session:alert', cb),
+  // Al suscribirse avisa que escucha: recién entonces el proceso principal marca un aviso como avisado.
+  onUsageAlert: (cb: Listener) => {
+    const off = subscribe('usage:alert', cb);
+    void ipcRenderer.invoke('usage:listen');
+    return off;
+  },
+  soundPick: () => ipcRenderer.invoke('sound:pick'),
+  soundRead: () => ipcRenderer.invoke('sound:read'),
+  soundClear: () => ipcRenderer.invoke('sound:clear'),
   onNotice: (cb: Listener) => subscribe('app:notice', cb),
 };
 

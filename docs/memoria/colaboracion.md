@@ -24,7 +24,7 @@ Cuando hay que elegir diseño, números o comportamiento, el PR (o el Issue) tra
 
 ## Pruebas
 
-- Antes del PR: `npm run typecheck`, `npm test` y las e2e de lo que se tocó (`npx playwright test tests/e2e/<archivo>`). El CI corre privacidad, typecheck, unitarias y build en Windows.
+- Antes del PR: `npm run typecheck`, `npm test` y las e2e de lo que se tocó (`npx playwright test tests/e2e/<archivo>`). El CI corre privacidad, typecheck, unitarias, build y las e2e en Windows (tarda unos 6 minutos); si falla una e2e, baja el artefacto `test-results` de esa corrida.
 - **Varios PR juntos:** antes de fusionarlos, se juntan en una rama local, se corren todas las pruebas, se fusionan en orden y se vuelve a probar `main`. PR que pasan por separado pueden chocar juntos.
 - **Las pruebas no tocan lo real.** Cada una usa su propia carpeta de datos (`launch()` en `tests/e2e/helpers.ts`), la ventana va oculta (`HILO_TEST_HIDDEN`), y nunca tocan la configuración de Claude ni las sesiones de quien usa el PC. Las PowerShell de las e2e son falsas; para una real, `env: { HILO_TEST_SHELL: '' }`.
 - **Reportes honestos:** cada PR y cada Release dicen qué se probó con personas, qué solo con pruebas automáticas y qué no se probó.
