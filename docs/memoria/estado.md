@@ -12,13 +12,17 @@ Hilo se actualiza sola desde las Releases y la usan personas reales todos los d�
 
 Hasta la 1.3.9 el código se escribía en un repo privado y se copiaba aquí limpio con un script. Desde ahora **este repo es la única fuente de verdad**: los dos colaboradores trabajan aquí con PR. El historial anterior no está en este repo.
 
-## Pruebas que fallan a veces
+## Pruebas e2e
 
-- `tests/e2e/leak.spec.ts`, "libera la terminal": intermitente desde la 1.2.2, sin diagnóstico.
-- `tests/e2e/pestanas.spec.ts`, "cerrar desde el menú": falló alguna vez en la tanda completa y pasa sola.
-- `tests/e2e/ajustes-scroll.spec.ts`: falló 2 veces en tanda y pasó 4 de 4 sola.
+El CI corre las e2e en `windows-latest` (89 pasan y 16 se omiten: las de Claude real y las de red). Las tres que fallaban a veces eran carreras de tiempo de las pruebas, no fallas de la app (#3):
 
-Por eso el CI todavía no corre las e2e: solo privacidad, typecheck, unitarias y build. Al leer resultados de Playwright, no filtrar líneas: un filtro escondió fallas una vez.
+- `pestanas`, "cerrar desde el menú": Escape llegaba antes de que el diálogo lo escuchara. Ahora espera a que "Cancelar" tenga el foco.
+- `leak`, "libera la terminal": el atajo de cerrar ignora una pulsación a menos de 800 ms de la anterior, y la prueba pulsaba antes. Ahora espera esa ventana.
+- `organize`: en un PC sin Claude (como el runner) sale el diálogo de requisitos y tapa los clics. Ahora marca `setupSeen`.
+- `ajustes-scroll`: falló 2 veces en tanda, pero no se pudo reproducir en más de 50 corridas. Sin cambios; si vuelve a fallar, abrir un Issue con el log.
+- `cambios`, "vive en el árbol": se colgó una vez bajo la carga de 4 suites completas a la vez, y pasó 24 de 24 al repetirla. No reproducido.
+
+Para probar como el CI en un PC que sí tiene Claude: `HILO_TEST_TOOLS='{"claude":null,"git":null}' npx playwright test`. Al leer resultados de Playwright, no filtrar líneas: un filtro escondió fallas una vez.
 
 ## Nunca probado con personas
 
@@ -34,4 +38,3 @@ Por eso el CI todavía no corre las e2e: solo privacidad, typecheck, unitarias y
 ## Lo que se sabe que falta
 
 - **Las actualizaciones no van firmadas.** Sin certificado (cuesta dinero), la única comprobación es el sha512 de `latest.yml` por HTTPS. Quien pueda editar una Release podría cambiar lo que reciben los usuarios. Ver la idea de firmar `latest.yml` en [roadmap.md](roadmap.md).
-- Las e2e no están en el CI (ver arriba).

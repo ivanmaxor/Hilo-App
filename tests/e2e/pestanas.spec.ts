@@ -85,7 +85,11 @@ test('cerrar desde el menú pregunta, y cancelar no cierra nada', async () => {
     await page.locator(`.row[data-session="${B}"]`).click({ button: 'right' });
     await page.getByRole('menuitem', { name: /Cerrar esta sesión/ }).click();
     await expect(page.locator('.dialog h2')).toHaveText('¿Cerrar «Dos»?');
+    // El diálogo escucha Escape desde un efecto que corre justo después de dibujarse, el mismo que da el foco a
+    // "Cancelar". Con el título ya visible, la tecla puede llegar antes y perderse (#3): se espera a ese foco.
+    await expect(page.getByRole('button', { name: 'Cancelar' })).toBeFocused();
     await page.keyboard.press('Escape');
+    await expect(page.locator('.dialog')).toHaveCount(0);
     await page.waitForTimeout(200);
     expect(await names(page)).toEqual(['Uno', 'Dos', 'Tres']);
 

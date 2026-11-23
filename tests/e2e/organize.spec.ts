@@ -34,6 +34,9 @@ test('crear, renombrar, colorear, mover, reordenar, colapsar, y sobrevive a rein
   // Encender lo que quedó encendido se prueba en restore.spec.ts.
   const empty = defaultState();
   empty.settings.startup = 'asleep';
+  // Sin esto, en un PC sin Claude (como el runner del CI) sale el diálogo de requisitos y tapa los clics (#3).
+  // Ese diálogo se prueba en requisitos.spec.ts, igual que hace makeState.
+  empty.settings.setupSeen = true;
   let ctx = await launch({ dataDir, state: empty });
   try {
     let { page } = ctx;
@@ -318,7 +321,7 @@ test('claude no encontrado: error claro, y corregir la ruta lo resuelve', async 
   }
 });
 
-test('el zoom también le llega al tamaño del proceso de las terminales ocultas', async () => {
+test('el zoom le llega al proceso de una terminal que estaba oculta, al volver a verla', async () => {
   const [a, b] = ['aaaaaaaa-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000002'] as const;
   const ctx = await launch({ state: makeState([{ id: a, name: 'A' }, { id: b, name: 'B' }]) });
   try {
@@ -330,8 +333,12 @@ test('el zoom también le llega al tamaño del proceso de las terminales ocultas
     await page.keyboard.press('Control+=');
     await page.keyboard.press('Control+=');
     await page.keyboard.press('Control+=');
-    await expect.poll(() => cols(a)).toBeLessThan(before);
-    // Al volver a A, el proceso y xterm coinciden: se comprueba abriendo la sesión.
+    await page.waitForTimeout(400);
+    // Una terminal oculta no se reajusta: estacionada usa el renderer de DOM, cuyas celdas miden distinto que con
+    // WebGL, así que mediría otro ancho que a la vista, y xterm recorta las columnas que sobran (#11). Conserva su
+    // tamaño hasta que se vuelve a ver.
+    expect(await cols(a)).toBe(before);
+    // Al volver a A se ajusta, y el proceso y xterm coinciden: se comprueba abriendo la sesión.
     await page.keyboard.press('Control+1');
     await expect.poll(() => cols(a)).toBeLessThan(before);
     // El proceso recibe el tamaño un momento después (D23).
