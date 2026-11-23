@@ -15,3 +15,4 @@
 - **Después: `main` quedó en rojo y se arregló.** Se fusionaron #18 y #24 con bypass sin mirar su CI, que fallaba:
   - `rutas.spec.ts`: en el runner, la línea con la ruta se partía dentro de "mi informe.md" y la prueba no la encontraba. Ahora la prueba parte la línea ahí a propósito, y `pointAt` une las filas. La versión vieja falla así en local; la nueva pasa.
   - `organize.spec.ts`, "cerrar con deshacer": al deshacer, la sesión vuelve a quedar activa y despierta (`wakeOnSelect`), y mirar `asleep` justo ahí era una carrera. Ahora espera que quede activa y en `idle`. Pasó 4 de 4 sin Claude ni Git, como en el CI.
+  - `organize.spec.ts`, "crear, renombrar…": al elegir PowerShell el nombre por defecto llega un momento después, y en el CI caía entre que Playwright selecciona el campo y escribe ("PowerShellCuatro"). Ahora la prueba espera ese nombre antes de escribir.

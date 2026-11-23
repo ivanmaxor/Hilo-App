@@ -23,6 +23,8 @@ async function createShell(page: Page, name: string, projectIndex = 0) {
   await page.locator('.project').nth(projectIndex).locator('.project-head').hover();
   await page.locator('.project').nth(projectIndex).locator('.project-head .add').click();
   await page.locator('.seg button', { hasText: 'PowerShell' }).click();
+  // El nombre por defecto llega un momento después: escribir antes lo pisaba a medias ("PowerShellCuatro" en el CI).
+  await expect(page.locator('input[data-field="name"]')).toHaveValue(/^PowerShell/);
   await page.locator('input[data-field="name"]').fill(name);
   await page.keyboard.press('Enter');
   await expect(page.locator('.row .name', { hasText: new RegExp(`^${name}$`) })).toBeVisible();
@@ -50,6 +52,7 @@ test('crear, renombrar, colorear, mover, reordenar, colapsar, y sobrevive a rein
     await page.locator('.empty .primary').click();
     await expect(page.locator('.dialog h2')).toHaveText('Nueva sesión');
     await page.locator('.seg button', { hasText: 'PowerShell' }).click();
+    await expect(page.locator('input[data-field="name"]')).toHaveValue(/^PowerShell/);
     await page.locator('input[data-field="name"]').fill('Uno');
     await page.keyboard.press('Enter');
     await expect(page.locator('.row .name', { hasText: 'Uno' })).toBeVisible();
@@ -95,6 +98,7 @@ test('crear, renombrar, colorear, mover, reordenar, colapsar, y sobrevive a rein
     await stubFolder(ctx, join(ROOT, 'docs'));
     await page.locator('.add-project').click();
     await page.locator('.seg button', { hasText: 'PowerShell' }).click();
+    await expect(page.locator('input[data-field="name"]')).toHaveValue(/^PowerShell/);
     await page.locator('input[data-field="name"]').fill('Cuatro');
     await page.keyboard.press('Enter');
     await expect(page.locator('.project')).toHaveCount(2);
