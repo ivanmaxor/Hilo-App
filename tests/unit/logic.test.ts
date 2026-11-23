@@ -653,7 +653,7 @@ describe('duración de los sonidos', () => {
 
 describe('Claude dentro de una PowerShell (#14)', () => {
   it('reconoce el título de arranque de Claude Code 2.1.330 y los de trabajo, y no otros', () => {
-    for (const t of ['claude', 'Claude', '✳ Claude Code', '◐ Arreglando el login', 'claude --resume']) expect(isClaudeTitle(t)).toBe(true);
-    for (const t of ['Windows PowerShell', 'C:\Users\dev\app', 'npm run claudette', 'Administrador: PowerShell']) expect(isClaudeTitle(t)).toBe(false);
+    for (const t of ['claude', 'Claude', 'Claude Code', '✳ Claude Code', '◐ Arreglando el login', 'claude --resume']) expect(isClaudeTitle(t)).toBe(true);
+    for (const t of ['Windows PowerShell', 'C:\\Proyectos\\app', 'npm run claudette', 'Administrador: PowerShell', 'notas sobre claude code']) expect(isClaudeTitle(t)).toBe(false);
   });
 });
