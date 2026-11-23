@@ -5,12 +5,18 @@
   - `retryAfterFailedLaunch` ya no cambia el `claudeId` si el historial existe: avisa en el panel de la sesión.
   - Si la carpeta de una sesión ya no existe al despertarla, el panel ofrece "Elegir dónde está ahora" (diálogo de Windows en el proceso principal) y "Abrirla en la carpeta del proyecto". La acción `session/cwd` solo la dispara el proceso principal: no está en la lista blanca del IPC.
   - El último mensaje de Claude y la fecha de la conversación también se leen de donde esté el historial.
+  - Tras una revisión crítica del propio PR: si el historial existe pero Claude no lo retoma, "Reintentar" repetía lo mismo para siempre. Ahora el panel ofrece "Empezar una conversación nueva" (con confirmación, solo si la persona lo elige; el historial viejo no se toca). Hilo sigue sin cambiar el id por su cuenta.
+  - `session:fixFolder` solo actúa si la carpeta de la sesión faltaba de verdad al despertarla.
+  - Al arrancar solo se mira la carpeta de la sesión (no se recorre todo `projects` por cada sesión antigua), y se limpian `missingCwd` y `unresumable` al borrar la sesión.
 - **Commits / PR:** rama `fix/6-retomar-por-id`, PR de `Closes #6`.
 - **Probado:**
   - `npm run typecheck`, `npm test` (unitarias nuevas en `tests/unit/retomar-por-id.test.ts`) y `npm run privacy`.
   - e2e nueva `tests/e2e/carpeta-inexistente.spec.ts` (panel de carpeta inexistente, con shell falsa).
   - e2e nueva con Claude real y haiku `tests/e2e/claude-retomar-otra-carpeta.spec.ts` (`HILO_E2E_CLAUDE=1`): la conversación nace en una carpeta, la sesión pasa a otra y retoma la misma. Con el código anterior falla (nace una conversación nueva en la carpeta nueva); con el cambio pasa. Borra solo lo que creó.
+  - e2e nueva `tests/e2e/claude-no-retomable.spec.ts` (un `claude.cmd` falso y una carpeta de configuración temporal, no toca `~/.claude`): el panel avisa, el id no cambia solo, el historial viejo no se toca y, al elegir empezar de nuevo, el id cambia. También prueba que `fixFolder` rechaza una sesión sana.
+  - Experimento con Claude real (no queda en el repo): una sesión que no recibió ningún mensaje **no deja un `.jsonl`**, ni abierta ni después de dormirla, y al despertarla arranca con el mismo id. Es decir, el camino "historial vacío que no se retoma" no ocurre en el flujo normal; el botón es una red de seguridad (archivo corrupto, por ejemplo).
 - **Sin verificar:**
+  - Qué pasa con un `.jsonl` corrupto o vacío de verdad: solo se probó con el Claude falso.
   - El botón "Elegir dónde está ahora" con el diálogo real de Windows: la e2e solo comprueba que aparece. "Abrirla en la carpeta del proyecto" sí se probó.
   - Con personas, a mano, el caso de un proyecto movido de verdad.
   - `copiar-respuesta.spec.ts` no se corrió con Claude real (está omitida sin `HILO_E2E_CLAUDE=1`).

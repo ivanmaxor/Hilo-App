@@ -28,3 +28,4 @@ Trampas ya resueltas: lo que costó descubrir y no hay que volver a pisar. Se su
 - **Las pruebas no deben sonar:** en modo prueba Hilo anota los sonidos en `__hiloTest.playedSounds` en vez de tocarlos. El botón Probar de Ajustes sí suena: las pruebas que lo usan bajan el volumen.
 - **`.playwright-mcp/`** aparece si un Claude usa el navegador de Playwright: está en `.gitignore`, no se sube.
 - **Al leer resultados de Playwright, no filtrar líneas:** un filtro escondió fallas una vez.
+- **Una sesión de Claude sin ningún mensaje no deja un `.jsonl`** (verificado con Claude real el 2026-11-23): dormirla y despertarla vuelve a usar `--session-id` con el mismo id y arranca bien. Por eso "No conversation found" con un historial que sí existe es un caso raro (archivo corrupto) y no el flujo normal; el panel deja empezar una conversación nueva si la persona lo decide (#6).
