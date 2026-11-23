@@ -1,0 +1,25 @@
+# 2026-11-23 · @dedalexcr7 · Cambiar la carpeta de un proyecto o de una sesión
+
+- **Qué se hizo:** #7, según la decisión del dueño (ver D36). Rama local `feature/7-cambiar-carpeta`, desde `origin/main` con los PR #17 a #24.
+  - «Cambiar carpeta…» en el menú de cada proyecto y de cada sesión (Claude o PowerShell).
+  - Proyecto: diálogo con la carpeta de antes y la nueva, y la lista de sesiones que estaban dentro de la vieja, con casilla marcada por defecto y la marca «su carpeta ya no existe». Las de otra carpeta no se tocan y se cuentan en una línea.
+  - La ruta nunca viene del renderer: `project:pickFolder` abre el diálogo en el proceso principal y guarda la ruta con un código de un solo uso; `project:applyFolder` canjea el código. Sesión suelta: `session:changeFolder`.
+  - `project/relocate` (solo del proceso principal) cambia `path` y `cwd` de las sesiones en una sola acción. `src/shared/folderPaths.ts` decide qué está «dentro de la vieja».
+  - Una sesión despierta sigue en su carpeta vieja y se avisa con un toast (no se apaga). Una dormida retoma por id desde la nueva. Una con error por carpeta inexistente vuelve a dormida.
+  - Si la nueva carpeta ya es de otro proyecto, o es la misma, se avisa y no se cambia nada.
+- **Ajuste al diseño recomendado:** las sesiones movidas conservan su subcarpeta (`C:\Viejo\src` pasa a `D:\Nuevo\src`); si no existe en la nueva, quedan en la raíz y se avisa. La acción lleva el `cwd` ya calculado por sesión, no solo los ids, para que el reducer siga siendo puro. No se tocó `validate.ts`: las dos acciones son solo del proceso principal.
+- **Commits / PR:** sin publicar (rama local). Ver `git log feature/7-cambiar-carpeta`.
+- **Probado:**
+  - Unitarias `tests/unit/cambiar-carpeta.test.ts` (función pura y reducer).
+  - e2e `tests/e2e/cambiar-carpeta.spec.ts`, con shells y `claude.cmd` falsos y un `CLAUDE_CONFIG_DIR` temporal: proyecto con cinco sesiones (qué cambia y qué no), duplicado y misma carpeta, sesión suelta (también PowerShell y una con carpeta inexistente), ruta o código falsos del renderer rechazados, sesión despierta frente a dormida (`--resume <id>` desde la carpeta nueva, `claudeId` y historial intactos).
+  - Además `organize` y `carpeta-inexistente`.
+- **Sin verificar:**
+  - El diálogo real de carpetas de Windows (se simula con `dialog.showOpenDialog`).
+  - Claude real retomando desde la carpeta nueva (lo cubre `claude-retomar-otra-carpeta.spec.ts`, que no se corrió).
+  - Una carpeta de red (UNC) como carpeta nueva: solo la función pura, con pruebas.
+  - Lo visual solo con una captura en tema oscuro.
+- **Queda pendiente / preguntas para el dueño:**
+  - ¿Conservar la subcarpeta al mover una sesión (lo que se hizo), o mandarlas todas a la raíz de la carpeta nueva?
+  - El nombre del proyecto no cambia con la carpeta.
+  - Al cambiar la carpeta de una sesión suelta que no arrancaba, se despierta sola (como su panel); desde el diálogo del proyecto no se despierta ninguna.
+  - D36 puede chocar en número con otro PR que agregue decisiones.

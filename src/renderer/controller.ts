@@ -17,6 +17,7 @@ import type {
   LayoutCount,
   PersistedState,
   ProjectRecord,
+  RelocatePick,
   RuntimeMap,
   SessionKind,
   SessionRecord,
@@ -63,6 +64,8 @@ export type Modal =
   | { type: 'ide'; projectId: string; file: string | null; line: number | null }
   /** Un color fuera de la paleta, para una sesión o un proyecto. */
   | { type: 'color'; target: ColorTarget }
+  /** Cambiar la carpeta de un proyecto (#7): la elegida ya está guardada en el proceso principal, y aquí solo se muestra. */
+  | { type: 'relocate'; projectId: string; pick: Extract<RelocatePick, { status: 'ok' }> }
   | { type: 'note'; id: string }
   | { type: 'mark'; id: string }
   | { type: 'confirm'; title: string; body: string; ok: string; danger: boolean; list?: string[]; resolve(ok: boolean): void };
@@ -228,6 +231,69 @@ export async function fixSessionFolder(id: string, mode: 'pick' | 'project'): Pr
   await wakeSession(id);
   if (statusOf(id) === 'error') toast('Sigue sin poder arrancar.');
   focusActive();
+}
+
+/** Las sesiones que siguen corriendo en su carpeta vieja: el aviso dice qué hacer, y no se apagan solas (#7). */
+function toastStillRunning(ids: string[]): void {
+  const names = ids.map((id) => findSession(app.get().state, id)?.session.name).filter((n): n is string => !!n);
+  if (!names.length) return;
+  const list = names.map((n) => `«${n}»`).join(', ');
+  toast(
+    names.length === 1
+      ? `${list} sigue corriendo en su carpeta anterior: pasará a la nueva cuando la duermas y la despiertes.`
+      : `${list} siguen corriendo en su carpeta anterior: pasarán a la nueva cuando las duermas y las despiertes.`,
+  );
+}
+
+/** Cambiar la carpeta de una sesión (#7). Su conversación no se toca: se retoma por su id desde la carpeta nueva. */
+export async function changeSessionFolder(id: string): Promise<void> {
+  const found = findSession(app.get().state, id);
+  if (!found) return;
+  const result = await api.changeSessionFolder(id).catch(() => ({ ok: false as const, message: 'No se pudo cambiar la carpeta.' }));
+  if (!result.ok) {
+    if (result.message) toast(result.message);
+    return;
+  }
+  if (result.awake) {
+    toastStillRunning([id]);
+    return;
+  }
+  // No arrancaba por su carpeta: lo mismo que el panel, se despierta en la nueva.
+  if (result.wasMissing) {
+    await wakeSession(id);
+    if (statusOf(id) === 'error') toast('Sigue sin poder arrancar.');
+    focusActive();
+    return;
+  }
+  disposeIfAsleep(id);
+  toast(`Carpeta de «${found.session.name}» cambiada. ${found.session.kind === 'claude' ? 'Al despertarla sigue su conversación desde ahí.' : 'Se abrirá ahí al despertarla.'}`);
+}
+
+/** Cambiar la carpeta de un proyecto (#7), paso 1: la ruta sale del diálogo de Windows y se queda en el proceso principal. */
+export async function changeProjectFolder(projectId: string): Promise<void> {
+  const pick = await api.pickProjectFolder(projectId).catch(() => ({ status: 'problem' as const, message: 'No se pudo cambiar la carpeta.' }));
+  if (pick.status === 'cancelled') return;
+  if (pick.status === 'problem') {
+    toast(pick.message);
+    return;
+  }
+  view.set({ modal: { type: 'relocate', projectId, pick }, menu: null });
+}
+
+/** Paso 2: solo viaja el código de un solo uso y qué sesiones se mueven. */
+export async function applyProjectFolder(projectId: string, token: string, sessionIds: string[]): Promise<void> {
+  const name = app.get().state.projects.find((p) => p.id === projectId)?.name ?? 'el proyecto';
+  const result = await api.applyProjectFolder(projectId, token, sessionIds).catch(() => ({ ok: false as const, message: 'No se pudo cambiar la carpeta.' }));
+  if (!result.ok) {
+    toast(result.message);
+    return;
+  }
+  for (const id of sessionIds) disposeIfAsleep(id);
+  const parts = [`Carpeta de «${name}» cambiada.`];
+  if (result.moved) parts.push(result.moved === 1 ? 'Se movió 1 sesión.' : `Se movieron ${result.moved} sesiones.`);
+  if (result.fellBack) parts.push(`${result.fellBack === 1 ? 'Una no tenía' : `${result.fellBack} no tenían`} su subcarpeta en la nueva y quedó en la raíz.`);
+  toast(parts.join(' '));
+  toastStillRunning(result.awake);
 }
 
 /**
