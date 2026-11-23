@@ -6,6 +6,7 @@ import { WebglAddon } from '@xterm/addon-webgl';
 import { WheelThinner, type WheelLike } from '../../shared/wheel';
 import { Terminal, type ITheme } from '@xterm/xterm';
 import { cleanCopy, isBlankSelection, joinHardWrapped, sanitizePaste } from '../../shared/paste';
+import { scanSecrets, type SecretKind } from '../../shared/secretScan';
 import { eventToKeys } from '../../shared/shortcuts';
 import type { SessionKind, Settings, ThemeName } from '../../shared/types';
 import { api } from '../api';
@@ -157,7 +158,8 @@ export interface TerminalCallbacks {
   toast(message: string): void;
   /** Un clic derecho en un panel lo activa, igual que el izquierdo. */
   activate(id: string): void;
-  confirmMultilinePaste(lines: number): Promise<boolean>;
+  /** Antes de pegar: `lines` > 0 si cada salto se ejecutaría, `secrets` con los tipos de clave detectados (nunca el valor). */
+  confirmPaste(info: { lines: number; secrets: SecretKind[] }): Promise<boolean>;
   windowFocused(): boolean;
   /** En qué anda el proceso. "waiting": está preguntando algo, como el diálogo de confianza. */
   statusOf(id: string): string;
@@ -634,15 +636,18 @@ export class TerminalManager {
           return;
         }
       }
-      // Sin bracketed paste cada salto es un Enter: en PowerShell, ejecutar.
-      if (this.settings.confirmMultilinePaste && !entry.term.modes.bracketedPasteMode && multiline) {
+      // Una clave pegada va al modelo y queda en la conversación en disco: se avisa siempre, con o sin
+      // bracketed paste. Sin él, además, cada salto es un Enter (en PowerShell, ejecutar): un solo diálogo.
+      const secrets = scanSecrets(clean);
+      const runsLines = this.settings.confirmMultilinePaste && !entry.term.modes.bracketedPasteMode && multiline;
+      if (secrets.length > 0 || runsLines) {
         // Otro pegado que ya había leído el portapapeles antes de abrirse este diálogo.
         if (entry.confirming) return;
-        const lines = clean.split(/\r\n|\r|\n/).filter((l) => l !== '').length;
+        const lines = runsLines ? clean.split(/\r\n|\r|\n/).filter((l) => l !== '').length : 0;
         entry.confirming = true;
         let ok = false;
         try {
-          ok = await this.callbacks.confirmMultilinePaste(lines);
+          ok = await this.callbacks.confirmPaste({ lines, secrets });
         } finally {
           entry.confirming = false;
         }
