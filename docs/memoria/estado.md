@@ -33,6 +33,7 @@ Para probar como el CI en un PC que sí tiene Claude: `HILO_TEST_TOOLS='{"claude
 - Pegar una imagen real, y `/copy` dentro de Claude.
 - Abrir en un IDE real (NetBeans y los demás solo con pruebas).
 - El 35 % de velocidad del touchpad no se calibró con hardware real.
+- Clic en una ruta de la terminal con el Explorador y un IDE reales (#10): las pruebas anotan lo que se abriría.
 - La pantalla clásica de Claude (1.3.7) y cómo suenan los sonidos (1.3.8 y 1.3.9) en parlantes reales.
 
 ## Lo que se sabe que falta

@@ -20,6 +20,7 @@ import {
   addProjectFromFolder,
   app,
   confirmCloseSession,
+  openSessionFolder,
   createSession,
   defaultSessionName,
   dispatch,
@@ -930,6 +931,17 @@ export function ContextMenu() {
           }
         >
           {session.note ? "Editar la nota…" : "Dejar una nota…"}
+        </button>
+        <button
+          role="menuitem"
+          data-action="open-session-folder"
+          title={session.cwd}
+          onClick={() => {
+            close();
+            void openSessionFolder(session.id);
+          }}
+        >
+          Abrir su carpeta
         </button>
         {status === "asleep" ? (
           <button

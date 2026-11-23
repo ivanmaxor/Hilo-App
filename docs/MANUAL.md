@@ -65,6 +65,17 @@ Si tenías un hook de sonido propio en la configuración de Claude Code, sigue s
 | Copiar uniendo líneas que cortó Claude | Ctrl+Shift+J |
 | Copiar el último mensaje de Claude, con el nombre de la sesión delante | Ctrl+Shift+L, o **Copiar respuesta** en la barra de pestañas o en el clic derecho de la sesión |
 
+## Rutas y carpetas
+
+Cuando Claude, o cualquier programa, escribe la ruta de un archivo o una carpeta que existe (`src/app.ts:12`, `C:\Proyectos\informe final.pdf`), al pasar el ratón se subraya y abajo aparece qué hace cada clic:
+
+- **Clic:** la muestra en el Explorador de Windows. Una carpeta se abre; un archivo queda marcado en la suya, sin abrirlo ni ejecutarlo.
+- **Ctrl+clic:** abre el archivo en el IDE del proyecto, en su línea si venía. Si queda fuera del proyecto, se muestra en el Explorador.
+
+Las rutas relativas se buscan desde la carpeta de la sesión. Las de red (`\\servidor\...`) no se tocan.
+
+El botón de la carpeta, arriba a la derecha, y **Abrir su carpeta** en el menú de una sesión abren la carpeta donde trabaja esa sesión, que puede no ser la del proyecto.
+
 ## Dormir sesiones
 
 Dormir cierra el proceso de Claude y conserva la conversación. Vuelve con un clic. Si hay algo corriendo en segundo plano, como `npm run dev`, Hilo te lo avisa antes, porque se cierra también. Al cerrar una sesión pasa lo mismo: la vista salta a la vecina, y si tenía procesos sigue abierta y un aviso te ofrece terminarla.

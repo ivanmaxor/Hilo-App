@@ -22,6 +22,7 @@ import { detectIdes, ideRootsFromEnv, launchIde } from './ide';
 import { installSharedConout } from './pty/sharedConout';
 import { APP_ORIGIN, applyNetworkSwitches, hardenSession, hardenWebContents, installEditMenu, openExternalSafe, registerAppScheme, serveRenderer } from './security';
 import { SessionController } from './sessions';
+import { isDirectory, resolveTerminalPath } from './pathOpen';
 import { Store } from './store';
 import { UpdateService } from './updater';
 import { resolveUpdateMode } from '../shared/updates';
@@ -567,6 +568,46 @@ function registerIpc(): void {
   on('link:open', (url: unknown) => {
     if (isStr(url)) openExternalSafe(url);
   });
+  // Rutas que se ven en una terminal (#10, D35). El renderer manda el texto tal cual; la carpeta desde la que se
+  // resuelve sale de la sesión guardada. Solo se mira si existe: no se lee nada.
+  handle('path:resolve', async (id: unknown, paths: unknown) => {
+    const found = isSafeId(id) ? findSession(store.get(), id) : null;
+    if (!found || !Array.isArray(paths) || paths.length > 40) return [];
+    return Promise.all(paths.map((raw) => resolveTerminalPath(raw, found.session.cwd, found.project.path)));
+  });
+  handle('path:reveal', async (id: unknown, raw: unknown) => {
+    const found = isSafeId(id) ? findSession(store.get(), id) : null;
+    if (!found) return 'Esa sesión ya no está.';
+    const target = await resolveTerminalPath(raw, found.session.cwd, found.project.path);
+    if (!target) return 'Ese archivo ya no está ahí.';
+    return revealPath(target.abs, target.dir);
+  });
+  handle('session:openFolder', async (id: unknown) => {
+    const found = isSafeId(id) ? findSession(store.get(), id) : null;
+    if (!found) return 'Esa sesión ya no está.';
+    if (!(await isDirectory(found.session.cwd))) return `La carpeta de esta sesión ya no existe:\n${found.session.cwd}`;
+    return revealPath(found.session.cwd, true);
+  });
+}
+
+/** Lo que se mostró en el Explorador, para las pruebas: ahí no se abre nada. */
+const revealedPaths: { path: string; dir: boolean }[] = [];
+
+/**
+ * Muestra algo en el Explorador. Una carpeta se abre; un archivo se marca dentro de la suya y nunca se abre:
+ * con `openPath`, un `.exe` o un `.bat` se ejecutaría.
+ */
+async function revealPath(path: string, dir: boolean): Promise<string> {
+  if (isTest) {
+    revealedPaths.push({ path, dir });
+    return '';
+  }
+  if (!dir) {
+    shell.showItemInFolder(path);
+    return '';
+  }
+  const problem = await shell.openPath(path);
+  return problem ? `No se pudo abrir ${path}: ${problem}` : '';
 }
 
 function appInfo(): AppInfo {
@@ -619,6 +660,7 @@ app.whenReady().then(() => {
       store,
       updates,
       sentNotifications,
+      revealedPaths,
       focusSession,
       pidOf: (id: string) => (sessions as unknown as { live: Map<string, { pid: number }> }).live.get(id)?.pid,
       focus: (focused: boolean) => send('window:focus', focused),
