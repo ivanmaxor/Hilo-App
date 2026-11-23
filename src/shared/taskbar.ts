@@ -1,17 +1,20 @@
 import type { SessionStatus } from './types';
 
 /**
- * Aviso en la barra de tareas: cuántas sesiones te esperan y el círculo con el número.
+ * Aviso en la barra de tareas: cuántas sesiones necesitan tu atención y el círculo con el número.
  * Pura y sin Electron: el main solo convierte los píxeles en un NativeImage.
  */
 
 /** Más de esto se muestra como «9+»: el círculo es de 16 px. */
 export const BADGE_MAX = 9;
 
-/** Cuántas sesiones esperan una respuesta tuya. Las que terminaron o fallaron no cuentan (se ven en el título). */
-export function waitingCount(statuses: Iterable<SessionStatus>): number {
+/**
+ * Cuántas sesiones necesitan tu atención: las que te esperan, las que terminaron sin que las vieras y las que fallaron
+ * (decisión del dueño, #13). Una sesión deja de contar al verla, responderle o volver a lanzarla.
+ */
+export function attentionCount(statuses: Iterable<SessionStatus>): number {
   let n = 0;
-  for (const s of statuses) if (s === 'waiting') n++;
+  for (const s of statuses) if (s === 'waiting' || s === 'done' || s === 'error') n++;
   return n;
 }
 
@@ -27,7 +30,7 @@ export function badgeDescription(count: number): string {
   if (!Number.isFinite(count)) return '';
   const n = Math.floor(count);
   if (n < 1) return '';
-  return n === 1 ? '1 sesión te espera' : `${n} sesiones te esperan`;
+  return n === 1 ? '1 sesión necesita tu atención' : `${n} sesiones necesitan tu atención`;
 }
 
 /** Lado del dibujo en píxeles. Windows pide 16 px lógicos: se dibuja al doble para pantallas con escala. */

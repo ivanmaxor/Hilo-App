@@ -34,12 +34,12 @@ test('la barra de tareas cuenta las sesiones que esperan y parpadea solo sin foc
     await setFocus(app, false);
     await settle(400);
     await waiting(app, 'a');
-    await expect.poll(() => lastOverlay(app)).toEqual({ label: '1', description: '1 sesión te espera' });
+    await expect.poll(() => lastOverlay(app)).toEqual({ label: '1', description: '1 sesión necesita tu atención' });
     await expect.poll(() => flashedOn(app)).toBe(1);
 
     // Otra más: la cuenta sube.
     await waiting(app, 'b');
-    await expect.poll(() => lastOverlay(app)).toEqual({ label: '2', description: '2 sesiones te esperan' });
+    await expect.poll(() => lastOverlay(app)).toEqual({ label: '2', description: '2 sesiones necesitan tu atención' });
     await expect.poll(() => flashedOn(app)).toBe(2);
 
     // Al volver a Hilo se apaga el parpadeo; el contador sigue mientras te esperen.
@@ -50,25 +50,24 @@ test('la barra de tareas cuenta las sesiones que esperan y parpadea solo sin foc
     // Con foco, una tercera cuenta pero no parpadea.
     const before = await flashedOn(app);
     await waiting(app, 'c');
-    await expect.poll(() => lastOverlay(app)).toEqual({ label: '3', description: '3 sesiones te esperan' });
+    await expect.poll(() => lastOverlay(app)).toEqual({ label: '3', description: '3 sesiones necesitan tu atención' });
     await settle(400);
     expect(await flashedOn(app)).toBe(before);
 
     // Cuando dejan de esperar, la cuenta baja y al final el círculo se quita.
     await resumed(app, 'a');
-    await expect.poll(() => lastOverlay(app)).toEqual({ label: '2', description: '2 sesiones te esperan' });
+    await expect.poll(() => lastOverlay(app)).toEqual({ label: '2', description: '2 sesiones necesitan tu atención' });
     await resumed(app, 'b');
     await resumed(app, 'c');
     await expect.poll(() => lastOverlay(app)).toBeNull();
 
-    // Una sesión que falla, sin foco: parpadea, pero no entra en la cuenta.
+    // Una sesión que falla, sin foco: parpadea y también entra en la cuenta.
     await setFocus(app, false);
     await settle(400);
     const beforeError = await flashedOn(app);
-    const overlaysBefore = (await calls(app)).overlays.length;
     await drive(app, 'a', { t: 'exit', code: 1, requested: false });
     await expect.poll(() => flashedOn(app)).toBe(beforeError + 1);
-    expect((await calls(app)).overlays.length).toBe(overlaysBefore);
+    await expect.poll(() => lastOverlay(app)).toEqual({ label: '1', description: '1 sesión necesita tu atención' });
   } finally {
     await ctx.close();
     cleanup(ctx.dataDir);
@@ -84,9 +83,46 @@ test('con las notificaciones apagadas no parpadea, pero el contador sigue', asyn
     await setFocus(app, false);
     await settle(400);
     await waiting(app, 'a');
-    await expect.poll(() => lastOverlay(app)).toEqual({ label: '1', description: '1 sesión te espera' });
+    await expect.poll(() => lastOverlay(app)).toEqual({ label: '1', description: '1 sesión necesita tu atención' });
     await settle(400);
     expect(await flashedOn(app)).toBe(0);
+  } finally {
+    await ctx.close();
+    cleanup(ctx.dataDir);
+  }
+});
+
+const started = (app: ElectronApplication, id: string) => drive(app, id, { t: 'hook', name: 'UserPromptSubmit' });
+const finished = (app: ElectronApplication, id: string) => drive(app, id, { t: 'hook', name: 'Stop' });
+const seen = (app: ElectronApplication, id: string) => drive(app, id, { t: 'viewed' });
+
+test('también cuentan las que terminaron sin verse y las que fallaron, y dejan de contar al verlas', async () => {
+  const ctx = await launch({ state: makeState([{ id: 'a', name: 'Uno' }, { id: 'b', name: 'Dos' }, { id: 'c', name: 'Tres' }]) });
+  try {
+    const { app } = ctx;
+    // Sin foco, así que terminar no se marca como visto por sí solo.
+    await setFocus(app, false);
+    await settle(400);
+
+    // Una terminó sin que la vieras: cuenta, pero no parpadea (solo parpadea lo que espera o falla).
+    await started(app, 'a');
+    await finished(app, 'a');
+    await expect.poll(() => lastOverlay(app)).toEqual({ label: '1', description: '1 sesión necesita tu atención' });
+    await settle(400);
+    expect(await flashedOn(app)).toBe(0);
+
+    // Otra falla: suma y parpadea. Otra te espera: suma y parpadea.
+    await drive(app, 'b', { t: 'exit', code: 1, requested: false });
+    await expect.poll(() => lastOverlay(app)).toEqual({ label: '2', description: '2 sesiones necesitan tu atención' });
+    await waiting(app, 'c');
+    await expect.poll(() => lastOverlay(app)).toEqual({ label: '3', description: '3 sesiones necesitan tu atención' });
+    await expect.poll(() => flashedOn(app)).toBe(2);
+
+    // Verla quita el verde y deja de contar; responderle a la que esperaba también.
+    await seen(app, 'a');
+    await expect.poll(() => lastOverlay(app)).toEqual({ label: '2', description: '2 sesiones necesitan tu atención' });
+    await resumed(app, 'c');
+    await expect.poll(() => lastOverlay(app)).toEqual({ label: '1', description: '1 sesión necesita tu atención' });
   } finally {
     await ctx.close();
     cleanup(ctx.dataDir);

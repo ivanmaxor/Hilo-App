@@ -7,7 +7,7 @@ import { release } from 'node:os';
 import { join } from 'node:path';
 import { STATUS_LABEL } from '../shared/statusMachine';
 import { CUSTOM_SOUND, soundFor } from '../shared/sounds';
-import { BADGE_SCALE_FACTOR, BADGE_SIZE, badgeDescription, badgeLabel, renderBadge, waitingCount } from '../shared/taskbar';
+import { BADGE_SCALE_FACTOR, BADGE_SIZE, badgeDescription, badgeLabel, renderBadge, attentionCount } from '../shared/taskbar';
 import { DEFAULT_SETTINGS } from '../shared/defaults';
 import { formatSpan, type PlanUsage } from '../shared/usage';
 import { CustomSound } from './customSound';
@@ -88,7 +88,7 @@ function setFlash(on: boolean): void {
   if (win && !win.isDestroyed()) win.flashFrame(on);
 }
 
-/** Círculo con las sesiones que te esperan sobre el ícono de la barra de tareas. Solo se vuelve a pedir si cambia. */
+/** Círculo con las sesiones que necesitan tu atención sobre el ícono de la barra de tareas. Solo se vuelve a pedir si cambia. */
 function updateTaskbarOverlay(count: number): void {
   if (!win || win.isDestroyed()) return;
   const label = badgeLabel(count);
@@ -201,14 +201,16 @@ const updates = new UpdateService(updateMode, {
 function updateWindowTitle(): void {
   if (!win || win.isDestroyed()) return;
   const map = sessions.runtimeMap();
-  const waiting = waitingCount(Object.values(map).map((r) => r.status));
+  const attention = attentionCount(Object.values(map).map((r) => r.status));
+  let waiting = 0;
   let done = 0;
   let error = 0;
   for (const r of Object.values(map)) {
-    if (r.status === 'done') done++;
+    if (r.status === 'waiting') waiting++;
+    else if (r.status === 'done') done++;
     else if (r.status === 'error') error++;
   }
-  updateTaskbarOverlay(waiting);
+  updateTaskbarOverlay(attention);
   const parts: string[] = [];
   if (waiting) parts.push(`${waiting} esperando`);
   if (error) parts.push(`${error} con error`);

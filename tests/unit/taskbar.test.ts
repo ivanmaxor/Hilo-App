@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { BADGE_SIZE, badgeDescription, badgeLabel, renderBadge, waitingCount } from '../../src/shared/taskbar';
+import { BADGE_SIZE, badgeDescription, badgeLabel, renderBadge, attentionCount } from '../../src/shared/taskbar';
 import type { SessionStatus } from '../../src/shared/types';
 
 describe('aviso en la barra de tareas', () => {
-  it('cuenta solo las sesiones que esperan', () => {
+  it('cuenta las que esperan, las que terminaron sin verse y las que fallaron', () => {
     const all: SessionStatus[] = ['asleep', 'starting', 'working', 'idle', 'done', 'error', 'exited', 'waiting', 'waiting'];
-    expect(waitingCount(all)).toBe(2);
-    expect(waitingCount([])).toBe(0);
-    expect(waitingCount(['done', 'error', 'working'])).toBe(0);
+    expect(attentionCount(all)).toBe(4);
+    expect(attentionCount([])).toBe(0);
+    expect(attentionCount(['done', 'error', 'waiting'])).toBe(3);
+    expect(attentionCount(['working', 'idle', 'asleep', 'starting', 'exited'])).toBe(0);
   });
 
   it('el texto del círculo llega a 9 y luego es «9+»', () => {
@@ -22,9 +23,9 @@ describe('aviso en la barra de tareas', () => {
 
   it('la descripción dice la cantidad real, aunque el círculo diga 9+', () => {
     expect(badgeDescription(0)).toBe('');
-    expect(badgeDescription(1)).toBe('1 sesión te espera');
-    expect(badgeDescription(2)).toBe('2 sesiones te esperan');
-    expect(badgeDescription(12)).toBe('12 sesiones te esperan');
+    expect(badgeDescription(1)).toBe('1 sesión necesita tu atención');
+    expect(badgeDescription(2)).toBe('2 sesiones necesitan tu atención');
+    expect(badgeDescription(12)).toBe('12 sesiones necesitan tu atención');
   });
 
   it('dibuja un círculo con texto, distinto para cada número', () => {
