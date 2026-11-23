@@ -27,3 +27,7 @@ Trampas ya resueltas: lo que costó descubrir y no hay que volver a pisar. Se su
 - **Las pruebas no deben sonar:** en modo prueba Hilo anota los sonidos en `__hiloTest.playedSounds` en vez de tocarlos. El botón Probar de Ajustes sí suena: las pruebas que lo usan bajan el volumen.
 - **`.playwright-mcp/`** aparece si un Claude usa el navegador de Playwright: está en `.gitignore`, no se sube.
 - **Al leer resultados de Playwright, no filtrar líneas:** un filtro escondió fallas una vez.
+- **El atajo de cerrar sesión ignora una pulsación a menos de 800 ms de la anterior** (`CLOSE_DOUBLE_PRESS_MS`, para que una tecla mantenida no cierre varias). Una prueba que cierra sesiones en serie tiene que esperar esa ventana: si no, la pulsación se descarta sin diálogo ni aviso y parece que "no pasa nada" (#3, `leak.spec.ts`).
+- **Una e2e que clica tiene que arrancar con `setupSeen` en `true`** (lo hace `makeState`). En un PC sin Claude, como el runner del CI, sale el diálogo de requisitos y tapa los clics. Para reproducirlo en un PC que sí lo tiene: `HILO_TEST_TOOLS='{"claude":null,"git":null}'`.
+- **Un `useEffect` de un diálogo corre después de dibujarlo:** una prueba que ve el título y pulsa Escape de inmediato puede llegar antes que el escucha de la tecla. Esperar a que el botón enfocado tenga el foco (`toBeFocused`).
+- **Al repetir e2e en paralelo** (varios `npx playwright test` a la vez) cada proceso necesita su `--output`, o se borran los resultados entre sí. En Windows, la salida redirigida de un proceso hijo queda en UTF-16: leerla decodificada.
