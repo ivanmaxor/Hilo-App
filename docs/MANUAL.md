@@ -56,6 +56,7 @@ Si tenías un hook de sonido propio en la configuración de Claude Code, sigue s
 | Salto de línea sin enviar | Shift+Enter |
 | Copiar uniendo líneas que cortó Claude | Ctrl+Shift+J |
 | Copiar el último mensaje de Claude, con el nombre de la sesión delante | Ctrl+Shift+L, el botón **Copiar respuesta** o clic derecho en la sesión |
+| Pegar el último mensaje de una sesión en otra, sin enviarlo | Clic derecho en la sesión > **Enviar su última respuesta a…** y elige una sesión de Claude despierta. Queda escrito en su cuadro, con «De …» delante, y tú pulsas Enter |
 
 ## Dormir sesiones
 

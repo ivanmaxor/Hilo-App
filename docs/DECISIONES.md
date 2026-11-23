@@ -283,6 +283,12 @@ Se lee de la conversación que Claude guarda (`~/.claude/projects/<carpeta>/<ses
 
 Es un archivo interno de Claude Code, sin contrato. Si cambia su formato, el botón avisa que no hay mensaje en vez de copiar algo equivocado.
 
+**Extensión: «Enviar su última respuesta a…» (propuesta, sin aprobar).** Clic derecho en una sesión de Claude > "Enviar su última respuesta a…" abre el selector rápido (el mismo de "Saltar a una sesión") con las demás sesiones de Claude **despiertas**. Al elegir, Hilo pega ahí el mensaje y deja esa sesión a la vista, sin Enter, para revisarlo antes de enviar.
+- La lectura es la misma de D26 (`session:lastMessage`, ahora con `forSend` para el encabezado), solo al pedirlo: no se duplica ni se lee nada más. El texto va al terminal destino, no pasa por el portapapeles.
+- Formato: `De «Nombre»:`, una línea en blanco y el mensaje (`formatSentMessage`). Entra por `terminals.pasteInto(id, texto)`, el mismo camino de pegar: espera a que Claude atienda, `sanitizePaste()` y `term.paste()`.
+- Una sesión dormida no se despierta para esto, y una que espera una respuesta tuya (permiso o pregunta) tampoco recibe: sale un aviso (`replyTargetProblem`). No hay atajo de teclado.
+- Alternativas que se dejaron: (a) despertar el destino dormido (descartado: arrancar un Claude es lento y gasta; se avisa), (b) submenú dentro del menú contextual (un selector con búsqueda sirve mejor con muchas sesiones), (c) enviar con Enter (descartado por el pedido: se revisa antes), (d) un atajo propio, (e) permitir también PowerShell como destino. Decide el dueño.
+
 ## D27. Novedades dentro de la app
 
 Pedido del dueño, para que quien use Hilo vea qué trae cada versión. Van en `src/shared/changelog.ts`, dentro de la app: bajarlas de GitHub sería otra conexión. Se ven en Ajustes > Novedades, y después de actualizar sale una vez un aviso con "Ver novedades" (`settings.lastSeenVersion`). Una instalación nueva no lo muestra.
