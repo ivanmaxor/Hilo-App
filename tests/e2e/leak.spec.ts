@@ -39,15 +39,55 @@ test('cerrar con el foco en la terminal libera la terminal', async () => {
       await page.evaluate((sid) => (window as any).__hiloTest.terminals.focus(sid), id);
       await page.waitForTimeout(100);
       await page.keyboard.press('Control+Shift+W');
-      // Con un shell pide confirmación, pero tarda en dibujarse: mirar una sola vez si ya está la dejaba sin
-      // aceptar y la sesión nunca se cerraba (#3). Se acepta en cuanto aparece, hasta que la terminal se libere.
+      // Cerrar una PowerShell puede acabar de tres formas (#3), y la prueba tiene que aceptar las tres:
+      //  1. se cierra sola, porque no tiene nada corriendo;
+      //  2. pide confirmación, que tarda en dibujarse: se acepta en cuanto aparece, sin mirar una sola vez;
+      //  3. la comprobación de procesos falla o tarda (bajo carga) y la app avisa "sigue abierta… <atajo> otra vez
+      //     la termina": se repite el atajo una vez, pasada la ventana que ignora pulsaciones seguidas (800 ms),
+      //     con el foco aún en la terminal, que es justo lo que esta prueba mide.
+      let repeated = false;
+      // Si aun así no se cierra, deja el estado de la app a la vista: es lo que falta para entender la falla.
+      const diagnostico = () =>
+        page
+          .evaluate((sid) => {
+            const t = (window as any).__hiloTest;
+            const v = t.view.get();
+            const a = t.app.get();
+            return JSON.stringify({
+              vuelta: sid,
+              activa: a.state.ui.activeSessionId,
+              estado: a.runtime[sid]?.status,
+              terminalViva: !!t.terminals.debugEntry(sid),
+              dialogo: v.modal?.type ?? null,
+              cerrando: v.closing,
+              ocupadas: v.busy,
+              avisos: v.toasts.map((x: any) => x.text),
+              foco: document.activeElement ? `${document.activeElement.tagName}.${document.activeElement.className}` : null,
+              sesiones: a.state.projects[0].sessions.length,
+            });
+          }, id)
+          .catch((e) => `sin diagnóstico: ${String(e)}`);
       await expect
-        .poll(async () => {
-          const confirm = page.locator('.dialog [data-confirm="ok"]');
-          if (await confirm.isVisible().catch(() => false)) await confirm.click().catch(() => undefined);
-          return page.evaluate((sid) => !(window as any).__hiloTest.terminals.debugEntry(sid), id);
-        })
-        .toBe(true);
+        .poll(
+          async () => {
+            const confirm = page.locator('.dialog [data-confirm="ok"]');
+            if (await confirm.isVisible().catch(() => false)) await confirm.click().catch(() => undefined);
+            const warning = page.locator('.toast', { hasText: 'otra vez la termina' });
+            if (!repeated && (await warning.isVisible().catch(() => false))) {
+              repeated = true;
+              console.log('Aviso al cerrar:', ((await warning.first().innerText().catch(() => '')) || '').replace(/\s+/g, ' '));
+              await page.waitForTimeout(900);
+              await page.keyboard.press('Control+Shift+W');
+            }
+            return page.evaluate((sid) => !(window as any).__hiloTest.terminals.debugEntry(sid), id);
+          },
+          { timeout: 25_000 },
+        )
+        .toBe(true)
+        .catch(async (error) => {
+          console.log('DIAGNÓSTICO al fallar:', await diagnostico());
+          throw error;
+        });
     }
     // Las entradas siguen en el controlador solo mientras viven: las 5 cerradas no deben quedar en memoria.
     await page.waitForTimeout(800);
