@@ -184,7 +184,7 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
       ? [...new Set(r.recentColors.filter((c): c is string => typeof c === 'string' && COLOR.test(c)).map((c) => c.toLowerCase()))].slice(0, MAX_RECENT_COLORS)
       : base.recentColors,
     staleMarks: typeof r.staleMarks === 'boolean' ? r.staleMarks : base.staleMarks,
-    lastSeenVersion: typeof r.lastSeenVersion === 'string' && /^\d+\.\d+\.\d+$/.test(r.lastSeenVersion) ? r.lastSeenVersion : base.lastSeenVersion,
+    lastSeenVersion: typeof r.lastSeenVersion === 'string' && /^\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$/.test(r.lastSeenVersion) ? r.lastSeenVersion : base.lastSeenVersion,
     changesShowSigns: typeof r.changesShowSigns === 'boolean' ? r.changesShowSigns : base.changesShowSigns,
     changesFullFile: typeof r.changesFullFile === 'boolean' ? r.changesFullFile : base.changesFullFile,
   };

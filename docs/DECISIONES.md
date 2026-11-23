@@ -327,3 +327,15 @@ Pedido del dueño, que tenía un hook Stop propio con sonido: que Hilo suene, co
 El hook del usuario sigue sonando en las sesiones de Hilo, porque viene de su configuración global y Hilo no la toca.
 
 En la 1.3.9, a pedido del dueño, que no notaba los sonidos cortos: cuatro sonidos de 2 a 3 segundos y `soundDuration`, que encadena pasadas del mismo sonido (con 0,35 s entre una y otra) hasta llenar la duración. Antes de cada pasada se pregunta si la sesión sigue en ese estado y si no la estás mirando, así que abrirla corta el aviso a la pasada siguiente.
+
+## D33. Un solo repo para trabajar de a dos
+
+Desde el 2026-11-23, el dueño y un colaborador (@dedalexcr7) trabajan en Hilo, cada uno con su Claude Code. Hasta la 1.3.9 el código se escribía en un repo privado y se copiaba limpio a este con un script, de un solo sentido: con dos personas, los cambios del colaborador no volvían al privado y chocaban en cada exportación. Darle el repo privado tampoco servía, porque su historial lleva el correo personal del dueño.
+
+Por eso **este repo es la única fuente de verdad**, y el historial privado quedó fuera, en el PC del dueño. Lo que antes se excluía al exportar (auditorías con capturas, diseño, bitácora, borradores de promoción y las pruebas de auditoría `a*`) no está en el repo. Lo útil para quien llega se resumió en `docs/memoria/`, sin datos personales.
+
+- **Privacidad sin la lista personal:** la lista de términos personales del dueño no puede estar en el repo. `scripts/check-privacy.mjs` revisa lo que nunca debe publicarse (correos que no son noreply, rutas `C:\Users\<nombre>` y claves), lo corre el CI en cada PR y acepta `--terms` con una lista de fuera del repo, para un hook `pre-commit` local.
+- **Revisión:** `CODEOWNERS` exige la aprobación del dueño en cada PR, y `main` solo recibe PR con *squash*. Los tags `v*` solo los crea el dueño, así que solo él saca versiones.
+- **Versiones de prueba:** `x.y.z-rc.N` se publica como pre-release. El actualizador no la ofrece (`allowPrerelease = false`) ni la instala (`isStableVersion`), así que a los usuarios no les llega.
+- **Riesgo que queda:** en un repo de cuenta personal, un colaborador tiene escritura completa, y eso incluye editar los archivos de una Release ya publicada. Las actualizaciones no van firmadas: la protección es la confianza hasta que se firme `latest.yml` (ver `docs/memoria/roadmap.md`).
+- **Commits sin firmas de IA:** por decisión del dueño, desde esta fecha.

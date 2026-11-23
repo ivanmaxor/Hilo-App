@@ -16,6 +16,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "start": "node scripts/build.mjs && electron .",
+    "privacy": "node scripts/check-privacy.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "e2e": "node scripts/build.mjs && playwright test",

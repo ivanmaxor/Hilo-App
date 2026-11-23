@@ -1,0 +1,22 @@
+# 2026-11-23 · @ivanmaxor · preparar el repo para trabajar de a dos
+
+- **Qué se hizo:** este repo pasó a ser la única fuente de verdad (antes se exportaba desde uno privado). Se sumaron:
+  - la memoria del proyecto en `docs/memoria/`;
+  - `CLAUDE.md` con las reglas de colaboración;
+  - CI en Windows: privacidad, typecheck, unitarias y build;
+  - `scripts/check-privacy.mjs`, `scripts/scan-installer.mjs` y `scripts/novedades.mjs`;
+  - plantilla de PR y `CODEOWNERS`;
+  - `.gitattributes` con LF;
+  - soporte de versiones de prueba (`x.y.z-rc.N`, `publish-release.mjs --prerelease`).
+- **Commits / PR:** el PR de `chore/colaboracion`.
+- **Probado:**
+  - `npm run privacy`: sin problemas.
+  - `npm run typecheck` y `npm test`: en verde.
+  - El chequeo de privacidad atrapa un correo y una ruta con usuario de prueba.
+  - `scan-installer.mjs` sobre el build de la 1.3.9: 0 coincidencias.
+- **Sin verificar:**
+  - una versión de prueba publicada de verdad;
+  - `novedades.mjs` con PR fusionados, porque todavía no hay.
+- **Queda pendiente:**
+  - reglas de `main` y de tags en GitHub, cuando el CI esté en verde;
+  - invitar a @dedalexcr7.

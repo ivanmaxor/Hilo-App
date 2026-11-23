@@ -1,0 +1,4 @@
+# Mismos saltos de línea en todos los PC y en el CI: LF, salvo lo que Windows necesita con CRLF.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf

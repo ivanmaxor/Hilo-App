@@ -520,7 +520,8 @@ describe('último mensaje de Claude', () => {
 describe('novedades', () => {
   it('la versión de package.json tiene sus novedades, y van de la más nueva a la más vieja', () => {
     const { version } = JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', 'package.json'), 'utf8'));
-    expect(CHANGELOG[0]!.version).toBe(version);
+    // Una versión de prueba (1.4.0-rc.1) usa las novedades de la versión que viene (1.4.0).
+    expect(CHANGELOG[0]!.version).toBe(version.replace(/-.*$/, ''));
     const key = (v: string) => v.split('.').map((n) => n.padStart(4, '0')).join('.');
     const keys = CHANGELOG.map((e) => key(e.version));
     expect([...keys].sort().reverse()).toEqual(keys);
