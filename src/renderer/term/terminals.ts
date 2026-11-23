@@ -927,6 +927,11 @@ export class TerminalManager {
     const prev = this.settings;
     this.settings = next;
     document.documentElement.classList.toggle('scrollbar-always', next.scrollbarAlways);
+    const sizeChanged =
+      prev.fontFamily !== next.fontFamily ||
+      prev.fontSize !== next.fontSize ||
+      prev.lineHeight !== next.lineHeight ||
+      prev.scrollbarAlways !== next.scrollbarAlways;
     for (const entry of this.entries.values()) {
       const opts = entry.term.options;
       if (prev.fontFamily !== next.fontFamily) {
@@ -941,8 +946,12 @@ export class TerminalManager {
         if (this.searchListener?.id === entry.id) this.searchHighlight(entry.id, true);
         opts.minimumContrastRatio = contrastFor(next);
       }
-      // Oculta o no, el proceso tiene que conocer el tamaño nuevo.
-      this.fitEntry(entry, true);
+      // Solo se reajusta si cambió algo que altera cuántas columnas caben, y solo una terminal que está en un panel.
+      // Antes se hacía en cada actualización del estado (el objeto `settings` llega nuevo cada vez) y también con las
+      // terminales estacionadas, que miden otro ancho: xterm con `windowsPty: conpty` recorta las columnas que sobran,
+      // así que cada línea completa perdía su final al cambiar de sesión y no volvía a aparecer (#11). Una terminal
+      // estacionada se ajusta y avisa al proceso al engancharla (`attach`).
+      if (sizeChanged && entry.host) this.fitEntry(entry, true);
     }
   }
 
