@@ -1,3 +1,6 @@
+import { sanitizePaste } from "./paste";
+import type { SessionKind, SessionStatus } from "./types";
+
 /**
  * El último mensaje de Claude en una conversación guardada (`<sesión>.jsonl`), para copiarlo (D26).
  * Claude guarda cada bloque de un mismo mensaje en su propia línea: se juntan los de texto del
@@ -57,4 +60,33 @@ export function lastAssistantText(jsonl: string): string | null {
 /** Lo que se copia: el nombre de la sesión, dos puntos, una línea en blanco y el mensaje. */
 export function formatCopiedMessage(sessionName: string, text: string): string {
   return `${sessionName}:\n\n${text}`;
+}
+
+/**
+ * Lo que se pega en otra sesión (idea «Enviar su última respuesta a…»): una línea `De «Nombre»:`, una línea
+ * en blanco y el mensaje. Se limpia aquí y otra vez al pegar: el nombre lo escribe la persona y el mensaje viene
+ * de un archivo que Claude Code guarda, y ninguno puede llevar controles que se salgan del pegado.
+ */
+export function formatSentMessage(sessionName: string, text: string): string {
+  // eslint-disable-next-line no-control-regex
+  const name = sessionName.replace(/[\x00-\x1f\x7f-\x9f]+/g, " ").trim();
+  const body = sanitizePaste(text).replace(/\r\n?/g, "\n").trim();
+  return `De «${name}»:\n\n${body}`;
+}
+
+/** Por qué no se le puede pegar a una sesión, o null si se puede. */
+export function replyTargetProblem(
+  kind: SessionKind,
+  status: SessionStatus,
+  name: string,
+): string | null {
+  if (kind !== "claude")
+    return `«${name}» es una PowerShell: la respuesta solo se envía a sesiones de Claude.`;
+  if (status === "asleep")
+    return `«${name}» está dormida: despiértala primero. No se despierta sola para esto.`;
+  if (status === "error" || status === "exited")
+    return `«${name}» ya no tiene proceso.`;
+  if (status === "waiting")
+    return `«${name}» está esperando una respuesta tuya: lo que se pegue podría contestarle.`;
+  return null;
 }

@@ -591,8 +591,14 @@ export class TerminalManager {
     await this.copyText(entry, joinHardWrapped(entry.term.getSelection(), entry.term.cols, startCol));
   }
 
-  async paste(entry: Entry): Promise<void> {
-    if (this.holdPaste(entry)) return;
+  /**
+   * Pega el portapapeles, o `given` si viene (texto que Hilo arma, como la respuesta de otra sesión).
+   * Lo dado pasa por el mismo camino: espera a que Claude atienda, `sanitizePaste` y `term.paste()`, sin Enter.
+   */
+  async paste(entry: Entry, given?: string): Promise<void> {
+    // Mientras se cierra otra sesión, un pegado del portapapeles espera como `null`; uno dado no puede esperar así.
+    const held = () => (given === undefined ? this.holdPaste(entry) : entry.closingHold !== null);
+    if (held()) return;
     if (entry.confirming) return;
     // Lo tecleado antes de pedir este pegado sale antes, aunque el despertar tarde.
     const typedBefore = entry.heldInput.length;
@@ -602,9 +608,9 @@ export class TerminalManager {
         await entry.wakeDone;
         if (entry.startQuestion) return;
       }
-      const { text, hasImage } = await api.clipRead();
+      const { text, hasImage } = given === undefined ? await api.clipRead() : { text: given, hasImage: false };
       if (!this.entries.has(entry.id)) return;
-      if (this.holdPaste(entry)) return;
+      if (held()) return;
       if (!entry.spawned) {
         if (text || hasImage) this.callbacks.toast('Esta terminal ya no tiene proceso: no se pegó nada.');
         return;
@@ -628,7 +634,7 @@ export class TerminalManager {
       if (entry.kind === 'claude' && multiline) {
         await this.waitForBracketedPaste(entry);
         if (!this.entries.has(entry.id)) return;
-        if (this.holdPaste(entry)) return;
+        if (held()) return;
         if (!entry.spawned) {
           this.callbacks.toast('Esta terminal ya no tiene proceso: no se pegó nada.');
           return;
@@ -651,7 +657,7 @@ export class TerminalManager {
           this.callbacks.toast('Esta terminal ya no tiene proceso: no se pegó nada.');
           return;
         }
-        if (this.holdPaste(entry)) return;
+        if (held()) return;
         entry.term.focus();
       }
       if (typedBefore > 0) api.write(entry.id, entry.heldInput.splice(0, typedBefore).join(''));
@@ -988,9 +994,9 @@ export class TerminalManager {
   }
 
   /** Pega en una terminal concreta, aunque el foco todavía no haya llegado a ella. */
-  async pasteInto(id: string): Promise<void> {
+  async pasteInto(id: string, given?: string): Promise<void> {
     const entry = this.entries.get(id);
-    if (entry) await this.paste(entry);
+    if (entry) await this.paste(entry, given);
   }
 
   /** Solo para pruebas automáticas. */

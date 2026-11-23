@@ -3,7 +3,7 @@ import { claudePathProblem } from '../../src/shared/claudePath';
 import { addRecentColor, hexToHsv, hsvToHex, normalizeHex } from '../../src/shared/color';
 import { mergeUsage, parseUsage } from '../../src/shared/usage';
 import { CHANGELOG } from '../../src/shared/changelog';
-import { formatCopiedMessage, lastAssistantText } from '../../src/shared/lastMessage';
+import { formatCopiedMessage, formatSentMessage, lastAssistantText, replyTargetProblem } from '../../src/shared/lastMessage';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -514,6 +514,35 @@ describe('último mensaje de Claude', () => {
 
   it('el formato: nombre, dos puntos y una línea en blanco', () => {
     expect(formatCopiedMessage('CC', 'Hice X')).toBe('CC:\n\nHice X');
+  });
+
+  describe('enviar a otra sesión', () => {
+    it('lleva De «Nombre»: en una línea, una línea en blanco y el mensaje', () => {
+      expect(formatSentMessage('CC', 'Hice X')).toBe('De «CC»:\n\nHice X');
+    });
+
+    it('conserva los saltos de línea, pasa CRLF a LF y recorta los bordes', () => {
+      expect(formatSentMessage('CC', '\n  Uno\r\n\r\n- dos\rtres  \n\n')).toBe('De «CC»:\n\nUno\n\n- dos\ntres');
+    });
+
+    it('quita los controles del mensaje: un ESC[201~ no puede salirse del pegado', () => {
+      const out = formatSentMessage('CC', 'a\x1b[201~b\x07c\x00d\te');
+      expect(out).toBe('De «CC»:\n\na[201~bcd\te');
+      expect(out).not.toContain('\x1b');
+    });
+
+    it('un nombre con saltos o controles sigue siendo una sola línea', () => {
+      expect(formatSentMessage('uno\ndos\r\x1b[0m', 'x')).toBe('De «uno dos [0m»:\n\nx');
+    });
+
+    it('solo se envía a una sesión de Claude que pueda recibirlo', () => {
+      for (const status of ['starting', 'working', 'idle', 'done'] as const) expect(replyTargetProblem('claude', status, 'B')).toBeNull();
+      expect(replyTargetProblem('claude', 'asleep', 'B')).toContain('dormida');
+      expect(replyTargetProblem('claude', 'waiting', 'B')).toContain('esperando');
+      expect(replyTargetProblem('claude', 'exited', 'B')).toContain('ya no tiene proceso');
+      expect(replyTargetProblem('claude', 'error', 'B')).toContain('ya no tiene proceso');
+      expect(replyTargetProblem('shell', 'idle', 'B')).toContain('PowerShell');
+    });
   });
 });
 

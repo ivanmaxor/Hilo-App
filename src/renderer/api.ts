@@ -24,7 +24,8 @@ export interface HiloApi {
   toolsCheck(): Promise<ToolCheck>;
   usageGet(): Promise<PlanUsage | null>;
   /** El último mensaje de Claude con el nombre de la sesión delante, listo para copiar. */
-  lastMessage(id: string): Promise<string | null>;
+  /** `forSend`: con el encabezado `De «Nombre»:` para pegarlo en otra sesión, en vez del de copiar. */
+  lastMessage(id: string, forSend?: boolean): Promise<string | null>;
   /** Quita el verde de "terminó" sin abrir la sesión. */
   markRead(id: string): Promise<void>;
   /** Abre la carpeta del proyecto en el Explorador. Devuelve el problema, o '' si se abrió. */
