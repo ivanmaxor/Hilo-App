@@ -6,7 +6,9 @@
  *   node scripts/publish-release.mjs --dry-run     comprueba todo y muestra el comando, sin publicar
  *   node scripts/publish-release.mjs               publica
  *
- * Opciones: --release-dir <carpeta> (por defecto release/), --notes-file <archivo>.
+ * Opciones: --release-dir <carpeta> (por defecto release/), --notes-file <archivo>, --prerelease.
+ * Una versión de prueba (x.y.z-rc.N) va con --prerelease: el actualizador de la gente no la ofrece ni la
+ * instala (allowPrerelease = false e isStableVersion).
  * No sube código: el tag apunta al último commit del repo público, que debe tener al menos uno.
  * GitHub le agrega por su cuenta el zip de ese contenido.
  */
@@ -29,6 +31,7 @@ const option = (name) => {
 };
 const releaseDir = resolve(option('--release-dir') ?? join(root, 'release'));
 const notesFile = option('--notes-file');
+const prerelease = args.includes('--prerelease');
 
 function fail(message) {
   console.error(`No se publica. ${message}`);
@@ -46,6 +49,9 @@ const ymlField = (yml, name) => new RegExp(`^${name}:\\s*['"]?(.*?)['"]?\\s*$`, 
 // Primero lo local: lo que se va a subir tiene que ser coherente.
 const { version } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const tag = `v${version}`;
+const isPre = version.includes('-');
+if (isPre && !prerelease) fail(`${version} es una versión de prueba: publícala con --prerelease, así no les llega a los usuarios.`);
+if (!isPre && prerelease) fail(`--prerelease es para versiones de prueba (x.y.z-rc.N), y package.json dice ${version}.`);
 const installer = `Hilo-Setup-${version}.exe`;
 const files = [installer, `${installer}.blockmap`, 'latest.yml'].map((f) => join(releaseDir, f));
 for (const file of files) {
@@ -74,7 +80,7 @@ if (tagRef.status === 0) fail(`El tag ${tag} ya existe en ${SLUG}.`);
 if (!/404/.test(tagRef.stderr + tagRef.stdout)) fail(`No se pudo comprobar el tag ${tag}: ${tagRef.stderr.trim()}`);
 
 const notes = notesFile ? ['--notes-file', notesFile] : ['--notes', `Hilo ${version}. Para instalar, baja ${installer}. Si ya tienes Hilo, se actualiza desde Ajustes.`];
-const create = ['release', 'create', tag, ...files, '--repo', SLUG, '--title', `Hilo ${version}`, '--latest', ...notes];
+const create = ['release', 'create', tag, ...files, '--repo', SLUG, '--title', `Hilo ${version}`, ...(prerelease ? ['--prerelease', '--latest=false'] : ['--latest']), ...notes];
 
 if (dryRun) {
   console.log('Todo en orden. Sin --dry-run se ejecutaría:\n');

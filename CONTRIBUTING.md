@@ -23,6 +23,12 @@ npm run e2e
 
 Keep each pull request to one change, and add a test that fails without it when you can.
 
+## How we work
+
+The maintainers work through Issues and small pull requests, one per Issue, on their own branch. Put `Closes #N` in the pull request body so the Issue closes on merge. Every pull request needs CI to pass and an approval from the owner, and `main` is merged with squash. Commits are in Spanish, use the GitHub noreply email, and carry no AI signatures. The full workflow, in Spanish, is in [docs/memoria/colaboracion.md](docs/memoria/colaboracion.md).
+
+Run `npm run privacy` before pushing: it fails on personal emails, Windows paths with a user name, and keys.
+
 ## Rules that don't bend
 
 Hilo runs inside people's daily work, so these come first. A change that breaks one of them won't be merged, however useful it is. [CLAUDE.md](CLAUDE.md) has the full list.
