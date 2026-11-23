@@ -15,7 +15,7 @@ import {
   useState,
 } from "preact/hooks";
 import { EFFORTS, MODELS, PALETTE } from "../../shared/defaults";
-import { fuzzyMatch } from "../../shared/fuzzy";
+import { fuzzyMatch, normalize } from "../../shared/fuzzy";
 import {
   eventToKeys,
   isModifierOnly,
@@ -69,6 +69,7 @@ import {
   previewSound,
 } from "../controller";
 import { CloseIcon, StatusIcon } from "./icons";
+import { SummaryDialog } from "./summary";
 import {
   ColorDialog,
   ColorPicker,
@@ -566,6 +567,8 @@ function Highlight({ text, positions }: { text: string; positions: number[] }) {
   );
 }
 
+const COMMAND_LABEL = "Resumen del día";
+
 function QuickOpen() {
   const { state } = useStore(app);
   const [query, setQuery] = useState("");
@@ -601,10 +604,14 @@ function QuickOpen() {
       });
   }, [query, state]);
 
+  // Un comando, no una sesión: sale al final de la lista si lo que se escribe está en su nombre.
+  const command = normalize(COMMAND_LABEL).includes(normalize(query.trim()));
+  const total = results.length + (command ? 1 : 0);
   const pick = (id: string) => {
     view.set({ modal: null });
     void selectSession(id);
   };
+  const runSummary = () => runCommand("dailySummary");
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => {
     list.current
@@ -630,13 +637,16 @@ function QuickOpen() {
           onKeyDown={(e) => {
             if (e.key === "ArrowDown") {
               e.preventDefault();
-              setAt((v) => Math.min(v + 1, results.length - 1));
+              setAt((v) => Math.min(v + 1, total - 1));
             } else if (e.key === "ArrowUp") {
               e.preventDefault();
               setAt((v) => Math.max(v - 1, 0));
             } else if (e.key === "Enter" && results[at]) {
               e.preventDefault();
               pick(results[at]!.s.id);
+            } else if (e.key === "Enter" && command && at === results.length) {
+              e.preventDefault();
+              runSummary();
             }
           }}
         />
@@ -661,7 +671,21 @@ function QuickOpen() {
               <span class="quick-status">{STATUS_LABEL[statusOf(r.s.id)]}</span>
             </button>
           ))}
-          {results.length === 0 && (
+          {command && (
+            <button
+              role="option"
+              aria-selected={at === results.length}
+              data-command="dailySummary"
+              class={`quick-item command${at === results.length ? " on" : ""}`}
+              onMouseEnter={() => setAt(results.length)}
+              onClick={runSummary}
+            >
+              <span class="name">{COMMAND_LABEL}</span>
+              <span class="sub">Copiar o guardar lo de hoy</span>
+              <span class="quick-status">Comando</span>
+            </button>
+          )}
+          {results.length === 0 && !command && (
             <p class="quick-empty">
               {allSessions(state).length
                 ? "Ninguna sesión se llama así."
@@ -1824,6 +1848,8 @@ export function Modals() {
       return <ConfirmDialog key={m.title} modal={m} />;
     case "quick":
       return <QuickOpen />;
+    case "summary":
+      return <SummaryDialog />;
     case "setup":
       return <SetupGuide initial={m.tools} />;
     case "ide":

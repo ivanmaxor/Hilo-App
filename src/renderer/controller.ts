@@ -58,6 +58,7 @@ export type Modal =
   | { type: 'newSession'; kind: SessionKind; projectId: string | null }
   | { type: 'settings'; section?: string }
   | { type: 'quick' }
+  | { type: 'summary' }
   | { type: 'setup'; tools: ToolCheck }
   /** Elegir el IDE de un proyecto. Si se venía a abrir algo, se abre después de elegir. */
   | { type: 'ide'; projectId: string; file: string | null; line: number | null }
@@ -963,6 +964,9 @@ export function runCommand(action: string): void {
       return;
     case 'quickOpen':
       view.set({ modal: { type: 'quick' } });
+      return;
+    case 'dailySummary':
+      view.set({ modal: { type: 'summary' }, menu: null });
       return;
     case 'nextSession':
       cycle(1);

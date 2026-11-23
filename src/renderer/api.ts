@@ -19,6 +19,8 @@ export interface HiloApi {
   clipRead(): Promise<{ text: string; hasImage: boolean }>;
   clipWrite(text: string): Promise<void>;
   pickFolder(): Promise<string | null>;
+  /** Pregunta la carpeta con el diálogo del sistema y guarda ahí el resumen del día. `message` vacío: canceló. */
+  summarySave(text: string): Promise<{ ok: true; path: string } | { ok: false; message: string }>;
   pickFile(): Promise<string | null>;
   pathExists(path: string): Promise<boolean>;
   toolsCheck(): Promise<ToolCheck>;

@@ -341,6 +341,11 @@ small.block { display: block; margin: -6px 0 8px; }
 .quick-item .sub { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quick-status { flex: none; color: var(--faint); font-size: 12px; }
 .quick-empty { margin: 0; padding: 14px; color: var(--muted); }
+.quick-item.command .name { max-width: none; }
+.dialog:has(.summary-preview) { width: min(640px, calc(100vw - 32px)); }
+.summary-preview { margin: 0; padding: 10px; min-height: 120px; overflow: auto; background: var(--bg); border: 1px solid var(--field-line); border-radius: 4px; font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.summary-preview:focus { outline: none; border-color: var(--accent); }
+.summary-msg { min-height: 1.4em; margin: 8px 0 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; user-select: text; }
 mark { background: none; color: var(--accent); font-weight: 600; }
 
 .dialog:has(.settings) { width: min(780px, calc(100vw - 32px)); }
