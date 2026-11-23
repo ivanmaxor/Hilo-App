@@ -14,6 +14,7 @@ import type {
   Action,
   AppInfo,
   BackgroundProcess,
+  GitHead,
   LayoutCount,
   PersistedState,
   ProjectRecord,
@@ -139,6 +140,9 @@ function onUpdateStatus(status: UpdateStatus): void {
 export const dispatch = (action: Action): Promise<void> => api.dispatch(action);
 export const statusOf = (id: string): SessionStatus => app.get().runtime[id]?.status ?? 'asleep';
 export const subagentsOf = (id: string): number => app.get().runtime[id]?.subagents ?? 0;
+/** Rama de la carpeta de la sesión y desde cuándo está en su estado. Una dormida no tiene ninguna. */
+export const headOf =(id: string): GitHead | undefined => (statusOf(id) === 'asleep' ? undefined : app.get().runtime[id]?.branch);
+export const sinceOf = (id: string): number | undefined => (statusOf(id) === 'asleep' ? undefined : app.get().runtime[id]?.since);
 /** Lo que se dibuja: durante una operación en curso, el ícono de "arrancando". */
 export const displayStatus = (id: string): SessionStatus => (view.get().busy.includes(id) ? 'starting' : statusOf(id));
 
@@ -1263,6 +1267,6 @@ export async function initController(): Promise<void> {
   }
 
   if (initial.info.isTest) {
-    (window as unknown as { __hiloTest: unknown }).__hiloTest = { terminals, app, view, playedSounds, runCommand, selectSession, sleepSession, createSession, wakeSession, closeSession };
+    (window as unknown as { __hiloTest: unknown }).__hiloTest = { terminals, app, view, playedSounds, runCommand, selectSession, sleepSession, createSession, wakeSession, closeSession, clock };
   }
 }

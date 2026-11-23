@@ -146,6 +146,17 @@ kbd { font: 11px "Segoe UI Variable Text", "Segoe UI", sans-serif; color: var(--
 .project-head:hover .add, .project-head .add:focus-visible, .project-head:hover .folder, .project-head .folder:focus-visible { opacity: 1; }
 .row { position: relative; width: 100%; height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 10px 0 14px; color: var(--muted); cursor: default; text-align: left; }
 .row .name { flex: 1; }
+/* Rama y tiempo en el estado: segunda línea chica, solo si hay algo que mostrar. La alternativa (misma fila) es .tree.meta-inline. */
+.row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.row-text .name { flex: none; }
+.row.has-meta { height: auto; min-height: 38px; padding-top: 4px; padding-bottom: 4px; }
+.row-meta { display: flex; gap: 6px; min-width: 0; font-size: 11px; line-height: 14px; color: var(--faint); }
+.row-meta .branch { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-meta .since { flex: none; margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tree.meta-inline .row.has-meta { height: 28px; min-height: 0; padding-top: 0; padding-bottom: 0; }
+.tree.meta-inline .row-text { flex-direction: row; align-items: center; gap: 8px; }
+.tree.meta-inline .row-text .name { flex: 1; }
+.tree.meta-inline .row-meta { flex: none; max-width: 55%; }
 .row:hover { background: var(--raised); }
 .row.active { background: var(--raised-2); color: var(--text); }
 .row.open { color: var(--text); }
