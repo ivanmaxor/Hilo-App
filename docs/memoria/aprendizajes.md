@@ -20,6 +20,7 @@ Trampas ya resueltas: lo que costó descubrir y no hay que volver a pisar. Se su
 - `--resume` falla si la sesión nunca tuvo conversación y `--session-id` falla si el id ya se usó; `retryAfterFailedLaunch` lo resuelve.
 - `CLAUDE_CODE_CHILD_SESSION` heredado apaga el guardado de la conversación. `buildEnv` lo quita.
 - El título queda en `◐` hasta que acaban los hooks Stop del usuario; por eso el Stop de Hilo adelanta el verde y deja un bloqueo de 20 s.
+- **El título de Claude cambia entre versiones.** Desde Claude Code 2.1.330 pone `claude` al arrancar, y el ✳ llega recién con la primera respuesta. La búsqueda de Claude dentro de una PowerShell usa `isClaudeTitle` (#14). Antes de suponer un título, mirarlo con `term.onTitleChange` en una e2e con Claude real.
 - En pruebas, nunca mandar Enter después de Alt+V: Claude toma el portapapeles del usuario. Las pruebas con el portapapeles real guardan y restauran **verificando primero** que pueden hacerlo.
 - Electron 45: el módulo `clipboard` es asíncrono y `write` no acepta lo que devuelve `read`: hay que construir `ClipboardItem` nuevos.
 - Fusibles de Electron activos en el empaquetado: `_electron` no funciona ahí; `packaged.spec.ts` entra por CDP, permitido solo con `HILO_E2E=1`.
