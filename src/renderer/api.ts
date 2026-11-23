@@ -18,6 +18,8 @@ export interface HiloApi {
   setView(visible: string[], focused: boolean): void;
   clipRead(): Promise<{ text: string; hasImage: boolean }>;
   clipWrite(text: string): Promise<void>;
+  /** Las rutas de los archivos o carpetas soltados desde el Explorador. Vacío si no están en disco. Un arreglo: un FileList no cruza el puente. */
+  pathsOfFiles(files: File[]): string[];
   pickFolder(): Promise<string | null>;
   pickFile(): Promise<string | null>;
   pathExists(path: string): Promise<boolean>;

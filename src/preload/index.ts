@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 type Listener = (...args: never[]) => void;
 
@@ -23,6 +23,19 @@ const api = {
   setView: (visible: string[], focused: boolean) => ipcRenderer.send('view:set', visible, focused),
   clipRead: () => ipcRenderer.invoke('clip:read'),
   clipWrite: (text: string) => ipcRenderer.invoke('clip:write', text),
+  /** Rutas reales de los archivos soltados. Un File no cruza el puente: la ruta se calcula aquí. */
+  pathsOfFiles: (files: unknown): string[] => {
+    const out: string[] = [];
+    for (const file of Array.isArray(files) ? (files as File[]) : []) {
+      try {
+        const path = webUtils.getPathForFile(file);
+        if (path) out.push(path);
+      } catch {
+        // No era un File, o no está en disco.
+      }
+    }
+    return out;
+  },
   pickFolder: () => ipcRenderer.invoke('dialog:pickFolder'),
   pickFile: () => ipcRenderer.invoke('dialog:pickFile'),
   pathExists: (p: string) => ipcRenderer.invoke('path:exists', p),

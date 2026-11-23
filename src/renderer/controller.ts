@@ -169,6 +169,27 @@ export function startRename(id: string): void {
   else void dispatch({ type: 'ui/select', id }).then(() => requestAnimationFrame(open));
 }
 
+/**
+ * Un archivo soltado fuera de una terminal no debe abrirse en la ventana. Las terminales despiertas
+ * lo atienden ellas (pegan la ruta); sobre una sesión dormida solo se avisa.
+ */
+function watchFileDrops(): void {
+  const hasFiles = (e: DragEvent) => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files');
+  window.addEventListener('dragover', (e) => {
+    if (hasFiles(e)) e.preventDefault();
+  });
+  window.addEventListener('drop', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    const target = e.target instanceof Element ? e.target : null;
+    const pane = Number(target?.closest('[data-pane]')?.getAttribute('data-pane'));
+    const content = Number.isInteger(pane) ? app.get().state.ui.panes[pane] : null;
+    if (content && findSession(app.get().state, content) && statusOf(content) === 'asleep') {
+      toast('Esta sesión está dormida: despiértala y suelta el archivo otra vez.');
+    }
+  });
+}
+
 export function focusActive(): void {
   requestAnimationFrame(() => {
     // Si mientras tanto se abrió un diálogo o un campo de nombre, no se le quita el foco.
@@ -1187,6 +1208,7 @@ export async function initController(): Promise<void> {
     toast: (text) => toast(text),
     windowFocused: () => view.get().focused,
     statusOf: (id) => statusOf(id),
+    cwdOf: (id) => findSession(app.get().state, id)?.session.cwd ?? null,
     activate: (id) => {
       if (app.get().state.ui.activeSessionId !== id) void dispatch({ type: 'ui/select', id });
     },
@@ -1201,6 +1223,7 @@ export async function initController(): Promise<void> {
     },
   });
   terminals.setWindowsBuild(initial.info.windowsBuild);
+  watchFileDrops();
 
   api.onState((state) => {
     const prev = app.get().state;
