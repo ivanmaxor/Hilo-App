@@ -3,6 +3,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   statSync,
 } from "node:fs";
@@ -42,11 +43,19 @@ export class CustomSound {
         ok: false,
         message: `Pesa ${(size / 1024 / 1024).toFixed(1)} MB y el máximo es 2 MB. Prueba con un audio más corto.`,
       };
+    // Primero la copia, con otro nombre: si falla, sigue sonando el audio anterior.
+    const temp = join(this.dir, `nuevo${ext}`);
     try {
       mkdirSync(this.dir, { recursive: true });
+      copyFileSync(source, temp);
       this.clear();
-      copyFileSync(source, join(this.dir, `propio${ext}`));
+      renameSync(temp, join(this.dir, `propio${ext}`));
     } catch {
+      try {
+        rmSync(temp, { force: true });
+      } catch {
+        // Se ignora: `file()` solo mira `propio.*`.
+      }
       return { ok: false, message: "No se pudo guardar una copia del audio." };
     }
     return { ok: true, name: basename(source).slice(0, 200) };

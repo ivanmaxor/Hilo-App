@@ -54,8 +54,6 @@ function playOnce(requested: PlayableSound, volume: number): () => void {
   if (requested === CUSTOM_SOUND && custom) {
     const src = ac.createBufferSource();
     src.buffer = custom;
-    // El audio propio va más fuerte: los sintetizados están pensados para no sonar a todo volumen.
-    master.gain.value = Math.min(100, volume) / 100;
     src.connect(master);
     src.start(t);
     src.stop(t + secondsOf(CUSTOM_SOUND));

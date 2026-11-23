@@ -56,9 +56,13 @@ export function dueUsageAlerts(
     const keys = crossed.map((t) => alertKey(name, win.resetsAt, t));
     const fresh = crossed.filter((_, i) => !fired.has(keys[i]!));
     if (!fresh.length) continue;
+    // Con el 80 % ya avisado, activar el 50 % no avisa otra vez: ese aviso ya llegó con uno mayor.
+    const highestFired = crossed.filter((_, i) => fired.has(keys[i]!)).pop();
+    const top = fresh[fresh.length - 1]!;
+    if (highestFired !== undefined && top < highestFired) continue;
     out.push({
       window: name,
-      threshold: fresh[fresh.length - 1]!,
+      threshold: top,
       used: win.used,
       resetsAt: win.resetsAt,
       keys,

@@ -51,6 +51,11 @@ const store = new Store(dataDir);
 store.onSaveError = (message) => send('app:notice', message);
 const clip = createClipboard();
 let win: BrowserWindow | null = null;
+/**
+ * El renderer ya escucha los avisos de uso (#8). Antes de eso un aviso se perdería y quedaría marcado como
+ * avisado; se revisa cuando avisa que escucha, y vuelve a false si la interfaz se recarga.
+ */
+let usageListening = false;
 let quitting = false;
 let crashNotice: string | null = null;
 
@@ -116,7 +121,7 @@ const usageAlerter = new UsageAlerter(dataDir, () => store.get().settings, (aler
 const sessions = new SessionController(store, dataDir, {
   send(channel: string, ...args: unknown[]) {
     send(channel, ...args);
-    if (channel === 'usage:update') usageAlerter.check(args[0] as PlanUsage | null);
+    if (channel === 'usage:update' && usageListening) usageAlerter.check(args[0] as PlanUsage | null);
   },
   statusChanged: updateWindowTitle,
   notify(session: SessionRecord, status: SessionStatus) {
@@ -226,7 +231,11 @@ function createWindow(): void {
   installEditMenu(win.webContents);
   void win.webContents.setVisualZoomLevelLimits(1, 1).catch(() => undefined);
   win.webContents.on('did-finish-load', applyAppZoom);
+  win.webContents.on('did-start-loading', () => {
+    usageListening = false;
+  });
   win.webContents.on('render-process-gone', (_event, details) => {
+    usageListening = false;
     if (details.reason === 'clean-exit' || quitting) return;
     console.error('[hilo] se cayó la interfaz:', details.reason);
     // Las terminales vivían ahí: se duermen las sesiones (las conversaciones están guardadas) y se recarga.
@@ -474,6 +483,10 @@ function registerIpc(): void {
   });
 
   handle('usage:get', () => sessions.planUsage());
+  handle('usage:listen', () => {
+    usageListening = true;
+    usageAlerter.check(sessions.planUsage());
+  });
   // Sonido propio (#12): la ruta sale del diálogo nativo y nunca del renderer, que solo recibe los bytes.
   handle('sound:pick', async () => {
     let source = isTest ? process.env.HILO_TEST_SOUND_FILE : undefined;

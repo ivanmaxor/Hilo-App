@@ -15,3 +15,9 @@
   - Cómo suena un audio propio real en parlantes. En modo prueba Hilo no decodifica ni toca audio.
   - Un aviso de uso con el medidor real de Claude.
 - **Queda pendiente:** nada de estos tres Issues.
+- **Tras la lectura de @dedalexcr7 en el #13:**
+  - Reemplazar el sonido propio ya no deja sin sonido si falla la copia.
+  - El audio propio suena al mismo volumen general que los demás (antes, al doble).
+  - Activar un umbral menor que uno ya avisado no da otro aviso.
+  - Un aviso de uso no se marca como avisado antes de que la interfaz lo escuche.
+  - Unitarias de `UsageAlerter` y `CustomSound` en `tests/unit/usage-alerts.test.ts`.
