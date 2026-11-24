@@ -209,6 +209,12 @@ export type Action =
   | { type: 'session/active'; id: string; at: number }
   /** Solo la dispara el proceso principal, con la carpeta que eligió la persona: no está en la lista blanca del IPC. */
   | { type: 'session/cwd'; id: string; cwd: string }
+  /**
+   * Solo la dispara el proceso principal (#7): la carpeta nueva sale del diálogo de Windows y no está en la lista blanca del IPC.
+   * Cambia la del proyecto y la de las sesiones que traen su carpeta nueva, todo junto. Solo cuentan las del proyecto
+   * que estaban dentro de la carpeta vieja.
+   */
+  | { type: 'project/relocate'; id: string; path: string; sessions: { id: string; cwd: string }[] }
   | { type: 'session/remove'; id: string }
   | { type: 'session/claudeId'; id: string; claudeId: string }
   | { type: 'session/awake'; id: string; awake: boolean }
@@ -224,3 +230,46 @@ export type Action =
   | { type: 'ui/sidebar'; width?: number; collapsed?: boolean }
   | { type: 'settings/set'; patch: Partial<Settings> }
   | { type: 'window/bounds'; bounds: WindowBounds };
+
+/** Una sesión de un proyecto cuya carpeta estaba dentro de la que se cambia (#7). */
+export interface RelocateSession {
+  id: string;
+  name: string;
+  kind: SessionKind;
+  /** Su carpeta de hoy existe. */
+  exists: boolean;
+  /** Lo que tiene de más que la carpeta del proyecto, o '' si es la misma. */
+  sub: string;
+}
+
+/** Primer paso de cambiar la carpeta de un proyecto: la ruta elegida se queda en el proceso principal; aquí solo vuelve para mostrarla. */
+export type RelocatePick =
+  | { status: 'cancelled' }
+  | { status: 'problem'; message: string }
+  | {
+      status: 'ok';
+      /** De un solo uso: el segundo paso lo canjea por la ruta guardada en el proceso principal. */
+      token: string;
+      from: string;
+      to: string;
+      sessions: RelocateSession[];
+      /** Sesiones del proyecto que usan otra carpeta y no se tocan. */
+      outside: number;
+      /** De esas, las que tampoco encuentran su carpeta. */
+      outsideMissing: number;
+    };
+
+export type RelocateResult =
+  | { ok: false; message: string }
+  | {
+      ok: true;
+      moved: number;
+      /** No tenían su subcarpeta en la nueva y quedaron en la raíz. */
+      fellBack: number;
+      /** Sesiones movidas que tienen proceso: siguen en la carpeta vieja hasta dormirlas y despertarlas. */
+      awake: string[];
+    };
+
+export type ChangeFolderResult =
+  | { ok: false; message?: string }
+  | { ok: true; awake: boolean; wasMissing: boolean };

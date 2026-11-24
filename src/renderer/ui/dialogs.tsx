@@ -19,6 +19,9 @@ import { api } from "../api";
 import {
   addProjectFromFolder,
   app,
+  applyProjectFolder,
+  changeProjectFolder,
+  changeSessionFolder,
   confirmCloseSession,
   openSessionFolder,
   createSession,
@@ -776,6 +779,91 @@ function SetupGuide({ initial }: { initial: ToolCheck }) {
   );
 }
 
+/**
+ * Cambiar la carpeta de un proyecto (#7). La carpeta nueva ya está elegida y guardada en el proceso principal: aquí
+ * solo se ve, y lo único que sale de este diálogo es el código de un solo uso y qué sesiones se mueven.
+ */
+function RelocateDialog({ modal }: { modal: Extract<Modal, { type: "relocate" }> }) {
+  const { state } = useStore(app);
+  const project = state.projects.find((p) => p.id === modal.projectId);
+  const { pick } = modal;
+  // Con «mover también» marcado por defecto, como decidió el dueño.
+  const [chosen, setChosen] = useState(() => new Set(pick.sessions.map((s) => s.id)));
+  const ok = useRef<HTMLButtonElement>(null);
+  useEffect(() => ok.current?.focus(), []);
+  if (!project) return null;
+  const toggle = (id: string) => {
+    const next = new Set(chosen);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setChosen(next);
+  };
+  const apply = () => {
+    closeModal();
+    void applyProjectFolder(project.id, pick.token, [...chosen]);
+  };
+  return (
+    <Backdrop onClose={closeModal} labelledBy="relocate-title">
+      <h2 id="relocate-title">Cambiar la carpeta de «{project.name}»</h2>
+      <div class="relocate-paths" data-relocate="paths">
+        <span class="relocate-label">Antes</span>
+        <code title={pick.from}>{pick.from}</code>
+        <span class="relocate-label">Ahora</span>
+        <code title={pick.to}>{pick.to}</code>
+      </div>
+      {pick.sessions.length > 0 ? (
+        <>
+          <p class="dialog-body">
+            Estas sesiones estaban en la carpeta de antes o dentro de ella.
+            Marca las que se mueven también: seguirán su conversación desde la
+            carpeta nueva.
+          </p>
+          <div class="relocate-list" role="group" aria-label="Sesiones a mover">
+            {pick.sessions.map((s) => (
+              <label key={s.id} class="check relocate-item" data-relocate-session={s.id}>
+                <input
+                  type="checkbox"
+                  checked={chosen.has(s.id)}
+                  onChange={() => toggle(s.id)}
+                />
+                <span class="relocate-name">
+                  {s.name}
+                  {s.sub && <small title="Su subcarpeta"> · {s.sub}</small>}
+                </span>
+                {!s.exists && (
+                  <span class="relocate-gone" data-relocate-gone>
+                    su carpeta ya no existe
+                  </span>
+                )}
+              </label>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p class="dialog-body">
+          Ninguna sesión de este proyecto trabaja en la carpeta de antes, así que
+          solo cambia la carpeta del proyecto.
+        </p>
+      )}
+      {pick.outside > 0 && (
+        <p class="dialog-body" data-relocate="outside">
+          {pick.outside === 1
+            ? "Otra sesión trabaja en una carpeta distinta y no se toca."
+            : `Otras ${pick.outside} sesiones trabajan en carpetas distintas y no se tocan.`}
+          {pick.outsideMissing > 0 &&
+            ` ${pick.outsideMissing === 1 ? "A una" : `A ${pick.outsideMissing}`} no se le encuentra la carpeta: se arregla con «Cambiar carpeta…» en su menú.`}
+        </p>
+      )}
+      <div class="actions">
+        <button onClick={closeModal}>Cancelar</button>
+        <button ref={ok} class="primary" data-confirm="ok" onClick={apply}>
+          Cambiar carpeta
+        </button>
+      </div>
+    </Backdrop>
+  );
+}
+
 export function Modals() {
   const v = useStore(view);
   const m = v.modal;
@@ -792,6 +880,8 @@ export function Modals() {
       return <SetupGuide initial={m.tools} />;
     case "ide":
       return <IdeDialog modal={m} />;
+    case "relocate":
+      return <RelocateDialog modal={m} />;
     case "settings":
       return <SettingsDialog modal={m} />;
     case "color":
@@ -942,6 +1032,17 @@ export function ContextMenu() {
           }}
         >
           Abrir su carpeta
+        </button>
+        <button
+          role="menuitem"
+          data-action="change-session-folder"
+          title={`Ahora: ${session.cwd}`}
+          onClick={() => {
+            close();
+            void changeSessionFolder(session.id);
+          }}
+        >
+          Cambiar carpeta…
         </button>
         {status === "asleep" ? (
           <button
@@ -1155,6 +1256,16 @@ export function ContextMenu() {
         }}
       >
         Abrir la carpeta
+      </button>
+      <button
+        role="menuitem"
+        data-action="menu-change-folder"
+        onClick={() => {
+          close();
+          void changeProjectFolder(project.id);
+        }}
+      >
+        Cambiar carpeta…
       </button>
       <button
         role="menuitem"

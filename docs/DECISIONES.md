@@ -369,3 +369,13 @@ Pedido del dueño (#4). Hasta la 1.3.9 la única comprobación era el sha512 de 
 - **Transición:** la 1.3.x no verifica nada, así que se actualiza a la primera versión que verifica como siempre. Desde ahí, toda versión tiene que ir firmada.
 - **Pruebas:** contra el servidor de pruebas de esta máquina (modo `local`, solo en pruebas) Hilo acepta solo la clave que da la prueba en `HILO_TEST_UPDATE_KEY`, nunca junto a las reales.
 - **Lo que no cubre:** si alguien obtiene una clave privada, puede firmar. Por eso viven fuera del repo y fuera de GitHub.
+
+## D37. Cambiar la carpeta de un proyecto o de una sesión
+
+Decisión del dueño (#7): «Cambiar carpeta…» en el clic derecho del proyecto y de cada sesión. Como Claude retoma por id desde cualquier carpeta (#6, #20), no se mueve ni se copia el historial.
+
+- **La ruta nunca viene del renderer.** Para una sesión suelta, `session:changeFolder(id)` abre el diálogo de Windows en el proceso principal. Para un proyecto son dos pasos: `project:pickFolder(id)` abre el diálogo, comprueba que la carpeta existe, **guarda la ruta en el proceso principal** con un código de un solo uso y devuelve el código, la ruta (solo para mostrarla) y las sesiones afectadas; `project:applyFolder(id, código, ids)` canjea el código. Un código inventado, ya usado o de otro proyecto no hace nada, y los ids que no sean del proyecto o no estuvieran dentro de la carpeta vieja se ignoran. `project/relocate` y `session/cwd` solo las dispara el proceso principal: no están en la lista blanca.
+- **«Dentro de la vieja»** (`src/shared/folderPaths.ts`, texto puro): se compara por segmentos, sin distinguir mayúsculas, con `\` o `/`; `C:\Proy` no contiene a `C:\Proyecto`, y valen la raíz de unidad y las rutas UNC. La carpeta de una sesión que estaba dentro se traslada con su subcarpeta (`C:\Viejo\src` pasa a `D:\Nuevo\src`); si esa subcarpeta no existe en la nueva, la sesión queda en la raíz del proyecto y se avisa.
+- **Atómico:** `project/relocate` cambia el `path` y los `cwd` en una sola acción del reducer. Las sesiones de otra carpeta no se tocan, y la nueva carpeta no puede ser la de otro proyecto (se avisa y no se duplica).
+- **Sesión despierta:** sigue corriendo en su carpeta vieja hasta que se duerma y despierte; Hilo avisa y no la apaga. Una dormida retoma por id desde la nueva. Una que no arrancaba por su carpeta inexistente vuelve a dormida (su panel de «carpeta inexistente» deja de valer); si se cambia desde su propio menú, se despierta, como hace su panel.
+- **Carpetas de red:** no se comprueban con `stat` (una caída congelaría la respuesta), igual que al lanzar una sesión.

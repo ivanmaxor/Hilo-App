@@ -3,6 +3,7 @@ import { checkTools } from './tools';
 import type { ToolCheck } from '../shared/types';
 import { mkdirSync } from 'node:fs';
 import { access, stat } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { release } from 'node:os';
 import { join } from 'node:path';
 import { STATUS_LABEL } from '../shared/statusMachine';
@@ -13,9 +14,10 @@ import { formatSpan, type PlanUsage } from '../shared/usage';
 import { CustomSound } from './customSound';
 import { UsageAlerter } from './usageAlerter';
 import { findSession } from '../shared/reducer';
+import { isInsideFolder, rebasePath, samePath, subfolderOf } from '../shared/folderPaths';
 import { isPath, isSafeId, isValidAction, sanitizeSettings } from '../shared/validate';
 import { ideName, isValidIdePath, type DetectedIde, type IdeOpenResult } from '../shared/ide';
-import type { Action, AppInfo, PersistedState, SessionRecord, SessionStatus, Settings, WindowBounds } from '../shared/types';
+import type { Action, AppInfo, ChangeFolderResult, PersistedState, RelocatePick, RelocateResult, SessionRecord, SessionStatus, Settings, WindowBounds } from '../shared/types';
 import { resolveClaude } from './claude';
 import { createClipboard } from './clipboard';
 import { fileDiff, listChanges, resolveInside } from './git';
@@ -391,6 +393,106 @@ async function openInIde(projectId: unknown, file: unknown, line: unknown): Prom
   return launchIde(project.ide.path, target);
 }
 
+/**
+ * Cambiar la carpeta de un proyecto (#7), en dos pasos para que la ruta nunca venga del renderer: el diálogo de
+ * Windows se abre aquí, la ruta elegida se guarda aquí con un código de un solo uso, y el renderer solo recibe el
+ * código (y la ruta, para mostrarla). El segundo paso canjea el código.
+ */
+const pendingRelocations = new Map<string, { projectId: string; from: string; to: string }>();
+const MAX_PENDING_RELOCATIONS = 8;
+
+/** Una carpeta de red no se comprueba (una caída congelaría la respuesta): se confía en lo que eligió la persona. */
+async function folderExists(path: string): Promise<boolean> {
+  return /^[\\/]{2}/.test(path) || isDirectory(path);
+}
+
+async function askFolder(title: string): Promise<string | null> {
+  if (!win) return null;
+  const result = await dialog.showOpenDialog(win, { properties: ['openDirectory'], title });
+  const path = result.canceled ? null : (result.filePaths[0] ?? null);
+  return path && isPath(path) ? path : null;
+}
+
+async function pickProjectFolder(projectId: unknown): Promise<RelocatePick> {
+  const first = projectById(projectId);
+  if (!first) return { status: 'problem', message: 'Ese proyecto ya no está.' };
+  const chosen = await askFolder(`Elige la nueva carpeta de «${first.name}»`);
+  if (!chosen) return { status: 'cancelled' };
+  // El diálogo es asíncrono: vale lo que hay ahora.
+  const project = projectById(first.id);
+  if (!project) return { status: 'problem', message: 'Ese proyecto ya no está.' };
+  if (!(await folderExists(chosen))) return { status: 'problem', message: 'Esa carpeta no existe.' };
+  if (samePath(chosen, project.path)) return { status: 'problem', message: `«${project.name}» ya usa esa carpeta.` };
+  const other = store.get().projects.find((p) => p.id !== project.id && samePath(p.path, chosen));
+  if (other) return { status: 'problem', message: `Esa carpeta ya es la del proyecto «${other.name}». Cambia o quita uno de los dos primero.` };
+
+  const inside = project.sessions.filter((s) => isInsideFolder(s.cwd, project.path));
+  const listed = await Promise.all(
+    inside.map(async (s) => ({ id: s.id, name: s.name, kind: s.kind, exists: await folderExists(s.cwd), sub: subfolderOf(s.cwd, project.path) ?? '' })),
+  );
+  const outside = project.sessions.filter((s) => !isInsideFolder(s.cwd, project.path));
+  const outsideMissing = (await Promise.all(outside.map((s) => folderExists(s.cwd)))).filter((ok) => !ok).length;
+
+  const token = randomUUID();
+  pendingRelocations.set(token, { projectId: project.id, from: project.path, to: chosen });
+  // Los códigos que nadie canjeó no se acumulan: se olvidan los más viejos.
+  for (const old of [...pendingRelocations.keys()].slice(0, Math.max(0, pendingRelocations.size - MAX_PENDING_RELOCATIONS))) pendingRelocations.delete(old);
+  return { status: 'ok', token, from: project.path, to: chosen, sessions: listed, outside: outside.length, outsideMissing };
+}
+
+async function applyProjectFolder(projectId: unknown, token: unknown, sessionIds: unknown): Promise<RelocateResult> {
+  const fail = (message: string): RelocateResult => ({ ok: false, message });
+  if (!isSafeId(projectId) || !isStr(token) || !Array.isArray(sessionIds) || sessionIds.length > 2000 || !sessionIds.every(isSafeId)) {
+    return fail('No se pudo cambiar la carpeta.');
+  }
+  // De un solo uso, salga bien o mal.
+  const pending = pendingRelocations.get(token);
+  pendingRelocations.delete(token);
+  if (!pending || pending.projectId !== projectId) return fail('No se pudo cambiar la carpeta: vuelve a elegirla.');
+  const project = projectById(projectId);
+  if (!project) return fail('Ese proyecto ya no está.');
+  if (!samePath(project.path, pending.from)) return fail('La carpeta del proyecto cambió mientras tanto: vuelve a elegirla.');
+  if (!(await folderExists(pending.to))) return fail('Esa carpeta ya no existe.');
+
+  // Solo las del proyecto que estaban dentro de la carpeta vieja: lo demás que mande el renderer se ignora.
+  const wanted = new Set(sessionIds);
+  const moves: { id: string; cwd: string }[] = [];
+  let fellBack = 0;
+  for (const s of project.sessions) {
+    if (!wanted.has(s.id) || !isInsideFolder(s.cwd, project.path)) continue;
+    let cwd = rebasePath(s.cwd, project.path, pending.to);
+    if (!cwd) continue;
+    // Si su subcarpeta no está en la nueva, se abre en la raíz del proyecto en vez de quedarse sin carpeta.
+    if (!(await folderExists(cwd))) {
+      cwd = pending.to;
+      fellBack++;
+    }
+    moves.push({ id: s.id, cwd });
+  }
+  // Tras los await otro cambio pudo mover o duplicar la carpeta: se comprueba otra vez, y hasta el dispatch no hay esperas.
+  const now = projectById(projectId);
+  if (!now || !samePath(now.path, pending.from)) return fail('La carpeta del proyecto cambió mientras tanto: vuelve a elegirla.');
+  if (store.get().projects.some((p) => p.id !== now.id && samePath(p.path, pending.to))) return fail('Esa carpeta ya es de otro proyecto.');
+  store.dispatch({ type: 'project/relocate', id: now.id, path: pending.to, sessions: moves });
+  const awake = moves.filter((m) => sessions.cwdChanged(m.id)).map((m) => m.id);
+  return { ok: true, moved: moves.length, fellBack, awake };
+}
+
+/** La carpeta de una sesión suelta (#7): lo mismo que `session:fixFolder`, sin su guarda de «faltaba». */
+async function changeSessionFolder(id: unknown): Promise<ChangeFolderResult> {
+  const first = isSafeId(id) ? findSession(store.get(), id) : null;
+  if (!first) return { ok: false, message: 'Esa sesión ya no está.' };
+  const chosen = await askFolder(`Elige la carpeta de «${first.session.name}»`);
+  if (!chosen) return { ok: false };
+  const found = findSession(store.get(), first.session.id);
+  if (!found) return { ok: false, message: 'Esa sesión ya no está.' };
+  if (!(await folderExists(chosen))) return { ok: false, message: 'Esa carpeta no existe.' };
+  if (samePath(chosen, found.session.cwd)) return { ok: false, message: 'Esa ya es la carpeta de esta sesión.' };
+  const wasMissing = sessions.hasMissingCwd(found.session.id);
+  store.dispatch({ type: 'session/cwd', id: found.session.id, cwd: chosen });
+  return { ok: true, awake: sessions.cwdChanged(found.session.id), wasMissing };
+}
+
 function registerIpc(): void {
   handle('state:get', () => {
     const notice = crashNotice ?? store.notice;
@@ -541,6 +643,10 @@ function registerIpc(): void {
     store.dispatch({ type: 'session/cwd', id, cwd });
     return { ok: true };
   });
+  // Cambiar la carpeta (#7). Las rutas salen del diálogo de Windows, abierto aquí: el renderer no manda ninguna.
+  handle('project:pickFolder', (projectId: unknown) => pickProjectFolder(projectId));
+  handle('project:applyFolder', (projectId: unknown, token: unknown, sessionIds: unknown) => applyProjectFolder(projectId, token, sessionIds));
+  handle('session:changeFolder', (id: unknown) => changeSessionFolder(id));
   // Salida explícita cuando el historial existe pero Claude no lo retoma (#6): la persona decide empezar de nuevo.
   handle('session:freshConversation', (id: unknown) => (isSafeId(id) ? sessions.startFreshConversation(id) : false));
   handle('dialog:pickFile', async () => {
