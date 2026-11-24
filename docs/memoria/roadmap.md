@@ -5,7 +5,6 @@ Ideas, no compromisos. Cuando alguien toma una, la pasa a un Issue y se lo asign
 ## Propuestas
 
 - **Explorador de archivos dentro de Hilo** (pedido del dueño): ver las carpetas del proyecto, abrir o previsualizar imágenes, copiar y pegar archivos, sin salir de la app. Hoy hay un botón que abre la carpeta en el Explorador de Windows (D28).
-- **Firmar las actualizaciones gratis:** firmar `latest.yml` con una clave que solo tenga quien publica, y que Hilo verifique la firma antes de instalar. Cerraría el riesgo de que alguien con permiso de escritura edite una Release. Ojo: la clave pública va dentro de la app, y una versión sin la firma tiene que seguir actualizando bien a la primera que la verifique.
 - **Importar sesiones** de Claude Code que se abrieron fuera de Hilo.
 - **Papelera de sesiones:** recuperar una sesión cerrada por error.
 - **Línea de tiempo de cambios** en el panel Cambios.

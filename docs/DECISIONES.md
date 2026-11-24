@@ -357,3 +357,15 @@ Pedido del dueño (#10): las rutas que escribe Claude se subrayan; un clic las m
 - **Qué abre**: una carpeta, con `openPath`; un archivo se marca con `showItemInFolder` y nunca se abre con `openPath`, que ejecutaría un `.exe` o un `.bat`. Ctrl+clic usa el camino del panel Cambios: la ruta relativa al proyecto, validada con `checkRelativePath` y `resolveInside`. Fuera del proyecto, se muestra en el Explorador.
 - **Enlaces `file://`** (OSC 8) van por el mismo camino. Los enlaces web siguen pidiendo Ctrl+clic.
 - **Sin red ni lecturas nuevas**: solo `stat` sobre rutas locales que ya están en la pantalla. Lo preguntado se recuerda 15 s en el renderer, porque el ratón pasa muchas veces por la misma línea.
+
+## D36. Actualizaciones firmadas
+
+Pedido del dueño (#4). Hasta la 1.3.9 la única comprobación era el sha512 de `latest.yml` por HTTPS: quien pudiera editar una Release podía cambiar lo que reciben los usuarios. Firmar con un certificado de Windows cuesta dinero; esto es gratis.
+
+- **Qué se firma** (`src/shared/updateSignature.ts`): con Ed25519, el texto `hilo-update-v1`, la versión, el nombre del instalador y su sha512, uno por línea. Va el sha512 del archivo, así que un `latest.yml` cambiado que apunte a otro instalador no calza, y con la versión y el nombre, así que no sirve la firma de una versión vieja.
+- **Quién firma:** `scripts/publish-release.mjs --key <clave privada>`, con `scripts/update-signature.mjs`. Sube `Hilo-Setup-x.y.z.exe.sig` junto al instalador. No firma con una clave que esté dentro del repo, ni con una que Hilo no acepte: esa versión no se podría instalar.
+- **Quién verifica** (`src/main/updater.ts`): después de bajar, Hilo baja la firma por la misma sesión endurecida (D19: solo los hosts de GitHub, sin cookies), calcula el sha512 de lo bajado y la verifica. Sin firma o con una que no calza, borra lo bajado y no ofrece instalar. Justo antes de instalar vuelve a calcular el sha512: si el archivo cambió desde que se verificó, no lo lanza.
+- **Dos claves:** la principal y una de reserva. Cualquiera de las dos sirve, así que perder una no deja a nadie sin actualizaciones; la de reserva se guarda aparte. Las privadas están en la carpeta privada del dueño, nunca en el repo. Cambiar las claves es sacar una versión con la lista nueva, firmada con una de las viejas.
+- **Transición:** la 1.3.x no verifica nada, así que se actualiza a la primera versión que verifica como siempre. Desde ahí, toda versión tiene que ir firmada.
+- **Pruebas:** contra el servidor de pruebas de esta máquina (modo `local`, solo en pruebas) Hilo acepta solo la clave que da la prueba en `HILO_TEST_UPDATE_KEY`, nunca junto a las reales.
+- **Lo que no cubre:** si alguien obtiene una clave privada, puede firmar. Por eso viven fuera del repo y fuera de GitHub.
