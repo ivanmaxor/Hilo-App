@@ -32,9 +32,20 @@ async function pointAt(
     ([id, text, off]) => {
       const term = (window as any).__hiloTest.terminals.debugEntry(id).term;
       const buffer = term.buffer.active;
+      // Una línea larga queda partida en varias filas (en el CI la carpeta temporal es más larga): se busca en la línea entera.
       for (let y = 0; y < buffer.length; y++) {
-        const x = buffer.getLine(y).translateToString(true).indexOf(text);
+        if (buffer.getLine(y).isWrapped) continue;
+        let joined = "";
+        for (
+          let rows = 0;
+          y + rows < buffer.length &&
+          (rows === 0 || buffer.getLine(y + rows).isWrapped);
+          rows++
+        )
+          joined += buffer.getLine(y + rows).translateToString(false);
+        const x = joined.indexOf(text);
         if (x === -1) continue;
+        const at = x + (off as number);
         const screen = term.element
           .querySelector(".xterm-screen")
           .getBoundingClientRect();
@@ -43,8 +54,10 @@ async function pointAt(
           h: screen.height / term.rows,
         };
         return {
-          x: screen.left + (x + (off as number) + 0.5) * cell.w,
-          y: screen.top + (y - buffer.viewportY + 0.5) * cell.h,
+          x: screen.left + ((at % term.cols) + 0.5) * cell.w,
+          y:
+            screen.top +
+            (y + Math.floor(at / term.cols) - buffer.viewportY + 0.5) * cell.h,
         };
       }
       return null;
@@ -88,9 +101,17 @@ test("las rutas de la terminal se subrayan si existen, y el clic las muestra o l
       .poll(() => status(page, A), { timeout: 15_000 })
       .not.toBe("asleep");
     await page.waitForTimeout(500);
+    // La ruta con espacios queda partida por el ancho justo dentro de "mi informe.md", como pasó en el CI:
+    // así se prueba también que se unen las filas que partió la terminal.
+    const cols: number = await page.evaluate(
+      (id) => (window as any).__hiloTest.terminals.debugEntry(id).term.cols,
+      A,
+    );
+    const before = `Informe en ${project}\\docs\\mi i`.length;
+    const pad = " ".repeat((cols - (before % cols)) % cols);
     const lines = [
       "Edité src/app.ts:12 y no-existe/otra.ts",
-      `Informe en ${project}\\docs\\mi informe.md listo`,
+      `${pad}Informe en ${project}\\docs\\mi informe.md listo`,
       "Red: \\\\servidor\\carpeta\\a.txt",
     ];
     await page.evaluate(
