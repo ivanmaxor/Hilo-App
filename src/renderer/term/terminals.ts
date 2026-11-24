@@ -698,8 +698,8 @@ export class TerminalManager {
   }
 
   /**
-   * Pega el portapapeles, o `given` si viene (texto que arma Hilo: archivos soltados, comentarios del diff). Pasa por
-   * el mismo camino, con `sanitizePaste` y `term.paste()`. Devuelve si llegó a pegarse.
+   * `given`: texto que no viene del portapapeles (archivos soltados, la respuesta de otra sesión). Pasa por el mismo camino.
+   * Devuelve si llegó a pegarse.
    */
   async paste(entry: Entry, given?: string): Promise<boolean> {
     if (this.holdPaste(entry, given !== undefined)) return false;
