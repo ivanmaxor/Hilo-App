@@ -5,6 +5,7 @@ import { changesPaneId, changesProjectOf, sessionInPane } from '../../shared/pan
 import { ChangesPanel } from './changes';
 import {
   activeProject,
+  openSessionFolder,
   app,
   cancelPendingWake,
   closeTab,
@@ -24,14 +25,17 @@ import {
   toast,
   toggleChanges,
   copyLastMessage,
+  fixSessionFolder,
+  startFreshConversation,
   useStore,
   view,
   wakeSession,
   subagentsOf,
 } from '../controller';
-import { CloseIcon, CopyMessageIcon, DiffIcon, LayoutIcon, PlusIcon, SearchIcon, ShellMark, StatusIcon, subagentsLabel } from './icons';
+import { CloseIcon, CopyMessageIcon, DiffIcon, FolderIcon, LayoutIcon, PlusIcon, SearchIcon, ShellMark, StatusIcon, subagentsLabel, ZoomIcon } from './icons';
 import { draggedPaneContent, endDragging, InlineRename, startDraggingPane, startDraggingSession } from './sidebar';
 import { MAX_PANES, moveDivider, paneDividers, paneRects, presetTree, resetDivider, type PaneDivider, type PaneEdge, type PaneNode, type PaneRect } from '../../shared/paneLayout';
+import { startZoom, zoomedPane, zoomRects, type PaneZoom } from '../../shared/paneZoom';
 import type { SessionRecord } from '../../shared/types';
 
 export function Tabs() {
@@ -173,6 +177,17 @@ export function Tabs() {
             <DiffIcon />
             <span>Cambios</span>
           </button>
+          {activeFound && (
+            <button
+              class="icon-btn"
+              data-action="open-session-folder"
+              title={`Abrir la carpeta de «${activeFound.session.name}» en el Explorador\n${activeFound.session.cwd}`}
+              aria-label={`Abrir la carpeta de ${activeFound.session.name}`}
+              onClick={() => void openSessionFolder(activeFound.session.id)}
+            >
+              <FolderIcon />
+            </button>
+          )}
           <button
             class="icon-btn"
             title={`Buscar en la terminal (${keysOf('search')})`}
@@ -291,6 +306,29 @@ function Overlay({ sessionId, name, active }: { sessionId: string; name: string;
       </div>
     );
   }
+  // La carpeta ya no existe (por ejemplo, el proyecto se movió): se elige otra y la conversación se conserva.
+  const missingCwd = runtime[sessionId]?.missingCwd;
+  if (blocking && missingCwd) {
+    return (
+      <div class="overlay center" role="alert" data-missing-cwd={sessionId}>
+        <StatusIcon status="error" size={28} />
+        <p class="overlay-title">{name}</p>
+        <p class="overlay-sub pre">{`La carpeta de esta sesión ya no existe:\n${missingCwd}`}</p>
+        <p class="overlay-hint">La conversación se conserva: se retoma desde la carpeta que elijas.</p>
+        <div class="overlay-actions">
+          <button ref={btn} class="primary" onClick={() => void fixSessionFolder(sessionId, 'pick')}>
+            Elegir dónde está ahora
+          </button>
+          <button class="secondary" onClick={() => void fixSessionFolder(sessionId, 'project')}>
+            Abrirla en la carpeta del proyecto
+          </button>
+          <button class="secondary" onClick={() => void confirmCloseSession(sessionId)}>
+            Cerrar esta sesión
+          </button>
+        </div>
+      </div>
+    );
+  }
   // No llegó a arrancar: no hay salida que mostrar, y el mensaje dice qué hacer.
   if (blocking) {
     const isClaude = message!.includes('claude');
@@ -317,6 +355,11 @@ function Overlay({ sessionId, name, active }: { sessionId: string; name: string;
           >
             Reintentar
           </button>
+          {runtime[sessionId]?.unresumable && (
+            <button class="secondary" data-fresh-conversation={sessionId} onClick={() => void startFreshConversation(sessionId)}>
+              Empezar una conversación nueva
+            </button>
+          )}
           <button class="secondary" onClick={() => void confirmCloseSession(sessionId)}>
             Cerrar esta sesión
           </button>
@@ -468,7 +511,17 @@ function DropMark({ zone, label, rect }: { zone: DropZone; label: string; rect: 
   );
 }
 
-function Pane({ index, content, rect }: { index: number; content: string | null; rect: PaneRect }) {
+interface ZoomProps {
+  /** Se ve en su sitio solo si no hay otro agrandado: oculto, su terminal queda estacionada y viva. */
+  hidden: boolean;
+  /** Este es el panel agrandado. */
+  on: boolean;
+  /** Cuántos paneles quedan ocultos mientras uno está agrandado. */
+  hiddenCount: number;
+  toggle(): void;
+}
+
+function Pane({ index, content, rect, zoom }: { index: number; content: string | null; rect: PaneRect; zoom: ZoomProps }) {
   const { state, runtime } = useStore(app);
   const sessionId = sessionInPane(content);
   const changesProjectId = changesProjectOf(content);
@@ -488,7 +541,8 @@ function Pane({ index, content, rect }: { index: number; content: string | null;
 
   useLayoutEffect(() => {
     const el = host.current;
-    if (!el || !sessionId || !hasTerm) return;
+    // Oculto por otro agrandado: la terminal se estaciona (sin WebGL) y sigue viva, con su tamaño.
+    if (!el || !sessionId || !hasTerm || zoom.hidden) return;
     terminals.attach(sessionId, el);
     const observer = new ResizeObserver(() => {
       terminals.fit(sessionId);
@@ -500,7 +554,7 @@ function Pane({ index, content, rect }: { index: number; content: string | null;
       terminals.detach(sessionId, el);
     };
     // Sin `active`: cambiar de panel no debe desmontar la terminal ni recrear WebGL.
-  }, [sessionId, generation]);
+  }, [sessionId, generation, zoom.hidden]);
 
   // Las sesiones que se crean fuera de pantalla nacen del tamaño del panel.
   useLayoutEffect(() => {
@@ -541,6 +595,28 @@ function Pane({ index, content, rect }: { index: number; content: string | null;
     setZone(zoneAt(e, e.currentTarget as HTMLElement, canAdd));
   };
 
+  // Con otro panel a la vista, este no tiene qué agrandar: hace falta que haya algo que mostrar.
+  const zoomControls = state.ui.panes.length > 1 && (session || changesProject) && (
+    <>
+      {zoom.on && (
+        <span class="pane-hidden-count" data-zoom-note title="Siguen vivos: se ven al devolver el panel a su lugar.">
+          {zoom.hiddenCount === 1 ? '1 panel oculto' : `${zoom.hiddenCount} paneles ocultos`}
+        </span>
+      )}
+      <button
+        class={`icon-btn pane-zoom${zoom.on ? ' on' : ''}`}
+        data-action="zoom-pane"
+        title={zoom.on ? 'Devolver el panel a su lugar' : 'Agrandar este panel a toda la ventana un momento'}
+        aria-label={zoom.on ? 'Devolver el panel a su lugar' : 'Agrandar este panel'}
+        aria-pressed={zoom.on}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={zoom.toggle}
+      >
+        <ZoomIcon on={zoom.on} />
+      </button>
+    </>
+  );
+
   const draggedId = zone ? draggedPaneContent() : null;
   const draggedShown = !!draggedId && state.ui.panes.includes(draggedId);
   const dropLabel = !title
@@ -556,6 +632,7 @@ function Pane({ index, content, rect }: { index: number; content: string | null;
       class={`pane${active && showHeader ? ' active' : ''}${zone ? ' drop-target' : ''}`}
       data-pane={index}
       style={{
+        ...(zoom.hidden ? { display: 'none' } : {}),
         left: `${rect.x * 100}%`,
         top: `${rect.y * 100}%`,
         // El hueco de 1 px deja ver la línea que separa los paneles.
@@ -588,6 +665,12 @@ function Pane({ index, content, rect }: { index: number; content: string | null;
         <div
           class="pane-head"
           draggable={!!session || !!changesProject}
+          // Doble clic en la cabecera = el botón de agrandar (decisión del dueño, #13). Uno que viene de un botón es de ese botón:
+          // si no, sus dos clics y este cambio dejarían el panel en el estado contrario.
+          onDblClick={(e) => {
+            if (!zoomControls || (e.target as Element).closest('button')) return;
+            zoom.toggle();
+          }}
           onDragStart={(e) => {
             if (session) startDraggingSession(e, session);
             else if (content && changesProject) startDraggingPane(e, content, 'Cambios');
@@ -599,6 +682,7 @@ function Pane({ index, content, rect }: { index: number; content: string | null;
               <StatusIcon status={displayStatus(session.id)} size={14} />
               <span class="pane-name">{session.name}</span>
               <span class="pane-project">{found?.project.name}</span>
+              {zoomControls}
               <button
                 class="icon-btn pane-close"
                 title="Quitar de la vista. La sesión sigue abierta en la barra lateral."
@@ -614,6 +698,7 @@ function Pane({ index, content, rect }: { index: number; content: string | null;
               <DiffIcon />
               <span class="pane-name">Cambios</span>
               <span class="pane-project">{changesProject.name}</span>
+              {zoomControls}
               <button
                 class="icon-btn pane-close"
                 title="Quitar el panel de cambios"
@@ -665,9 +750,29 @@ export function Workspace() {
   const box = useRef<HTMLDivElement>(null);
   // Mientras se arrastra un divisor manda esto; se guarda al soltar.
   const [preview, setPreview] = useState<PaneNode | null>(null);
+  // Agrandar un panel es solo de esta vista: no pasa por el store ni se guarda.
+  const [zoom, setZoom] = useState<PaneZoom | null>(null);
+  const projectId = activeProject()?.id ?? null;
+  const zoomed = zoomedPane(zoom, ui, projectId);
+  // Cerrar la sesión, cambiar de panel o de proyecto, o tocar el reparto: vuelve a su lugar.
+  useEffect(() => {
+    if (zoom && zoomed === null) setZoom(null);
+  });
   if (state.projects.length === 0) return <EmptyApp />;
   const tree = preview ?? ui.tree ?? presetTree(ui.panes.length);
-  const rects = paneRects(tree);
+  const rects = zoomRects(paneRects(tree), zoomed);
+  const toggleZoom = (index: number) => {
+    if (zoomed !== null) {
+      setZoom(null);
+      focusActive();
+      return;
+    }
+    // Agrandar uno que no es el activo lo activa antes.
+    void dispatch({ type: 'ui/activePane', pane: index }).then(() => {
+      setZoom(startZoom(app.get().state.ui, projectId));
+      focusActive();
+    });
+  };
   const save = (next: PaneNode) => {
     void dispatch({ type: 'ui/tree', tree: next }).finally(() => {
       setPreview(null);
@@ -698,11 +803,17 @@ export function Workspace() {
     el.addEventListener('pointercancel', up);
   };
   return (
-    <div ref={box} class={`panes layout-${ui.layout}`}>
+    <div ref={box} class={`panes layout-${ui.layout}${zoomed !== null ? ' zoomed' : ''}`}>
       {ui.panes.map((content, i) => (
-        <Pane key={i} index={i} content={content} rect={rects[i] ?? { x: 0, y: 0, w: 1, h: 1 }} />
+        <Pane
+          key={i}
+          index={i}
+          content={content}
+          rect={rects[i] ?? { x: 0, y: 0, w: 1, h: 1 }}
+          zoom={{ hidden: zoomed !== null && zoomed !== i, on: zoomed === i, hiddenCount: ui.panes.length - 1, toggle: () => toggleZoom(i) }}
+        />
       ))}
-      {paneDividers(tree).map((d) => (
+      {(zoomed === null ? paneDividers(tree) : []).map((d) => (
         <div
           key={`${d.path.join('.')}:${d.index}`}
           class={`pane-divider ${d.dir === 'row' ? 'along-x' : 'along-y'}`}

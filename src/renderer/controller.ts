@@ -1,7 +1,7 @@
 import type { PlanUsage } from '../shared/usage';
 import { addRecentColor } from '../shared/color';
 import { soundFor, type SoundChoice } from '../shared/sounds';
-import { playSound } from './sound';
+import { loadCustomSound, playSound } from './sound';
 import type { ToolCheck } from '../shared/types';
 import { changesPaneId, sessionInPane } from '../shared/paneContent';
 import { MAX_PANES, paneInDirection, presetTree } from '../shared/paneLayout';
@@ -9,14 +9,17 @@ import { useEffect, useState } from 'preact/hooks';
 import { DEFAULT_SETTINGS } from '../shared/defaults';
 import { STATUS_PRIORITY } from '../shared/statusMachine';
 import { allSessions, findSession } from '../shared/reducer';
+import { SECRET_LABELS } from '../shared/secretScan';
 import { buildKeymap, eventToKeys, isModifierOnly, prettyKeys, SHORTCUTS } from '../shared/shortcuts';
 import type {
   Action,
   AppInfo,
   BackgroundProcess,
+  GitHead,
   LayoutCount,
   PersistedState,
   ProjectRecord,
+  RelocatePick,
   RuntimeMap,
   SessionKind,
   SessionRecord,
@@ -63,6 +66,8 @@ export type Modal =
   | { type: 'ide'; projectId: string; file: string | null; line: number | null }
   /** Un color fuera de la paleta, para una sesión o un proyecto. */
   | { type: 'color'; target: ColorTarget }
+  /** Cambiar la carpeta de un proyecto (#7): la elegida ya está guardada en el proceso principal, y aquí solo se muestra. */
+  | { type: 'relocate'; projectId: string; pick: Extract<RelocatePick, { status: 'ok' }> }
   | { type: 'note'; id: string }
   | { type: 'mark'; id: string }
   | { type: 'confirm'; title: string; body: string; ok: string; danger: boolean; list?: string[]; resolve(ok: boolean): void };
@@ -139,6 +144,9 @@ function onUpdateStatus(status: UpdateStatus): void {
 export const dispatch = (action: Action): Promise<void> => api.dispatch(action);
 export const statusOf = (id: string): SessionStatus => app.get().runtime[id]?.status ?? 'asleep';
 export const subagentsOf = (id: string): number => app.get().runtime[id]?.subagents ?? 0;
+/** Rama de la carpeta de la sesión y desde cuándo está en su estado. Una dormida no tiene ninguna. */
+export const headOf =(id: string): GitHead | undefined => (statusOf(id) === 'asleep' ? undefined : app.get().runtime[id]?.branch);
+export const sinceOf = (id: string): number | undefined => (statusOf(id) === 'asleep' ? undefined : app.get().runtime[id]?.since);
 /** Lo que se dibuja: durante una operación en curso, el ícono de "arrancando". */
 export const displayStatus = (id: string): SessionStatus => (view.get().busy.includes(id) ? 'starting' : statusOf(id));
 
@@ -167,6 +175,27 @@ export function startRename(id: string): void {
   if (document.querySelector(`[data-tab="${id}"]`)) open();
   // En el riel, una sesión de otro proyecto no tiene ni fila ni pestaña: primero se va a ella.
   else void dispatch({ type: 'ui/select', id }).then(() => requestAnimationFrame(open));
+}
+
+/**
+ * Un archivo soltado fuera de una terminal no debe abrirse en la ventana. Las terminales despiertas
+ * lo atienden ellas (pegan la ruta); sobre una sesión dormida solo se avisa.
+ */
+function watchFileDrops(): void {
+  const hasFiles = (e: DragEvent) => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files');
+  window.addEventListener('dragover', (e) => {
+    if (hasFiles(e)) e.preventDefault();
+  });
+  window.addEventListener('drop', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    const target = e.target instanceof Element ? e.target : null;
+    const pane = Number(target?.closest('[data-pane]')?.getAttribute('data-pane'));
+    const content = Number.isInteger(pane) ? app.get().state.ui.panes[pane] : null;
+    if (content && findSession(app.get().state, content) && statusOf(content) === 'asleep') {
+      toast('Esta sesión está dormida: despiértala y suelta el archivo otra vez.');
+    }
+  });
 }
 
 export function focusActive(): void {
@@ -216,6 +245,103 @@ export async function wakeSession(id: string): Promise<void> {
   const status = statusOf(id);
   if (status === 'error' || status === 'exited') terminals.dispose(id);
   await terminals.wake(id, found.session.kind);
+}
+
+/** La carpeta de la sesión ya no existe: se cambia por otra y se despierta. La conversación se conserva (#6). */
+export async function fixSessionFolder(id: string, mode: 'pick' | 'project'): Promise<void> {
+  const result = await api.fixFolder(id, mode).catch(() => ({ ok: false, message: 'No se pudo cambiar la carpeta.' }));
+  if (!result.ok) {
+    if (result.message) toast(result.message);
+    return;
+  }
+  await wakeSession(id);
+  if (statusOf(id) === 'error') toast('Sigue sin poder arrancar.');
+  focusActive();
+}
+
+/** Las sesiones que siguen corriendo en su carpeta vieja: el aviso dice qué hacer, y no se apagan solas (#7). */
+function toastStillRunning(ids: string[]): void {
+  const names = ids.map((id) => findSession(app.get().state, id)?.session.name).filter((n): n is string => !!n);
+  if (!names.length) return;
+  const list = names.map((n) => `«${n}»`).join(', ');
+  toast(
+    names.length === 1
+      ? `${list} sigue corriendo en su carpeta anterior: pasará a la nueva cuando la duermas y la despiertes.`
+      : `${list} siguen corriendo en su carpeta anterior: pasarán a la nueva cuando las duermas y las despiertes.`,
+  );
+}
+
+/** Cambiar la carpeta de una sesión (#7). Su conversación no se toca: se retoma por su id desde la carpeta nueva. */
+export async function changeSessionFolder(id: string): Promise<void> {
+  const found = findSession(app.get().state, id);
+  if (!found) return;
+  const result = await api.changeSessionFolder(id).catch(() => ({ ok: false as const, message: 'No se pudo cambiar la carpeta.' }));
+  if (!result.ok) {
+    if (result.message) toast(result.message);
+    return;
+  }
+  if (result.awake) {
+    toastStillRunning([id]);
+    return;
+  }
+  // No arrancaba por su carpeta: lo mismo que el panel, se despierta en la nueva.
+  if (result.wasMissing) {
+    await wakeSession(id);
+    if (statusOf(id) === 'error') toast('Sigue sin poder arrancar.');
+    focusActive();
+    return;
+  }
+  disposeIfAsleep(id);
+  toast(`Carpeta de «${found.session.name}» cambiada. ${found.session.kind === 'claude' ? 'Al despertarla sigue su conversación desde ahí.' : 'Se abrirá ahí al despertarla.'}`);
+}
+
+/** Cambiar la carpeta de un proyecto (#7), paso 1: la ruta sale del diálogo de Windows y se queda en el proceso principal. */
+export async function changeProjectFolder(projectId: string): Promise<void> {
+  const pick = await api.pickProjectFolder(projectId).catch(() => ({ status: 'problem' as const, message: 'No se pudo cambiar la carpeta.' }));
+  if (pick.status === 'cancelled') return;
+  if (pick.status === 'problem') {
+    toast(pick.message);
+    return;
+  }
+  view.set({ modal: { type: 'relocate', projectId, pick }, menu: null });
+}
+
+/** Paso 2: solo viaja el código de un solo uso y qué sesiones se mueven. */
+export async function applyProjectFolder(projectId: string, token: string, sessionIds: string[]): Promise<void> {
+  const name = app.get().state.projects.find((p) => p.id === projectId)?.name ?? 'el proyecto';
+  const result = await api.applyProjectFolder(projectId, token, sessionIds).catch(() => ({ ok: false as const, message: 'No se pudo cambiar la carpeta.' }));
+  if (!result.ok) {
+    toast(result.message);
+    return;
+  }
+  for (const id of sessionIds) disposeIfAsleep(id);
+  const parts = [`Carpeta de «${name}» cambiada.`];
+  if (result.moved) parts.push(result.moved === 1 ? 'Se movió 1 sesión.' : `Se movieron ${result.moved} sesiones.`);
+  if (result.fellBack) parts.push(`${result.fellBack === 1 ? 'Una no tenía' : `${result.fellBack} no tenían`} su subcarpeta en la nueva y quedó en la raíz.`);
+  toast(parts.join(' '));
+  toastStillRunning(result.awake);
+}
+
+/**
+ * Claude no pudo retomar una conversación cuyo historial existe. Reintentar repetiría lo mismo: se ofrece, a
+ * elección de la persona, empezar una nueva. El historial viejo queda guardado por Claude (#6).
+ */
+export async function startFreshConversation(id: string): Promise<void> {
+  const found = findSession(app.get().state, id);
+  if (!found) return;
+  const ok = await confirmDialog({
+    title: `¿Empezar una conversación nueva en «${found.session.name}»?`,
+    body: 'Claude no pudo retomar la anterior. Su historial queda guardado por Claude, pero esta sesión empezará una conversación vacía.',
+    ok: 'Empezar una nueva',
+  });
+  if (!ok) return;
+  if (!(await api.freshConversation(id).catch(() => false))) {
+    toast('No se pudo empezar una conversación nueva.');
+    return;
+  }
+  await wakeSession(id);
+  if (statusOf(id) === 'error') toast('Sigue sin poder arrancar.');
+  focusActive();
 }
 
 let pendingWake: { timer: ReturnType<typeof setTimeout>; id: string } | null = null;
@@ -842,6 +968,47 @@ export function previewSound(sound: SoundChoice, onEnd: () => void = () => undef
   return playSound(sound, soundVolume, soundDuration, () => true, onEnd);
 }
 
+/** El sonido propio (#12): se carga al abrir y cada vez que cambia. */
+let loadedSoundName: string | null = null;
+
+async function syncCustomSound(): Promise<void> {
+  const name = app.get().state.settings.customSoundName;
+  if (name === loadedSoundName) return;
+  loadedSoundName = name;
+  const bytes = name ? await api.soundRead().catch(() => null) : null;
+  if (app.get().info.isTest) return;
+  const ok = await loadCustomSound(bytes);
+  if (!ok) toast(`No se pudo reproducir «${name}». Mientras tanto suena la gota: prueba con otro audio.`);
+}
+
+/** Elegir el sonido propio con el diálogo de Windows. Devuelve el problema, o '' si quedó guardado. */
+export async function pickCustomSound(): Promise<string> {
+  const result = await api.soundPick().catch(() => ({ ok: false as const, message: 'No se pudo abrir el archivo.' }));
+  if (!result) return '';
+  if (!result.ok) return result.message;
+  loadedSoundName = null;
+  await syncCustomSound();
+  return '';
+}
+
+export async function clearCustomSound(): Promise<void> {
+  await api.soundClear();
+  await syncCustomSound();
+}
+
+/** Aviso de uso del plan (#8): un aviso en pantalla y el sonido elegido, una vez. */
+function onUsageAlert(alert: { window: 'session' | 'week'; threshold: number; used: number; body: string }): void {
+  toast(alert.body);
+  const settings = app.get().state.settings;
+  const sound = settings.usageAlertSound;
+  if (sound === 'none') return;
+  if (app.get().info.isTest) {
+    playedSounds.push({ id: `uso-${alert.window}`, sound, duration: 0 });
+    return;
+  }
+  playSound(sound, settings.soundVolume);
+}
+
 const soundRepeats = new Map<string, ReturnType<typeof setInterval>>();
 
 /** ¿La estás mirando ahora? */
@@ -903,6 +1070,31 @@ export function rememberColor(color: string): void {
 
 export async function openProjectFolder(id: string): Promise<void> {
   const problem = await api.openProjectFolder(id).catch(() => 'No se pudo abrir la carpeta.');
+  if (problem) toast(problem);
+}
+
+/** La carpeta donde trabaja una sesión, que puede no ser la del proyecto. */
+export async function openSessionFolder(id: string): Promise<void> {
+  const problem = await api.openSessionFolder(id).catch(() => 'No se pudo abrir la carpeta.');
+  if (problem) toast(problem);
+}
+
+/**
+ * Una ruta que se vio en la terminal (#10, D35). Clic: se muestra en el Explorador. Ctrl+clic: se abre en el IDE
+ * del proyecto, en su línea si venía; si queda fuera del proyecto, se muestra en el Explorador.
+ */
+export async function openTerminalPath(id: string, path: string, line: number | null, ide: boolean): Promise<void> {
+  const found = findSession(app.get().state, id);
+  if (!found) return;
+  if (ide) {
+    const [target] = await api.pathResolve(id, [path]).catch(() => [null]);
+    if (target && !target.dir && target.rel !== null) {
+      await openInIde(found.project.id, target.rel, line);
+      return;
+    }
+    if (target && !target.dir) toast('Ese archivo queda fuera del proyecto: se muestra en el Explorador.');
+  }
+  const problem = await api.pathReveal(id, path).catch(() => 'No se pudo abrir el Explorador.');
   if (problem) toast(problem);
 }
 
@@ -1185,22 +1377,35 @@ export async function initController(): Promise<void> {
 
   terminals = new TerminalManager(initial.state.settings, {
     toast: (text) => toast(text),
+    openPath: (id, path, line, ide) => void openTerminalPath(id, path, line, ide),
     windowFocused: () => view.get().focused,
     statusOf: (id) => statusOf(id),
+    cwdOf: (id) => findSession(app.get().state, id)?.session.cwd ?? null,
+    kindOf: (id) => findSession(app.get().state, id)?.session.kind ?? null,
     activate: (id) => {
       if (app.get().state.ui.activeSessionId !== id) void dispatch({ type: 'ui/select', id });
     },
-    confirmMultilinePaste: async (lines) => {
-      const ok = await confirmDialog({
-        title: lines > 1 ? `Vas a pegar ${lines} líneas` : 'Lo que vas a pegar termina en un salto de línea',
-        body: 'Esta terminal no distingue un pegado de lo que escribes: cada salto de línea se ejecuta como si pulsaras Enter. Esto se puede desactivar en Ajustes.',
-        ok: 'Pegar',
-      });
+    confirmPaste: async ({ lines, secrets }) => {
+      const multi = 'Esta terminal no distingue un pegado de lo que escribes: cada salto de línea se ejecuta como si pulsaras Enter. Esto se puede desactivar en Ajustes.';
+      const ok = secrets.length
+        ? await confirmDialog({
+            title: 'Esto parece una clave',
+            body: `Lo que pegas va a la terminal y, si es Claude, al modelo y a la conversación guardada en disco. Parece contener lo siguiente. ¿Pegarlo de todos modos?`,
+            list: [...secrets.map((k) => SECRET_LABELS[k]), ...(lines > 0 ? [`Además son ${lines} líneas y cada salto se ejecutaría como un Enter (se puede desactivar en Ajustes).`] : [])],
+            ok: 'Pegar',
+            danger: true,
+          })
+        : await confirmDialog({
+            title: lines > 1 ? `Vas a pegar ${lines} líneas` : 'Lo que vas a pegar termina en un salto de línea',
+            body: multi,
+            ok: 'Pegar',
+          });
       focusActive();
       return ok;
     },
   });
   terminals.setWindowsBuild(initial.info.windowsBuild);
+  watchFileDrops();
 
   api.onState((state) => {
     const prev = app.get().state;
@@ -1229,6 +1434,9 @@ export async function initController(): Promise<void> {
   api.onSessionFocus((id) => void selectSession(id));
   api.onAutoSlept((id) => disposeIfAsleep(id));
   api.onAlert(onAlert);
+  api.onUsageAlert(onUsageAlert);
+  void syncCustomSound();
+  app.subscribe(() => void syncCustomSound());
   api.onNotice((message) => toast(message));
   api.onUpdateStatus(onUpdateStatus);
   void api.updateGet().then(onUpdateStatus);
@@ -1263,6 +1471,6 @@ export async function initController(): Promise<void> {
   }
 
   if (initial.info.isTest) {
-    (window as unknown as { __hiloTest: unknown }).__hiloTest = { terminals, app, view, playedSounds, runCommand, selectSession, sleepSession, createSession, wakeSession, closeSession };
+    (window as unknown as { __hiloTest: unknown }).__hiloTest = { terminals, app, view, playedSounds, runCommand, selectSession, sleepSession, createSession, wakeSession, closeSession, clock };
   }
 }

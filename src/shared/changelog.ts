@@ -11,6 +11,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.4.0",
+    date: "2026-11-24",
+    items: [
+      "Las rutas que escribe Claude se pueden tocar: un clic las muestra en el Explorador y Ctrl+clic las abre en el IDE del proyecto, en su línea. Cada sesión tiene un botón para abrir su carpeta.",
+      "Arrastrar archivos del Explorador a una sesión pega su ruta, sin Enter.",
+      "Antes de pegar algo que parece una clave (de Anthropic, GitHub, AWS, Slack, Stripe o un .env), Hilo pregunta.",
+      "El ícono de la barra de tareas muestra cuántas sesiones te necesitan, y parpadea cuando una te espera o falla.",
+      "Un panel se puede agrandar a toda la ventana un momento, con su botón o con doble clic en la cabecera.",
+      "Cada sesión muestra su rama de Git y cuánto lleva en su estado.",
+      "Cambiar la carpeta de un proyecto o de una sesión, desde su clic derecho. Las conversaciones se retoman aunque la carpeta se haya movido, y nunca se empieza una nueva sin preguntarte.",
+      "Ajustes por módulos, con buscador. Tu propio sonido de aviso (mp3, wav u ogg) y avisos cuando llevas un porcentaje de tu sesión de 5 horas o de la semana.",
+      "Las actualizaciones vienen firmadas: Hilo comprueba la firma antes de instalarlas.",
+      "Arreglos: una PowerShell donde abres claude vuelve a pasar sola a Claude, y cambiar de sesión ya no recorta las líneas de la terminal.",
+    ],
+  },
+  {
     version: "1.3.9",
     date: "2026-11-22",
     items: [

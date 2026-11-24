@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, promises as fsp } from 'node:fs';
 import { join } from 'node:path';
-import { OscTitleScanner, classifyTitle } from '../shared/oscScanner';
+import { OscTitleScanner, classifyTitle, isClaudeTitle } from '../shared/oscScanner';
 import { findSession, allSessions } from '../shared/reducer';
 import { initialState, transition, type MachineEvent, type MachineState } from '../shared/statusMachine';
-import type { BackgroundProcess, RuntimeMap, SessionRecord, SessionRuntime, SessionStatus } from '../shared/types';
+import type { BackgroundProcess, GitHead, RuntimeMap, SessionRecord, SessionRuntime, SessionStatus } from '../shared/types';
 import { buildClaudeArgs, buildCommandLine, buildEnv, claudeConfigDir, commandFor, defaultShell, resolveClaude, transcriptExists, transcriptMtime } from './claude';
+import { branchOf } from './git';
 import { HookChannel } from './hooks';
 import type { PlanUsage } from '../shared/usage';
 import { formatCopiedMessage, lastAssistantText } from '../shared/lastMessage';
@@ -80,6 +81,14 @@ export interface SessionEvents {
 export class SessionController {
   private readonly machines = new Map<string, MachineState>();
   private readonly messages = new Map<string, string>();
+  /** Desde cuándo está cada sesión en su estado actual. No va en MachineState: es solo para mostrar. */
+  private readonly statusSince = new Map<string, number>();
+  private readonly branches = new Map<string, GitHead>();
+  private readonly branchChecks = new Set<string>();
+  /** Sesiones que no arrancaron porque su carpeta ya no existe: el panel ofrece elegir otra (#6). */
+  private readonly missingCwd = new Map<string, string>();
+  /** Sesiones cuyo historial existe pero Claude no pudo retomar: el panel deja empezar una conversación nueva (#6). */
+  private readonly unresumable = new Set<string>();
   private readonly live = new Map<string, Live>();
   private readonly pty: PtyManager;
   private readonly hooks: HookChannel;
@@ -110,7 +119,8 @@ export class SessionController {
     // Las sesiones de antes de la 1.3.5 no saben cuándo fue su último mensaje: lo dice la fecha de su conversación.
     for (const s of allSessions(store.get())) {
       if (s.kind !== 'claude' || s.lastActiveAt) continue;
-      const at = transcriptMtime(s.cwd, s.claudeId);
+      // Solo la carpeta de la sesión: al arrancar no se recorre todo `projects` por cada sesión antigua.
+      const at = transcriptMtime(s.cwd, s.claudeId, false);
       if (at) store.dispatch({ type: 'session/active', id: s.id, at });
     }
     setConoutLostHandler(() => console.error('[sesiones] se perdió el proceso auxiliar de terminales'));
@@ -144,8 +154,11 @@ export class SessionController {
         live.claudePid = proc.pid;
         live.otherClaudeId = null;
         this.machines.set(id, { kind: 'claude', status: 'idle', stopLatchUntil: 0 });
+        this.statusSince.set(id, Date.now());
         this.store.dispatch({ type: 'session/active', id, at: Date.now() });
         this.publish(id);
+        // La carpeta real es la que dice el archivo de sesión de Claude, no la de la PowerShell.
+        void this.refreshBranch(id);
         this.events.send('app:notice', `«${session.name}» ahora es una sesión de Claude, en ${info.cwd}.`);
         adopted = true;
         return;
@@ -189,7 +202,69 @@ export class SessionController {
     if (machine.subagents) runtime.subagents = machine.subagents;
     const message = this.messages.get(id);
     if (message) runtime.message = message;
+    const missing = this.missingCwd.get(id);
+    if (missing) runtime.missingCwd = missing;
+    if (this.unresumable.has(id)) runtime.unresumable = true;
+    // Una dormida no tiene ni tiempo en el estado ni rama que mostrar.
+    if (machine.status !== 'asleep') {
+      const since = this.statusSince.get(id);
+      if (since !== undefined) runtime.since = since;
+      const branch = this.branches.get(id);
+      if (branch) runtime.branch = branch;
+    }
     return runtime;
+  }
+
+  /** La carpeta de esta sesión no existía al despertarla: solo entonces se deja elegir otra (#6). */
+  hasMissingCwd(id: string): boolean {
+    return this.missingCwd.has(id);
+  }
+
+  /**
+   * La carpeta de la sesión cambió (#7). Devuelve si tiene proceso: ese sigue en la carpeta vieja, y no se apaga ni se
+   * reinicia por su cuenta; recién al dormirla y despertarla retoma por id desde la nueva. Una que no pudo arrancar por
+   * su carpeta vuelve a dormida, y su aviso de carpeta inexistente deja de valer.
+   */
+  cwdChanged(id: string): boolean {
+    if (this.live.has(id)) return true;
+    if (this.missingCwd.has(id)) {
+      this.missingCwd.delete(id);
+      this.messages.delete(id);
+      this.apply(id, { t: 'sleep' });
+    }
+    return false;
+  }
+
+  /**
+   * Salida explícita cuando el historial existe pero Claude no lo retoma: la persona elige empezar una conversación
+   * nueva. El historial viejo no se toca ni se borra: sigue guardado por Claude. Hilo nunca lo hace por su cuenta.
+   */
+  startFreshConversation(id: string): boolean {
+    if (!this.unresumable.has(id) || this.live.has(id)) return false;
+    if (!findSession(this.store.get(), id)) return false;
+    this.store.dispatch({ type: 'session/claudeId', id, claudeId: randomUUID() });
+    this.unresumable.delete(id);
+    this.messages.delete(id);
+    return true;
+  }
+
+  /** La rama sale de la carpeta de la sesión que guarda el main, nunca de una ruta del renderer. Se publica solo si cambió. */
+  private async refreshBranch(id: string): Promise<void> {
+    if (this.branchChecks.has(id)) return;
+    const cwd = findSession(this.store.get(), id)?.session.cwd;
+    if (!cwd) return;
+    this.branchChecks.add(id);
+    try {
+      const next = await branchOf(cwd);
+      if (!findSession(this.store.get(), id)) return;
+      const prev = this.branches.get(id);
+      if (prev?.kind === next?.kind && prev?.name === next?.name) return;
+      if (next) this.branches.set(id, next);
+      else this.branches.delete(id);
+      this.events.send('runtime:update', id, this.runtimeOf(id));
+    } finally {
+      this.branchChecks.delete(id);
+    }
   }
 
   private publish(id: string): void {
@@ -203,12 +278,14 @@ export class SessionController {
     const next = transition(prev, ev, Date.now());
     if (next === prev) return;
     this.machines.set(id, next);
+    if (next.status !== prev.status) this.statusSince.set(id, Date.now());
     if (next.status !== prev.status || next.exitCode !== prev.exitCode) this.onStatusChange(id, prev.status, next.status);
     else if ((next.subagents ?? 0) !== (prev.subagents ?? 0)) this.publish(id);
   }
 
   private onStatusChange(id: string, from: SessionStatus, to: SessionStatus): void {
     this.publish(id);
+    if (to !== 'asleep') void this.refreshBranch(id);
     // Empezar a trabajar es un mensaje tuyo; terminar, uno de Claude.
     if (to === 'working' || from === 'working') this.store.dispatch({ type: 'session/active', id, at: Date.now() });
     const pending = this.notifyTimers.get(id);
@@ -273,7 +350,7 @@ export class SessionController {
     if (live.session.kind !== 'claude') {
       // Una PowerShell donde se abrió Claude: su título lo delata (D30).
       for (const title of live.scanner.feed(data)) {
-        if (classifyTitle(title) !== 'other') void this.detectClaudeInShell(id, live);
+        if (isClaudeTitle(title)) void this.detectClaudeInShell(id, live);
       }
       return;
     }
@@ -295,6 +372,7 @@ export class SessionController {
     // La marca sigue: una carpeta en un disco sin conectar vuelve a intentarse la próxima vez.
     this.messages.set(session.id, message);
     this.machines.set(session.id, { kind: session.kind, status: 'error', stopLatchUntil: 0 });
+    this.statusSince.set(session.id, Date.now());
     this.publish(session.id);
   }
 
@@ -325,11 +403,15 @@ export class SessionController {
   private spawnSession(session: SessionRecord, cols: number, rows: number, forceResume: boolean | null, attempts: number): void {
     const id = session.id;
     this.messages.delete(id);
+    this.missingCwd.delete(id);
+    this.unresumable.delete(id);
     if (!this.machines.has(id)) this.machines.set(id, initialState(session.kind));
 
     // Una ruta de red caída bloquearía el proceso principal 20 s: que falle al lanzar.
     if (!session.cwd.startsWith('\\\\') && !existsSync(session.cwd)) {
-      this.fail(session, `La carpeta ya no existe:\n${session.cwd}`);
+      // El panel ofrece elegir otra carpeta: la conversación se conserva, porque se retoma por id (#6).
+      this.missingCwd.set(id, session.cwd);
+      this.fail(session, `La carpeta de esta sesión ya no existe:\n${session.cwd}`);
       return;
     }
 
@@ -429,7 +511,8 @@ export class SessionController {
       code !== undefined &&
       code !== 0 &&
       Date.now() - live.startedAt < FAST_FAIL_MS &&
-      this.machines.get(id)?.status === 'starting'
+      this.machines.get(id)?.status === 'starting' &&
+      !this.messages.has(id)
     ) {
       this.messages.set(
         id,
@@ -456,6 +539,18 @@ export class SessionController {
     const missing = text.includes(`No conversation found with session ID: ${session.claudeId}`);
     const inUse = text.includes(`Session ID ${session.claudeId} is already in use`);
     if (!missing && !inUse) return false;
+
+    // El historial existe pero Claude no lo retomó: no se cambia el id ni se empieza una conversación vacía
+    // por nuestra cuenta (#6). Se avisa en el panel y la conversación sigue en su id. Reintentar repetiría lo mismo,
+    // así que el panel ofrece una salida explícita: empezar una conversación nueva, si la persona lo decide.
+    if (missing && transcriptExists(session.cwd, session.claudeId)) {
+      this.unresumable.add(session.id);
+      this.messages.set(
+        session.id,
+        `Esta conversación no se pudo retomar, aunque su historial existe.\nHilo no empieza una conversación nueva por su cuenta. Su id es:\n${session.claudeId}`,
+      );
+      return false;
+    }
 
     const found = findSession(this.store.get(), session.id);
     if (!found) return false;
@@ -559,6 +654,10 @@ export class SessionController {
     }
     this.machines.delete(id);
     this.messages.delete(id);
+    this.statusSince.delete(id);
+    this.branches.delete(id);
+    this.missingCwd.delete(id);
+    this.unresumable.delete(id);
   }
 
   /** Registra una sesión nueva o restaurada. */

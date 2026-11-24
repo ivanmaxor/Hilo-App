@@ -79,6 +79,14 @@ export interface Settings {
   soundDuration: number;
   /** Sonar también si la sesión está a la vista. */
   soundAlways: boolean;
+  /** Nombre del archivo del sonido propio (#12); vacío si no hay. El audio se guarda en la carpeta de datos. */
+  customSoundName: string;
+  /** Avisos de uso del plan (#8): umbrales en % para la sesión de 5 horas y para la semana. */
+  usageAlerts: boolean;
+  usageAlertSession: number[];
+  usageAlertWeek: number[];
+  usageAlertNotify: boolean;
+  usageAlertSound: SoundChoice;
   useHooks: boolean;
   /** Lanza Claude con --dangerously-skip-permissions: decisión del dueño, ver docs/DECISIONES.md. */
   skipPermissions: boolean;
@@ -148,6 +156,12 @@ export interface PersistedState {
   window: WindowBounds;
 }
 
+/** Dónde está parada la carpeta de una sesión: en una rama, o en un commit suelto (primeros 7 del hash). */
+export interface GitHead {
+  kind: 'branch' | 'detached';
+  name: string;
+}
+
 export interface SessionRuntime {
   status: SessionStatus;
   /** Subagentes de esta sesión que siguen corriendo. */
@@ -155,6 +169,14 @@ export interface SessionRuntime {
   exitCode?: number;
   /** Mensaje de error para mostrar en el panel, si no pudo arrancar. */
   message?: string;
+  /** La carpeta de la sesión ya no existe: es la ruta que falta. El panel deja elegir otra. */
+  missingCwd?: string;
+  /** Su historial existe pero Claude no pudo retomarlo: el panel deja empezar una conversación nueva, a elección de la persona. */
+  unresumable?: boolean;
+  /** Rama de la carpeta de la sesión, si es un repositorio y está encendida. */
+  branch?: GitHead;
+  /** Desde cuándo (ms) está en este estado. Solo desde que Hilo la encendió: una dormida no lo tiene. */
+  since?: number;
 }
 
 export type RuntimeMap = Record<string, SessionRuntime>;
@@ -195,6 +217,14 @@ export type Action =
   /** Solo las dispara el proceso principal: no están en la lista blanca del IPC. */
   | { type: 'session/adopt'; id: string; claudeId: string; cwd: string }
   | { type: 'session/active'; id: string; at: number }
+  /** Solo la dispara el proceso principal, con la carpeta que eligió la persona: no está en la lista blanca del IPC. */
+  | { type: 'session/cwd'; id: string; cwd: string }
+  /**
+   * Solo la dispara el proceso principal (#7): la carpeta nueva sale del diálogo de Windows y no está en la lista blanca del IPC.
+   * Cambia la del proyecto y la de las sesiones que traen su carpeta nueva, todo junto. Solo cuentan las del proyecto
+   * que estaban dentro de la carpeta vieja.
+   */
+  | { type: 'project/relocate'; id: string; path: string; sessions: { id: string; cwd: string }[] }
   | { type: 'session/remove'; id: string }
   | { type: 'session/claudeId'; id: string; claudeId: string }
   | { type: 'session/awake'; id: string; awake: boolean }
@@ -210,3 +240,46 @@ export type Action =
   | { type: 'ui/sidebar'; width?: number; collapsed?: boolean }
   | { type: 'settings/set'; patch: Partial<Settings> }
   | { type: 'window/bounds'; bounds: WindowBounds };
+
+/** Una sesión de un proyecto cuya carpeta estaba dentro de la que se cambia (#7). */
+export interface RelocateSession {
+  id: string;
+  name: string;
+  kind: SessionKind;
+  /** Su carpeta de hoy existe. */
+  exists: boolean;
+  /** Lo que tiene de más que la carpeta del proyecto, o '' si es la misma. */
+  sub: string;
+}
+
+/** Primer paso de cambiar la carpeta de un proyecto: la ruta elegida se queda en el proceso principal; aquí solo vuelve para mostrarla. */
+export type RelocatePick =
+  | { status: 'cancelled' }
+  | { status: 'problem'; message: string }
+  | {
+      status: 'ok';
+      /** De un solo uso: el segundo paso lo canjea por la ruta guardada en el proceso principal. */
+      token: string;
+      from: string;
+      to: string;
+      sessions: RelocateSession[];
+      /** Sesiones del proyecto que usan otra carpeta y no se tocan. */
+      outside: number;
+      /** De esas, las que tampoco encuentran su carpeta. */
+      outsideMissing: number;
+    };
+
+export type RelocateResult =
+  | { ok: false; message: string }
+  | {
+      ok: true;
+      moved: number;
+      /** No tenían su subcarpeta en la nueva y quedaron en la raíz. */
+      fellBack: number;
+      /** Sesiones movidas que tienen proceso: siguen en la carpeta vieja hasta dormirlas y despertarlas. */
+      awake: string[];
+    };
+
+export type ChangeFolderResult =
+  | { ok: false; message?: string }
+  | { ok: true; awake: boolean; wasMissing: boolean };

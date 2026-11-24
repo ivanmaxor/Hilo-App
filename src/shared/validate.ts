@@ -1,3 +1,4 @@
+import { USAGE_THRESHOLDS } from './usageAlerts';
 import { isSoundChoice, SOUND_DURATIONS, SOUND_REPEATS } from './sounds';
 import { isValidTree } from './paneLayout';
 import { DEFAULT_SETTINGS, EFFORTS } from './defaults';
@@ -138,6 +139,12 @@ const clamp = (v: unknown, min: number, max: number, fallback: number): number =
 };
 
 /** Valor por valor: un ajuste inválido se descarta en vez de dejar la app sin arrancar. */
+/** Umbrales de aviso de uso: solo los permitidos, sin repetir y en orden. */
+function thresholds(v: unknown, fallback: number[]): number[] {
+  if (!Array.isArray(v)) return fallback;
+  return [...new Set(v.filter((n): n is number => (USAGE_THRESHOLDS as readonly number[]).includes(n as number)))].sort((a, b) => a - b);
+}
+
 export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS): Settings {
   const r = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
   const shortcuts: Record<string, string> = {};
@@ -167,6 +174,12 @@ export function sanitizeSettings(raw: unknown, base: Settings = DEFAULT_SETTINGS
     soundVolume: Math.round(clamp(r.soundVolume, 0, 100, base.soundVolume)),
     soundRepeat: (SOUND_REPEATS as readonly number[]).includes(r.soundRepeat as number) ? (r.soundRepeat as number) : base.soundRepeat,
     soundAlways: typeof r.soundAlways === 'boolean' ? r.soundAlways : base.soundAlways,
+    customSoundName: typeof r.customSoundName === 'string' && r.customSoundName.length <= 200 && !/[\\/\0]/.test(r.customSoundName) ? r.customSoundName : base.customSoundName,
+    usageAlerts: typeof r.usageAlerts === 'boolean' ? r.usageAlerts : base.usageAlerts,
+    usageAlertSession: thresholds(r.usageAlertSession, base.usageAlertSession),
+    usageAlertWeek: thresholds(r.usageAlertWeek, base.usageAlertWeek),
+    usageAlertNotify: typeof r.usageAlertNotify === 'boolean' ? r.usageAlertNotify : base.usageAlertNotify,
+    usageAlertSound: isSoundChoice(r.usageAlertSound) ? r.usageAlertSound : base.usageAlertSound,
     soundDuration: (SOUND_DURATIONS as readonly number[]).includes(r.soundDuration as number) ? (r.soundDuration as number) : base.soundDuration,
     useHooks: typeof r.useHooks === 'boolean' ? r.useHooks : base.useHooks,
     skipPermissions: typeof r.skipPermissions === 'boolean' ? r.skipPermissions : base.skipPermissions,

@@ -24,7 +24,7 @@ Cuando hay que elegir diseño, números o comportamiento, el PR (o el Issue) tra
 
 ## Pruebas
 
-- Antes del PR: `npm run typecheck`, `npm test` y las e2e de lo que se tocó (`npx playwright test tests/e2e/<archivo>`). El CI corre privacidad, typecheck, unitarias y build en Windows.
+- Antes del PR: `npm run typecheck`, `npm test` y las e2e de lo que se tocó (`npx playwright test tests/e2e/<archivo>`). El CI corre privacidad, typecheck, unitarias, build y las e2e en Windows (tarda unos 6 minutos); si falla una e2e, baja el artefacto `test-results` de esa corrida.
 - **Varios PR juntos:** antes de fusionarlos, se juntan en una rama local, se corren todas las pruebas, se fusionan en orden y se vuelve a probar `main`. PR que pasan por separado pueden chocar juntos.
 - **Las pruebas no tocan lo real.** Cada una usa su propia carpeta de datos (`launch()` en `tests/e2e/helpers.ts`), la ventana va oculta (`HILO_TEST_HIDDEN`), y nunca tocan la configuración de Claude ni las sesiones de quien usa el PC. Las PowerShell de las e2e son falsas; para una real, `env: { HILO_TEST_SHELL: '' }`.
 - **Reportes honestos:** cada PR y cada Release dicen qué se probó con personas, qué solo con pruebas automáticas y qué no se probó.
@@ -34,7 +34,7 @@ Cuando hay que elegir diseño, números o comportamiento, el PR (o el Issue) tra
 Solo el dueño saca versiones, porque le llegan solas a los usuarios.
 
 1. **PR de versión** (`chore/version-1.4.0`): sube `version` en `package.json` y `package-lock.json`, y escribe su entrada en `src/shared/changelog.ts` (una prueba lo exige). El borrador sale de `node scripts/novedades.mjs`, que lista los PR fusionados desde la última versión.
-2. Con ese PR fusionado y `main` limpio: `npm run dist`, luego `node scripts/scan-installer.mjs --terms <lista personal> --except "<nombres comunes>"`, y al final `node scripts/publish-release.mjs --notes-file <notas>`.
+2. Con ese PR fusionado y `main` limpio: `npm run dist`, luego `node scripts/scan-installer.mjs --terms <lista personal> --except "<nombres comunes>"`, y al final `node scripts/publish-release.mjs --key <clave privada> --notes-file <notas>`. Sin la firma (D36), las versiones desde la 1.4.0 no instalan la nueva.
 3. **Versión de prueba antes de la final:** `1.4.0-rc.1` en `package.json` y `publish-release.mjs --prerelease`. A los usuarios no les llega: el actualizador tiene `allowPrerelease = false` y además rechaza todo lo que no sea `x.y.z` (`isStableVersion`). Los dos la instalan a mano desde la Release.
 4. **Guía de prueba** en un Issue fijado por cada versión de prueba: cada cambio con en qué fijarse al usarla, y respuestas con ✅ / ⚠️ / ❌. Cada ⚠️ o ❌ se vuelve un Issue nuevo.
 

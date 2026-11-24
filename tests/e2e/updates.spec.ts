@@ -1,10 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomBytes, sign } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingHttpHeaders, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { signedMessage } from '../../src/shared/updateSignature';
 import { cleanup, launch, makeState, pidAlive, ROOT, status, type Launched } from './helpers';
 
 /**
@@ -13,6 +14,10 @@ import { cleanup, launch, makeState, pidAlive, ROOT, status, type Launched } fro
  */
 
 const A = 'aaaaaaaa-3333-4000-8000-00000000000a';
+// Las firmas de estas pruebas (#4): Hilo acepta TEST_KEY solo contra el servidor de esta máquina (HILO_TEST_UPDATE_KEY).
+const KEYS = generateKeyPairSync('ed25519');
+const OTHER_KEYS = generateKeyPairSync('ed25519');
+const TEST_KEY = KEYS.publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
 const SHOTS = join(ROOT, 'test-results', 'updates');
 mkdirSync(SHOTS, { recursive: true });
 
@@ -27,6 +32,10 @@ interface Feed {
   fileUrl: string;
   redirectFile?: string;
   chunkDelay: number;
+  /** La firma que se sirve: con la clave de la prueba, con otra, o ninguna (404). */
+  signature: 'buena' | 'otra' | 'ninguna';
+  /** Lo que firmó quien publica, si no es `file`: un instalador cambiado después de firmar. */
+  signedFile?: Buffer;
   close(): Promise<void>;
 }
 
@@ -55,6 +64,7 @@ async function feedServer(version = '9.9.9'): Promise<Feed> {
     sha512: sha512(file),
     fileUrl: `Hilo-Setup-${version}.exe`,
     chunkDelay: 40,
+    signature: 'buena',
     close: () => closeServer(server),
   };
   const sendFile = async (res: ServerResponse) => {
@@ -72,6 +82,16 @@ async function feedServer(version = '9.9.9'): Promise<Feed> {
     if (path === '/latest.yml') {
       res.writeHead(200, { 'content-type': 'text/yaml', 'set-cookie': 'rastreo=1' });
       res.end(`version: ${feed.version}\nfiles:\n  - url: ${feed.fileUrl}\n    sha512: ${feed.sha512}\n    size: ${feed.file.length}\npath: ${feed.fileUrl}\nsha512: ${feed.sha512}\nreleaseDate: '2026-11-04T00:00:00.000Z'\n`);
+    } else if (path.endsWith('.exe.sig')) {
+      if (feed.signature === 'ninguna') {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
+      const name = decodeURIComponent(path.slice(1, -'.sig'.length));
+      const message = Buffer.from(signedMessage(feed.version, name, sha512(feed.signedFile ?? feed.file)), 'utf8');
+      res.writeHead(200, { 'content-type': 'text/plain' });
+      res.end(sign(null, message, (feed.signature === 'buena' ? KEYS : OTHER_KEYS).privateKey).toString('base64'));
     } else if (path.endsWith('.exe')) {
       if (feed.redirectFile) {
         res.writeHead(302, { location: feed.redirectFile });
@@ -93,7 +113,7 @@ function tempCache(): string {
 async function launchWithFeed(feed: Feed | null, cache: string, state = makeState([{ id: A, name: 'Uno' }])): Promise<Launched> {
   state.ui = { ...state.ui, activeSessionId: A, panes: [A], layout: 1, activePane: 0 };
   // LOCALAPPDATA: lo bajado va a una carpeta temporal, y no a la del Hilo instalado.
-  return launch({ state, env: { LOCALAPPDATA: cache, ...(feed ? { HILO_TEST_UPDATE_FEED: feed.url } : {}) }, width: 1100, height: 720 });
+  return launch({ state, env: { LOCALAPPDATA: cache, HILO_TEST_UPDATE_KEY: TEST_KEY, ...(feed ? { HILO_TEST_UPDATE_FEED: feed.url } : {}) }, width: 1100, height: 720 });
 }
 
 const statusLine = (page: Page) => page.locator('[data-field="update-status"]');
@@ -431,6 +451,58 @@ test('un archivo alterado se descarta y no se ofrece instalarlo; volver a bajarl
     await page.getByRole('button', { name: 'Buscar actualizaciones' }).click();
     await page.getByRole('button', { name: 'Bajar la versión 9.9.9' }).click();
     await expect(page.getByRole('button', { name: 'Reiniciar e instalar' })).toBeVisible({ timeout: 30_000 });
+  } finally {
+    await run.close();
+    await feed.close();
+    cleanup(run.dataDir);
+    rmSync(cache, { recursive: true, force: true });
+  }
+});
+
+test('sin una firma de Hilo que calce no se instala: sin firma, con otra clave, o con latest.yml cambiado (#4)', async () => {
+  test.setTimeout(150_000);
+  const feed = await feedServer();
+  const cache = tempCache();
+  const original = feed.file;
+  const run = await launchWithFeed(feed, cache);
+  try {
+    const { page } = run;
+    await expect.poll(() => stateOf(page), { timeout: 20_000 }).toBe('available');
+    await openUpdates(page);
+    const pending = join(cache, 'hilo-updater', 'pending');
+    const exes = () => (existsSync(pending) ? readdirSync(pending).filter((f) => f.endsWith('.exe')) : []);
+    const cases: [string, () => void][] = [
+      ['sin firma publicada', () => (feed.signature = 'ninguna')],
+      ['firmada con otra clave', () => (feed.signature = 'otra')],
+      // Quien toma la Release cambia el instalador y su sha512 en latest.yml, que entonces calzan entre sí: la firma no.
+      [
+        'latest.yml cambiado',
+        () => {
+          feed.signature = 'buena';
+          feed.signedFile = original;
+          feed.file = randomBytes(original.length);
+          feed.sha512 = sha512(feed.file);
+        },
+      ],
+    ];
+    for (const [name, apply] of cases) {
+      apply();
+      await page.getByRole('button', { name: 'Buscar actualizaciones' }).click();
+      await page.getByRole('button', { name: 'Bajar la versión 9.9.9' }).click();
+      await expect(statusLine(page), name).toContainText('no trae una firma válida', { timeout: 30_000 });
+      await expect(page.getByRole('button', { name: 'Reiniciar e instalar' }), name).toHaveCount(0);
+      expect(exes(), name).toEqual([]);
+    }
+    await page.screenshot({ path: join(SHOTS, 'sin-firma.png') });
+
+    // Lo que firmó quien publica, sin tocar, sí se ofrece instalar.
+    feed.file = original;
+    feed.signedFile = undefined;
+    feed.sha512 = sha512(original);
+    await page.getByRole('button', { name: 'Buscar actualizaciones' }).click();
+    await page.getByRole('button', { name: 'Bajar la versión 9.9.9' }).click();
+    await expect(page.getByRole('button', { name: 'Reiniciar e instalar' })).toBeVisible({ timeout: 30_000 });
+    expect(feed.requests.some((r) => r.url.endsWith('.exe.sig'))).toBe(true);
   } finally {
     await run.close();
     await feed.close();
