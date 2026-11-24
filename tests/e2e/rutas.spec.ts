@@ -168,7 +168,12 @@ test("las rutas de la terminal se subrayan si existen, y el clic las muestra o l
         file: "src/app.ts",
         line: 12,
       });
-    await page.keyboard.press("Escape");
+    // El diálogo pone su escucha de Escape después de dibujarse y reparte el foco cuando termina de buscar IDEs: un Escape
+    // demasiado pronto se pierde y su fondo tapa los clics siguientes. Se insiste hasta que desaparezca.
+    await expect(async () => {
+      await page.keyboard.press("Escape");
+      await expect(page.locator(".backdrop")).toHaveCount(0, { timeout: 1000 });
+    }).toPass({ timeout: 10_000 });
 
     // El proceso principal no mira rutas de red, ni rutas con flujos alternativos.
     const answer = await page.evaluate(
