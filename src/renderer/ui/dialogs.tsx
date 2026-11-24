@@ -10,6 +10,7 @@ import { EFFORTS, MODELS, PALETTE } from "../../shared/defaults";
 import { fuzzyMatch } from "../../shared/fuzzy";
 import { STATUS_LABEL, STATUS_PRIORITY } from "../../shared/statusMachine";
 import { allSessions, findSession } from "../../shared/reducer";
+import { replyTargetProblem } from "../../shared/lastMessage";
 import type { Modal } from "../controller";
 import { moveToast } from "./sidebar";
 import type { SessionKind, ToolCheck } from "../../shared/types";
@@ -34,6 +35,7 @@ import {
   keysOf,
   toggleChanges,
   copyLastMessage,
+  sendLastReply,
   runCommand,
   sleepSession,
   startRename,
@@ -547,16 +549,30 @@ function Highlight({ text, positions }: { text: string; positions: number[] }) {
   );
 }
 
-function QuickOpen() {
+/**
+ * El selector rápido. Con `sendFrom` es el de «Enviar su última respuesta a…»: lista solo las otras sesiones
+ * de Claude (las dormidas se despiertan al enviar) y, al elegir, les pega en vez de saltar.
+ */
+function QuickOpen({ sendFrom }: { sendFrom?: string }) {
   const { state } = useStore(app);
   const [query, setQuery] = useState("");
   const [at, setAt] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => input.current?.focus(), []);
+  const fromName = sendFrom ? findSession(state, sendFrom)?.session.name : null;
+  const label = sendFrom
+    ? `Enviar la respuesta de «${fromName ?? ""}» a…`
+    : "Saltar a una sesión";
 
   const results = useMemo(() => {
     const items = allSessions(state)
       .filter((s) => !view.get().closing.includes(s.id))
+      .filter(
+        (s) =>
+          !sendFrom ||
+          (s.id !== sendFrom &&
+            replyTargetProblem(s.kind, statusOf(s.id), s.name) === null),
+      )
       .map((s) => {
         const found = findSession(state, s.id)!;
         const match = fuzzyMatch(query, s.name);
@@ -584,7 +600,8 @@ function QuickOpen() {
 
   const pick = (id: string) => {
     view.set({ modal: null });
-    void selectSession(id);
+    if (sendFrom) void sendLastReply(sendFrom, id);
+    else void selectSession(id);
   };
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -595,15 +612,15 @@ function QuickOpen() {
 
   return (
     <Backdrop onClose={closeModal} labelledBy="quick-label">
-      <div class="quick">
+      <div class="quick" data-picker={sendFrom ? "send-reply" : "quick"}>
         <span id="quick-label" class="sr-only">
-          Saltar a una sesión
+          {label}
         </span>
         <input
           ref={input}
           value={query}
-          placeholder="Saltar a una sesión"
-          aria-label="Saltar a una sesión"
+          placeholder={label}
+          aria-label={label}
           onInput={(e) => {
             setQuery(e.currentTarget.value);
             setAt(0);
@@ -644,9 +661,13 @@ function QuickOpen() {
           ))}
           {results.length === 0 && (
             <p class="quick-empty">
-              {allSessions(state).length
-                ? "Ninguna sesión se llama así."
-                : "Aún no hay sesiones."}
+              {sendFrom
+                ? query
+                  ? "Ninguna sesión de Claude se llama así."
+                  : "No hay otra sesión de Claude a la que enviarla."
+                : allSessions(state).length
+                  ? "Ninguna sesión se llama así."
+                  : "Aún no hay sesiones."}
             </p>
           )}
         </div>
@@ -876,6 +897,8 @@ export function Modals() {
       return <ConfirmDialog key={m.title} modal={m} />;
     case "quick":
       return <QuickOpen />;
+    case "sendReply":
+      return <QuickOpen key={m.fromId} sendFrom={m.fromId} />;
     case "setup":
       return <SetupGuide initial={m.tools} />;
     case "ide":
@@ -988,6 +1011,20 @@ export function ContextMenu() {
             }}
           >
             Copiar respuesta <kbd>{keysOf("copyLastMessage")}</kbd>
+          </button>
+        )}
+        {session.kind === "claude" && (
+          <button
+            role="menuitem"
+            data-action="send-last-reply"
+            onClick={() =>
+              view.set({
+                menu: null,
+                modal: { type: "sendReply", fromId: session.id },
+              })
+            }
+          >
+            Enviar su última respuesta a…
           </button>
         )}
         {isUnread(session) ? (

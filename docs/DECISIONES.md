@@ -283,6 +283,14 @@ Se lee de la conversación que Claude guarda (`~/.claude/projects/<carpeta>/<ses
 
 Es un archivo interno de Claude Code, sin contrato. Si cambia su formato, el botón avisa que no hay mensaje en vez de copiar algo equivocado.
 
+**Extensión: «Enviar su última respuesta a…» (propuesta, sin aprobar).** Clic derecho en una sesión de Claude > "Enviar su última respuesta a…" abre el selector rápido (el mismo de "Saltar a una sesión") con las demás sesiones de Claude. Al elegir, Hilo despierta la sesión si estaba dormida, pega ahí el mensaje y la deja a la vista, sin Enter, para revisarlo antes de enviar.
+- La lectura es la misma de D26 (`session:lastMessage`, ahora con `forSend` para el encabezado), solo al pedirlo: no se duplica ni se lee nada más. El texto va al terminal destino, no pasa por el portapapeles.
+- Formato: el mismo de «Copiar respuesta» (`formatCopiedMessage`) con `De «Nombre»` de encabezado: `De «Nombre»:`, una línea en blanco y el mensaje (`formatSentMessage`). Entra por `terminals.pasteTextInto(id, texto)`, que es el único `paste(entry, given?)`: espera a que Claude atienda, `sanitizePaste()` y `term.paste()`, y respeta el detector de claves (#30) y la confirmación de varias líneas. Devuelve si se pegó: el aviso «Se pegó…» solo sale si fue así (la persona pudo cancelar el diálogo de una clave).
+- Un destino dormido se despierta antes de pegar (`paste()` espera el despertar); si al despertar Claude pregunta algo (confianza, permiso), no se pega. Una que espera una respuesta tuya (permiso o pregunta) tampoco recibe: sale un aviso (`replyTargetProblem`).
+- Solo sesiones de Claude: PowerShell no es destino, porque es una respuesta de Claude para otro Claude. No hay atajo de teclado por ahora.
+- Alternativas que se dejaron: (a) submenú dentro del menú contextual (un selector con búsqueda sirve mejor con muchas sesiones), (b) enviar con Enter (descartado por el pedido: se revisa antes), (c) un atajo propio, (d) no despertar al destino dormido y avisar. Decidido por el dueño: despertar sí, atajo no, PowerShell no, línea en blanco como «Copiar respuesta».
+- Cuando se junte con el resumen del día: su selector `QuickOpen` debe tener `const command = !sendFrom && ...`, para que el modo de enviar no trate el texto como un comando.
+
 ## D27. Novedades dentro de la app
 
 Pedido del dueño, para que quien use Hilo vea qué trae cada versión. Van en `src/shared/changelog.ts`, dentro de la app: bajarlas de GitHub sería otra conexión. Se ven en Ajustes > Novedades, y después de actualizar sale una vez un aviso con "Ver novedades" (`settings.lastSeenVersion`). Una instalación nueva no lo muestra.

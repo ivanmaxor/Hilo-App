@@ -60,7 +60,7 @@ Los instaladores publicados se arman en el PC del autor. Leer este código te di
 - No tiene telemetría ni analítica, ni fuentes o scripts remotos. La interfaz misma no tiene acceso a la red.
 - Hilo nunca lee tu token ni tus credenciales de Claude, y no cambia tu configuración global de Claude Code. Sus hooks de estado solo llegan a las sesiones que abre, con `claude --settings`.
 - Claude Code se conecta a Anthropic por su cuenta dentro de cada sesión, como en cualquier terminal.
-- Lo que Hilo sí lee, y para qué: el uso del plan que Claude Code le pasa a su línea de estado (solo se guarda `rate_limits`); el final del archivo de una conversación, solo al pulsar "Copiar respuesta"; y `~/.claude/sessions/<pid>.json` del propio Claude, para el estado y la carpeta de una sesión.
+- Lo que Hilo sí lee, y para qué: el uso del plan que Claude Code le pasa a su línea de estado (solo se guarda `rate_limits`); el final del archivo de una conversación, solo al pulsar "Copiar respuesta" o "Enviar su última respuesta a…"; y `~/.claude/sessions/<pid>.json` del propio Claude, para el estado y la carpeta de una sesión.
 - No hace falta creerlo: todo el código está aquí. Clona el repo y pídele a tu propio Claude Code que lo revise, empezando por `src/main/`.
 
 Sin firma, una actualización solo se comprueba contra el SHA-512 publicado en GitHub, por HTTPS. Eso detecta una descarga dañada, no que alguien tome el control de esta cuenta de GitHub.

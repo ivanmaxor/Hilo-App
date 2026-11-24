@@ -9,7 +9,7 @@ import { buildClaudeArgs, buildCommandLine, buildEnv, claudeConfigDir, commandFo
 import { branchOf } from './git';
 import { HookChannel } from './hooks';
 import type { PlanUsage } from '../shared/usage';
-import { formatCopiedMessage, lastAssistantText } from '../shared/lastMessage';
+import { formatCopiedMessage, formatSentMessage, lastAssistantText } from '../shared/lastMessage';
 import { readTranscriptTail } from './claude';
 import { backgroundProcesses, descendants, killPid, shellChildren, snapshotProcesses, taskkillTree, type ProcInfo } from './processes';
 import { ensureConoutWorker, setConoutLostHandler } from './pty/sharedConout';
@@ -176,13 +176,14 @@ export class SessionController {
     }
   }
 
-  /** El último mensaje de Claude en esta sesión, ya con el formato para copiar. null si no hay. */
-  async lastMessage(id: string): Promise<string | null> {
+  /** El último mensaje de Claude en esta sesión, ya con el formato para copiar (o para pegar en otra sesión). null si no hay. */
+  async lastMessage(id: string, forSend = false): Promise<string | null> {
     const found = findSession(this.store.get(), id);
     if (!found || found.session.kind !== 'claude') return null;
     const tail = await readTranscriptTail(found.session.cwd, found.session.claudeId);
     const text = tail ? lastAssistantText(tail) : null;
-    return text ? formatCopiedMessage(found.session.name, text) : null;
+    if (!text) return null;
+    return forSend ? formatSentMessage(found.session.name, text) : formatCopiedMessage(found.session.name, text);
   }
 
   planUsage(): PlanUsage | null {

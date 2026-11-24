@@ -691,7 +691,7 @@ function registerIpc(): void {
     }
     patchSettings(patch);
   });
-  handle('session:lastMessage', (id: unknown) => (isStr(id) ? sessions.lastMessage(id) : null));
+  handle('session:lastMessage', (id: unknown, forSend: unknown) => (isStr(id) ? sessions.lastMessage(id, forSend === true) : null));
   handle('session:markRead', (id: unknown) => (isStr(id) ? sessions.markRead(id) : undefined));
   // La ruta sale del estado guardado, nunca del renderer.
   handle('project:openFolder', async (id: unknown) => {
