@@ -221,6 +221,10 @@ kbd { font: 11px "Segoe UI Variable Text", "Segoe UI", sans-serif; color: var(--
 .pane-divider:hover, .pane-divider:active { background: color-mix(in srgb, var(--accent) 55%, transparent); }
 .pane-head[draggable="true"] { cursor: grab; }
 .pane-close { flex: none; width: 18px; height: 18px; margin-left: auto; }
+.pane-zoom { flex: none; width: 18px; height: 18px; margin-left: auto; }
+.pane-zoom.on { color: var(--accent); }
+.pane-hidden-count { flex: none; margin-left: auto; padding: 0 6px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--text); font-size: 11px; white-space: nowrap; }
+.pane-hidden-count + .pane-zoom, .pane-zoom ~ .pane-close { margin-left: 0; }
 .pane.drop-target { z-index: 30; }
 .drop-mark { position: absolute; inset: 0; z-index: 30; pointer-events: none; }
 .drop-mark.center { display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 2px var(--accent); }

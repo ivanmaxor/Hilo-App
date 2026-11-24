@@ -171,6 +171,22 @@ export function LayoutIcon({ count }: { count: 1 | 2 | 3 | 4 }) {
   );
 }
 
+/** Agrandar un panel (esquinas hacia fuera) o devolverlo a su lugar (hacia dentro). */
+export function ZoomIcon({ on }: { on: boolean }) {
+  return (
+    <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+      <path
+        d={on ? 'M5 1.5V5H1.5M7 10.5V7h3.5' : 'M1.5 5V1.5H5M10.5 7v3.5H7'}
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.4"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  );
+}
+
 /** Dos líneas de texto, una que entra y otra que sale. */
 export function CopyMessageIcon() {
   return (
