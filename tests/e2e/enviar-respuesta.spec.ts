@@ -52,6 +52,7 @@ interface Rig {
 async function start(
   conversations: Record<string, string>,
   awake: string[],
+  wakeOnSelect = true,
 ): Promise<Rig> {
   const tmp = mkdtempSync(join(tmpdir(), "hilo-enviar-"));
   const config = join(tmp, "claude-config");
@@ -78,6 +79,7 @@ async function start(
     ROOT,
   );
   state.settings.claudePath = join(bin, "claude.cmd");
+  state.settings.wakeOnSelect = wakeOnSelect;
   const ctx = await launch({
     state,
     env: { CLAUDE_CONFIG_DIR: config },
@@ -132,11 +134,12 @@ test("pega la respuesta en la sesión elegida, con el encabezado y sin Enter, y 
     await page.locator(`.row[data-session="${A}"]`).click({ button: "right" });
     await page.locator('[data-action="send-last-reply"]').click();
     const picker = page.locator('[data-picker="send-reply"]');
-    // Solo las despiertas que no son la de origen: ni ella, ni la dormida, ni la PowerShell.
-    await expect(picker.getByRole("option")).toHaveCount(1);
+    // Solo sesiones de Claude, y no la de origen: las dormidas entran (se despiertan al enviar), la PowerShell no.
+    await expect(picker.getByRole("option")).toHaveCount(3);
     await expect(picker).toContainText("Destino");
-    await expect(picker).not.toContainText("Dormida");
-    await expect(picker).not.toContainText("Consola");
+    await expect(picker).toContainText("Dormida");
+    await expect(picker.getByRole("option", { name: /Origen/ })).toHaveCount(0);
+    await expect(picker.getByRole("option", { name: /Consola/ })).toHaveCount(0);
     await page.screenshot({ path: "test-results/enviar-respuesta-selector.png" });
     await picker.getByRole("option", { name: /Destino/ }).click();
 
@@ -162,17 +165,40 @@ test("pega la respuesta en la sesión elegida, con el encabezado y sin Enter, y 
   }
 });
 
-test("a una sesión dormida no la despierta: avisa; sin respuesta, avisa; una PowerShell no tiene la opción", async () => {
+for (const wakeOnSelect of [true, false]) {
+  test(`una sesión dormida se despierta y recibe la respuesta (Despertar al seleccionar: ${wakeOnSelect ? "sí" : "no"})`, async () => {
+    const rig = await start({ [A]: jsonl("Hola\n\ndesde A") }, [A], wakeOnSelect);
+    try {
+      const { page } = rig.ctx;
+      await select(page, A);
+      expect(await status(page, C)).toBe("asleep");
+
+      await send(page, A, C);
+
+      const got = await waitForSink(rig.sink(C), (b) =>
+        b.toString("utf8").includes("\x1b[201~"),
+      );
+      // Después del despertar: un solo pegado, con el encabezado, la línea en blanco y sin Enter.
+      expect(pasted(got)).toBe("\x1b[200~De «Origen»:\r\rHola\r\rdesde A\x1b[201~");
+      expect(await status(page, C)).not.toBe("asleep");
+      expect(await activeId(page)).toBe(C);
+      await expect(page.locator(".toast").last()).toContainText(
+        "Se pegó la respuesta de «Origen» en «Dormida»",
+      );
+      await settle(400);
+      expect(pasted(readSink(rig.sink(C)))).toBe(pasted(got));
+    } finally {
+      await stop(rig);
+    }
+  });
+}
+
+test("sin respuesta, la misma sesión y una PowerShell solo avisan: la PowerShell no es destino ni tiene la opción", async () => {
   const rig = await start({ [A]: jsonl("Hola") }, [A, B, D]);
   try {
     const { page } = rig.ctx;
     await select(page, A);
     const toast = page.locator(".toast").last();
-
-    await send(page, A, C);
-    await expect(toast).toContainText("«Dormida» está dormida");
-    expect(await status(page, C)).toBe("asleep");
-    expect(await activeId(page)).toBe(A);
 
     await send(page, D, B);
     await expect(toast).toContainText("«Sin respuesta» todavía no tiene un mensaje");
@@ -180,12 +206,18 @@ test("a una sesión dormida no la despierta: avisa; sin respuesta, avisa; una Po
 
     await send(page, A, SHELL);
     await expect(toast).toContainText("es una PowerShell");
+    expect(await activeId(page)).toBe(A);
 
     await send(page, A, A);
     await expect(toast).toContainText("Elige otra sesión");
 
+    await send(page, SHELL, B);
+    await expect(toast).toContainText("solo las sesiones de Claude");
+
     await settle(400);
     expect(pasted(readSink(rig.sink(B)))).toBe("");
+    // Una dormida que no se eligió sigue dormida.
+    expect(await status(page, C)).toBe("asleep");
     expect(readSink(rig.sink(C)).length).toBe(0);
 
     await page.locator(`.row[data-session="${SHELL}"]`).click({ button: "right" });

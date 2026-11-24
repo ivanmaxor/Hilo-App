@@ -63,18 +63,22 @@ export function formatCopiedMessage(sessionName: string, text: string): string {
 }
 
 /**
- * Lo que se pega en otra sesión (idea «Enviar su última respuesta a…»): una línea `De «Nombre»:`, una línea
- * en blanco y el mensaje. Se limpia aquí y otra vez al pegar: el nombre lo escribe la persona y el mensaje viene
+ * Lo que se pega en otra sesión (idea «Enviar su última respuesta a…»): lo mismo que «Copiar respuesta», con
+ * `De «Nombre»:` de encabezado, una línea en blanco y el mensaje. Se limpia aquí y otra vez al pegar: el nombre lo escribe la persona y el mensaje viene
  * de un archivo que Claude Code guarda, y ninguno puede llevar controles que se salgan del pegado.
  */
 export function formatSentMessage(sessionName: string, text: string): string {
   // eslint-disable-next-line no-control-regex
   const name = sessionName.replace(/[\x00-\x1f\x7f-\x9f]+/g, " ").trim();
   const body = sanitizePaste(text).replace(/\r\n?/g, "\n").trim();
-  return `De «${name}»:\n\n${body}`;
+  // El mismo formato que «Copiar respuesta»: encabezado, dos puntos, línea en blanco y el mensaje.
+  return formatCopiedMessage(`De «${name}»`, body);
 }
 
-/** Por qué no se le puede pegar a una sesión, o null si se puede. */
+/**
+ * Por qué no se le puede pegar a una sesión, o null si se puede. Una dormida sí: se despierta antes de pegar.
+ * Una PowerShell nunca es destino: es una respuesta de Claude para otro Claude.
+ */
 export function replyTargetProblem(
   kind: SessionKind,
   status: SessionStatus,
@@ -82,8 +86,6 @@ export function replyTargetProblem(
 ): string | null {
   if (kind !== "claude")
     return `«${name}» es una PowerShell: la respuesta solo se envía a sesiones de Claude.`;
-  if (status === "asleep")
-    return `«${name}» está dormida: despiértala primero. No se despierta sola para esto.`;
   if (status === "error" || status === "exited")
     return `«${name}» ya no tiene proceso.`;
   if (status === "waiting")

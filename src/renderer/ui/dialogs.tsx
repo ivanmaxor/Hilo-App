@@ -1,11 +1,3 @@
-import {
-  SOUND_DURATIONS,
-  SOUND_REPEATS,
-  SOUNDS,
-  type SoundChoice,
-} from "../../shared/sounds";
-import { CHANGELOG } from "../../shared/changelog";
-import { claudePathProblem } from "../../shared/claudePath";
 import type { ComponentChildren } from "preact";
 import {
   useEffect,
@@ -16,34 +8,23 @@ import {
 } from "preact/hooks";
 import { EFFORTS, MODELS, PALETTE } from "../../shared/defaults";
 import { fuzzyMatch } from "../../shared/fuzzy";
-import {
-  eventToKeys,
-  isModifierOnly,
-  prettyKeys,
-  shortcutProblem,
-  SHORTCUTS,
-} from "../../shared/shortcuts";
 import { STATUS_LABEL, STATUS_PRIORITY } from "../../shared/statusMachine";
 import { allSessions, findSession } from "../../shared/reducer";
 import { replyTargetProblem } from "../../shared/lastMessage";
 import type { Modal } from "../controller";
 import { moveToast } from "./sidebar";
-import type {
-  SessionKind,
-  Settings,
-  StartupMode,
-  TerminalColors,
-  ThemeName,
-  ToolCheck,
-} from "../../shared/types";
-import { RELEASES_URL, type UpdateStatus } from "../../shared/updates";
+import type { SessionKind, ToolCheck } from "../../shared/types";
 import { changesPaneId } from "../../shared/paneContent";
 import type { DetectedIde } from "../../shared/ide";
 import { api } from "../api";
 import {
   addProjectFromFolder,
   app,
+  applyProjectFolder,
+  changeProjectFolder,
+  changeSessionFolder,
   confirmCloseSession,
+  openSessionFolder,
   createSession,
   defaultSessionName,
   dispatch,
@@ -68,9 +49,9 @@ import {
   markUnread,
   openProjectFolder,
   rememberColor,
-  previewSound,
 } from "../controller";
-import { CloseIcon, StatusIcon } from "./icons";
+import { StatusIcon } from "./icons";
+import { SettingsDialog } from "./settings";
 import {
   ColorDialog,
   ColorPicker,
@@ -570,7 +551,7 @@ function Highlight({ text, positions }: { text: string; positions: number[] }) {
 
 /**
  * El selector rápido. Con `sendFrom` es el de «Enviar su última respuesta a…»: lista solo las otras sesiones
- * de Claude a las que se les puede pegar ahora (despiertas) y, al elegir, les pega en vez de saltar.
+ * de Claude (las dormidas se despiertan al enviar) y, al elegir, les pega en vez de saltar.
  */
 function QuickOpen({ sendFrom }: { sendFrom?: string }) {
   const { state } = useStore(app);
@@ -682,8 +663,8 @@ function QuickOpen({ sendFrom }: { sendFrom?: string }) {
             <p class="quick-empty">
               {sendFrom
                 ? query
-                  ? "Ninguna sesión despierta se llama así."
-                  : "No hay otra sesión de Claude despierta a la que enviarla. Despierta una y vuelve a intentarlo."
+                  ? "Ninguna sesión de Claude se llama así."
+                  : "No hay otra sesión de Claude a la que enviarla."
                 : allSessions(state).length
                   ? "Ninguna sesión se llama así."
                   : "Aún no hay sesiones."}
@@ -696,1020 +677,6 @@ function QuickOpen({ sendFrom }: { sendFrom?: string }) {
 }
 
 /** Campo de ajustes: confirma al salir o con Enter. Un repintado no pisa lo que se está escribiendo. */
-function DraftInput(props: {
-  value: string | number;
-  type?: "number";
-  min?: number;
-  max?: number;
-  step?: number;
-  field?: string;
-  placeholder?: string;
-  onCommit(value: string): void;
-}) {
-  const { value, onCommit, field, ...rest } = props;
-  const [draft, setDraft] = useState(String(value));
-  const focused = useRef(false);
-  useEffect(() => {
-    if (!focused.current) setDraft(String(value));
-  }, [value]);
-  const commit = () => {
-    if (draft !== String(value)) onCommit(draft);
-  };
-  return (
-    <input
-      {...(rest as Record<string, unknown>)}
-      data-field={field}
-      value={draft}
-      onFocus={() => {
-        focused.current = true;
-      }}
-      onInput={(e) => setDraft(e.currentTarget.value)}
-      onBlur={() => {
-        focused.current = false;
-        commit();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          commit();
-        }
-      }}
-    />
-  );
-}
-
-function ShortcutRow({
-  id,
-  label,
-  keys,
-  note: outerNote,
-  onSet,
-}: {
-  id: string;
-  label: string;
-  keys: string;
-  note: string | undefined;
-  onSet(id: string, keys: string | null): void;
-}) {
-  const [capturing, setCapturing] = useState(false);
-  const [note, setNote] = useState("");
-  const def = SHORTCUTS.find((s) => s.id === id)!;
-  return (
-    <div class="shortcut">
-      <span class="shortcut-label">{label}</span>
-      {(note || outerNote) && (
-        <span class="shortcut-note">{note || outerNote}</span>
-      )}
-      <button
-        type="button"
-        class={`keycap${capturing ? " capturing" : ""}`}
-        onClick={() => {
-          setCapturing(true);
-          setNote("");
-        }}
-        onBlur={() => setCapturing(false)}
-        onKeyDown={(e) => {
-          if (!capturing) return;
-          if (e.key !== "Tab") {
-            e.preventDefault();
-            e.stopPropagation();
-          }
-          if (e.key === "Escape") {
-            setCapturing(false);
-            setNote("");
-            return;
-          }
-          if (e.key === "Tab") {
-            setCapturing(false);
-            setNote("");
-            return;
-          }
-          if (isModifierOnly(e)) return;
-          const combo = eventToKeys(e);
-          const problem = shortcutProblem(combo);
-          if (problem) {
-            setNote(problem);
-            return;
-          }
-          setNote("");
-          setCapturing(false);
-          onSet(id, combo);
-        }}
-      >
-        {capturing ? "Pulsa la combinación" : prettyKeys(keys)}
-      </button>
-      {keys !== def.defaultKeys && (
-        <button type="button" class="link" onClick={() => onSet(id, null)}>
-          Restaurar
-        </button>
-      )}
-    </div>
-  );
-}
-
-const SETTINGS_SECTIONS = [
-  ["look", "Apariencia"],
-  ["terminal", "Terminal"],
-  ["sessions", "Sesiones"],
-  ["claude", "Claude Code"],
-  ["updates", "Actualizaciones"],
-  ["news", "Novedades"],
-  ["changes", "Cambios"],
-  ["shortcuts", "Atajos"],
-] as const;
-
-/** "9 de noviembre de 2026", sin depender del idioma del sistema. */
-function formatDate(iso: string): string {
-  const months = [
-    "enero",
-    "febrero",
-    "marzo",
-    "abril",
-    "mayo",
-    "junio",
-    "julio",
-    "agosto",
-    "septiembre",
-    "octubre",
-    "noviembre",
-    "diciembre",
-  ];
-  const [y, mo, d] = iso.split("-").map(Number);
-  return `${d} de ${months[(mo ?? 1) - 1]} de ${y}`;
-}
-
-function updateMessage(status: UpdateStatus): string {
-  switch (status.state) {
-    case "off":
-      return "Esta copia es de desarrollo o de pruebas: no se conecta a nada.";
-    case "idle":
-      return "Todavía no se buscó desde que abriste Hilo.";
-    case "checking":
-      return "Buscando…";
-    case "current":
-      return "Estás al día: tienes la última versión.";
-    case "available":
-      return `Hay una versión nueva: ${status.version}. No se baja ni se instala nada hasta que lo pidas.`;
-    case "downloading":
-      return `Bajando la versión ${status.version}: ${status.percent} %.`;
-    case "ready":
-      return `La versión ${status.version} está lista. Al instalarla, Hilo se cierra, se actualiza sin mostrar pantallas y vuelve a abrirse solo. Tus sesiones vuelven con su conversación.`;
-    case "installing":
-      return `Cerrando las sesiones para instalar la versión ${status.version}…`;
-    case "error":
-      return status.message;
-  }
-}
-
-function UpdatesSection({
-  version,
-  checkOnStart,
-  onCheckOnStart,
-}: {
-  version: string;
-  checkOnStart: boolean;
-  onCheckOnStart(on: boolean): void;
-}) {
-  const status = useStore(view).update;
-  const [confirming, setConfirming] = useState(false);
-  const install = (force: boolean) =>
-    void api.updateInstall(force).then((r) => setConfirming(r.needsConfirm));
-  const busy =
-    status.state === "off" ||
-    status.state === "checking" ||
-    status.state === "downloading" ||
-    status.state === "ready" ||
-    status.state === "installing";
-  return (
-    <section class="settings-section" data-section="updates">
-      <h3>Actualizaciones</h3>
-      <p class="update-version">
-        Versión instalada:{" "}
-        <strong data-field="current-version">{version}</strong>
-      </p>
-      <label class="check">
-        <input
-          type="checkbox"
-          data-field="check-updates"
-          checked={checkOnStart}
-          onChange={(e) => onCheckOnStart(e.currentTarget.checked)}
-        />
-        Buscar una versión nueva cada vez que abro Hilo
-      </label>
-      <p
-        class={`update-status${status.state === "error" ? " warn" : ""}`}
-        data-field="update-status"
-        data-state={status.state}
-        role="status"
-      >
-        {updateMessage(status)}
-      </p>
-      {status.state === "downloading" && (
-        <progress
-          class="update-bar"
-          max={100}
-          value={status.percent}
-          aria-label="Progreso de la descarga"
-        />
-      )}
-      {confirming && status.state === "ready" ? (
-        <>
-          <p class="update-status warn" data-field="update-working">
-            Hay sesiones trabajando. Si actualizas ahora se interrumpen; después
-            vuelven con su conversación.
-          </p>
-          <div class="actions update-actions">
-            <button
-              type="button"
-              class="danger"
-              data-field="update-force"
-              onClick={() => install(true)}
-            >
-              Reiniciar de todos modos
-            </button>
-            <button
-              type="button"
-              data-field="update-wait"
-              onClick={() => setConfirming(false)}
-            >
-              Esperar
-            </button>
-          </div>
-        </>
-      ) : (
-        <div class="actions update-actions">
-          {status.state === "available" && (
-            <button
-              type="button"
-              class="primary"
-              data-field="update-download"
-              onClick={() => void api.updateDownload()}
-            >
-              Bajar la versión {status.version}
-            </button>
-          )}
-          {status.state === "ready" && (
-            <button
-              type="button"
-              class="primary"
-              data-field="update-install"
-              onClick={() => install(false)}
-            >
-              Reiniciar e instalar
-            </button>
-          )}
-          {status.state === "error" && status.phase === "download" && (
-            <button
-              type="button"
-              class="primary"
-              data-field="update-retry"
-              onClick={() => void api.updateDownload()}
-            >
-              Reintentar la descarga
-            </button>
-          )}
-          <button
-            type="button"
-            data-field="update-check"
-            disabled={busy}
-            onClick={() => void api.updateCheck()}
-          >
-            Buscar actualizaciones
-          </button>
-          {status.state === "error" && (
-            <button
-              type="button"
-              class="link"
-              data-field="update-releases"
-              onClick={() => api.openLink(RELEASES_URL)}
-            >
-              Abrir la página de versiones
-            </button>
-          )}
-        </div>
-      )}
-      <small class="update-note">
-        Es la única conexión de Hilo. Solo habla con GitHub para buscar y bajar
-        versiones, no envía datos tuyos y nunca instala sin preguntarte.
-      </small>
-    </section>
-  );
-}
-
-function SettingsDialog({
-  modal,
-}: {
-  modal: Extract<Modal, { type: "settings" }>;
-}) {
-  const { state, info } = useStore(app);
-  const s = state.settings;
-  const set = (patch: Partial<Settings>) =>
-    void dispatch({ type: "settings/set", patch });
-  const num = (value: string, min: number, max: number, fallback: number) => {
-    const n = Number(value);
-    return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : fallback;
-  };
-  const [conflicts, setConflicts] = useState<Record<string, string>>({});
-  const [claudeMissing, setClaudeMissing] = useState(false);
-  const [previewing, setPreviewing] = useState<string | null>(null);
-  const preview = useRef<{ key: string; stop(): void } | null>(null);
-  useEffect(() => () => preview.current?.stop(), []);
-  const [fontMissing, setFontMissing] = useState(false);
-  useEffect(() => {
-    let live = true;
-    if (s.claudePath)
-      void api
-        .pathExists(s.claudePath)
-        .then((ok) => live && setClaudeMissing(!ok));
-    else setClaudeMissing(false);
-    return () => {
-      live = false;
-    };
-  }, [s.claudePath]);
-  useEffect(() => {
-    setFontMissing(!document.fonts.check(`16px "${s.fontFamily}"`));
-  }, [s.fontFamily]);
-  const setShortcut = (id: string, keys: string | null) => {
-    const next = { ...s.shortcuts };
-    const notes: Record<string, string> = {};
-    if (keys === null) delete next[id];
-    else {
-      // Si otra acción la usaba, queda sin asignar y se avisa.
-      for (const def of SHORTCUTS) {
-        if (def.id !== id && (next[def.id] ?? def.defaultKeys) === keys) {
-          next[def.id] = "";
-          notes[id] = `Se quitó de «${def.label}»`;
-        }
-      }
-      next[id] = keys;
-    }
-    setConflicts(notes);
-    set({ shortcuts: next });
-  };
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  useEffect(() => titleRef.current?.focus(), []);
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const [section, setSection] = useState<string>(SETTINGS_SECTIONS[0]![0]);
-  useEffect(() => {
-    if (!modal.section) return;
-    setSection(modal.section);
-    bodyRef.current
-      ?.querySelector(`[data-section="${modal.section}"]`)
-      ?.scrollIntoView({ block: "start" });
-  }, [modal]);
-
-  return (
-    <Backdrop onClose={closeModal} labelledBy="settings-title">
-      <div class="settings">
-        <header class="settings-head">
-          <h2 id="settings-title" ref={titleRef} tabIndex={-1}>
-            Ajustes
-          </h2>
-          <button
-            class="icon-btn"
-            aria-label="Cerrar ajustes"
-            onClick={closeModal}
-          >
-            <CloseIcon />
-          </button>
-        </header>
-        <div class="settings-main">
-          <nav class="settings-nav" aria-label="Secciones de ajustes">
-            {SETTINGS_SECTIONS.map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                class={section === id ? "on" : ""}
-                aria-current={section === id ? "true" : undefined}
-                onClick={() => {
-                  setSection(id);
-                  bodyRef.current
-                    ?.querySelector(`[data-section="${id}"]`)
-                    ?.scrollIntoView({ block: "start" });
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
-          <div
-            ref={bodyRef}
-            class="settings-body"
-            onScroll={(e) => {
-              const area = e.currentTarget;
-              const top = area.getBoundingClientRect().top + 24;
-              let current: string = SETTINGS_SECTIONS[0]![0];
-              for (const [id] of SETTINGS_SECTIONS) {
-                const el = area.querySelector(`[data-section="${id}"]`);
-                if (el && el.getBoundingClientRect().top <= top) current = id;
-              }
-              // Al final de la lista, la última sección puede no llegar arriba.
-              if (area.scrollTop + area.clientHeight >= area.scrollHeight - 2)
-                current = SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1]![0];
-              setSection(current);
-            }}
-          >
-            <section class="settings-section" data-section="look">
-              <h3>Apariencia</h3>
-              <div class="field">
-                <span id="font-size-label">
-                  Tamaño de la letra en las terminales
-                </span>
-                <div class="stepper">
-                  <button
-                    type="button"
-                    aria-label="Letra más chica"
-                    onClick={() =>
-                      set({ fontSize: Math.max(9, s.fontSize - 1) })
-                    }
-                  >
-                    −
-                  </button>
-                  <DraftInput
-                    field="font-size"
-                    aria-labelledby="font-size-label"
-                    type="number"
-                    min={9}
-                    max={32}
-                    value={s.fontSize}
-                    onCommit={(v) =>
-                      set({ fontSize: num(v, 9, 32, s.fontSize) })
-                    }
-                  />
-                  <button
-                    type="button"
-                    aria-label="Letra más grande"
-                    onClick={() =>
-                      set({ fontSize: Math.min(32, s.fontSize + 1) })
-                    }
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-              <div
-                class="font-preview"
-                style={{
-                  fontFamily: `"${s.fontFamily}", "Cascadia Mono", "Hilo Mono", monospace`,
-                  fontSize: `${s.fontSize}px`,
-                  lineHeight: s.lineHeight,
-                }}
-              >
-                Así se ve el texto. 0123456789
-              </div>
-              <label class="field">
-                <span>Tamaño de toda la ventana</span>
-                <select
-                  data-field="app-zoom"
-                  value={s.appZoom}
-                  onChange={(e) =>
-                    set({ appZoom: Number(e.currentTarget.value) })
-                  }
-                >
-                  {[80, 90, 100, 110, 125, 150].map((z) => (
-                    <option key={z} value={z}>
-                      {z} %{z === 100 ? " (normal)" : ""}
-                    </option>
-                  ))}
-                </select>
-                <small>
-                  Agranda también la lista de sesiones, las pestañas y estos
-                  ajustes.
-                </small>
-              </label>
-              <div class="field-pair">
-                <label class="field">
-                  <span>Fuente</span>
-                  <DraftInput
-                    field="font"
-                    value={s.fontFamily}
-                    onCommit={(v) =>
-                      set({ fontFamily: v.trim() || "Cascadia Mono" })
-                    }
-                  />
-                  {fontMissing && (
-                    <small class="warn">
-                      No está instalada: se usa Cascadia Mono.
-                    </small>
-                  )}
-                </label>
-                <label class="field">
-                  <span>Interlineado</span>
-                  <DraftInput
-                    type="number"
-                    min={1}
-                    max={2}
-                    step={0.05}
-                    value={s.lineHeight}
-                    onCommit={(v) =>
-                      set({ lineHeight: num(v, 1, 2, s.lineHeight) })
-                    }
-                  />
-                </label>
-              </div>
-              <div class="field-pair">
-                <label class="field">
-                  <span>Tema</span>
-                  <select
-                    data-field="theme"
-                    value={s.theme}
-                    onChange={(e) =>
-                      set({ theme: e.currentTarget.value as ThemeName })
-                    }
-                  >
-                    <option value="dark">Oscuro</option>
-                    <option value="light">Claro</option>
-                  </select>
-                </label>
-                <label class="field">
-                  <span>Colores de la terminal</span>
-                  <select
-                    data-field="colors"
-                    value={s.terminalColors}
-                    onChange={(e) =>
-                      set({
-                        terminalColors: e.currentTarget.value as TerminalColors,
-                      })
-                    }
-                  >
-                    <option value="hilo">
-                      Los de Hilo, con mejor contraste
-                    </option>
-                    <option value="campbell">
-                      Los de Windows Terminal (Campbell)
-                    </option>
-                  </select>
-                </label>
-              </div>
-            </section>
-
-            <section class="settings-section" data-section="terminal">
-              <h3>Terminal y desplazamiento</h3>
-              <label class="check">
-                <input
-                  type="checkbox"
-                  data-field="scrollbar-always"
-                  checked={s.scrollbarAlways}
-                  onChange={(e) =>
-                    set({ scrollbarAlways: e.currentTarget.checked })
-                  }
-                />
-                Mostrar siempre la barra de desplazamiento, si hay historial
-              </label>
-              <label class="field">
-                <span>Velocidad con la rueda del ratón</span>
-                <div class="range-row">
-                  <input
-                    type="range"
-                    data-field="wheel-speed"
-                    min={25}
-                    max={300}
-                    step={25}
-                    value={s.wheelSpeed}
-                    onChange={(e) =>
-                      set({ wheelSpeed: Number(e.currentTarget.value) })
-                    }
-                  />
-                  <output>{s.wheelSpeed} %</output>
-                </div>
-              </label>
-              <label class="field">
-                <span>Velocidad con dos dedos en el touchpad</span>
-                <div class="range-row">
-                  <input
-                    type="range"
-                    data-field="touchpad-speed"
-                    min={10}
-                    max={100}
-                    step={5}
-                    value={s.touchpadSpeed}
-                    onChange={(e) =>
-                      set({ touchpadSpeed: Number(e.currentTarget.value) })
-                    }
-                  />
-                  <output>{s.touchpadSpeed} %</output>
-                </div>
-                <small>
-                  Si baja muy rápido, reduce este valor. Vale al momento, sin
-                  reiniciar.
-                </small>
-              </label>
-              <label class="field">
-                <span>Líneas de historial por terminal</span>
-                <DraftInput
-                  field="scrollback"
-                  type="number"
-                  min={500}
-                  max={100000}
-                  step={500}
-                  value={s.scrollback}
-                  onCommit={(v) =>
-                    set({ scrollback: num(v, 500, 100000, s.scrollback) })
-                  }
-                />
-                <small>
-                  Cada 3000 líneas usan unos 8 MB si la terminal está llena.
-                  {s.scrollback >= 20000
-                    ? ` Con ${s.scrollback} líneas, unos ${Math.round((s.scrollback / 3000) * 8)} MB por terminal.`
-                    : ""}
-                </small>
-              </label>
-              <label class="check">
-                <input
-                  type="checkbox"
-                  data-field="confirm-multiline"
-                  checked={s.confirmMultilinePaste}
-                  onChange={(e) =>
-                    set({ confirmMultilinePaste: e.currentTarget.checked })
-                  }
-                />
-                Avisar antes de pegar varias líneas en una terminal donde se
-                ejecutarían, como PowerShell
-              </label>
-            </section>
-
-            <section class="settings-section" data-section="sessions">
-              <h3>Sesiones</h3>
-              <label class="field">
-                <span>Al abrir Hilo</span>
-                <select
-                  data-field="startup"
-                  value={s.startup}
-                  onChange={(e) =>
-                    set({ startup: e.currentTarget.value as StartupMode })
-                  }
-                >
-                  <option value="restore">
-                    Encender las que dejé encendidas
-                  </option>
-                  <option value="asleep">Todas las sesiones dormidas</option>
-                  <option value="wakeLast">Despertar la última que usé</option>
-                  <option value="wakeAll">Despertar todas</option>
-                </select>
-              </label>
-              <label class="check">
-                <input
-                  type="checkbox"
-                  checked={s.wakeOnSelect}
-                  onChange={(e) =>
-                    set({ wakeOnSelect: e.currentTarget.checked })
-                  }
-                />
-                Despertar una sesión al seleccionarla
-              </label>
-              <label class="field">
-                <span>Dormir tras estos minutos sin actividad (0 = nunca)</span>
-                <DraftInput
-                  field="autosleep"
-                  type="number"
-                  min={0}
-                  max={1440}
-                  value={s.autoSleepMinutes}
-                  onCommit={(v) =>
-                    set({ autoSleepMinutes: num(v, 0, 1440, 0) })
-                  }
-                />
-                <small>
-                  Nunca duerme una sesión que trabaja, que te espera, sin leer o
-                  con procesos en segundo plano.
-                </small>
-              </label>
-              <label class="check">
-                <input
-                  type="checkbox"
-                  data-field="notifications"
-                  checked={s.notifications}
-                  onChange={(e) =>
-                    set({ notifications: e.currentTarget.checked })
-                  }
-                />
-                Avisar con una notificación de Windows si una sesión termina o
-                me espera mientras no la miro
-              </label>
-              <h4 class="settings-sub">Sonidos</h4>
-              {(
-                [
-                  ["soundDone", "Cuando termina"],
-                  [
-                    "soundWaiting",
-                    "Cuando te espera (un permiso o una pregunta)",
-                  ],
-                  ["soundError", "Cuando falla"],
-                ] as const
-              ).map(([key, label]) => (
-                <label class="field" key={key}>
-                  <span>{label}</span>
-                  <div class="field-row">
-                    <select
-                      data-field={key}
-                      value={s[key]}
-                      onChange={(e) =>
-                        set({ [key]: e.currentTarget.value as SoundChoice })
-                      }
-                    >
-                      <option value="none">Sin sonido</option>
-                      {SOUNDS.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      data-action={`preview-${key}`}
-                      disabled={s[key] === "none"}
-                      onClick={() => {
-                        // Se mira antes de detener: al detenerse, el aviso de fin ya vacía preview.
-                        const wasPlaying = preview.current?.key === key;
-                        preview.current?.stop();
-                        preview.current = null;
-                        setPreviewing(null);
-                        if (wasPlaying) return;
-                        const entry = { key, stop: () => undefined as void };
-                        preview.current = entry;
-                        setPreviewing(key);
-                        entry.stop = previewSound(s[key], () => {
-                          if (preview.current === entry) {
-                            preview.current = null;
-                            setPreviewing(null);
-                          }
-                        });
-                      }}
-                    >
-                      {previewing === key ? "Detener" : "Probar"}
-                    </button>
-                  </div>
-                </label>
-              ))}
-              <label class="field">
-                <span>Volumen: {s.soundVolume} %</span>
-                <input
-                  type="range"
-                  class="range"
-                  data-field="sound-volume"
-                  min={0}
-                  max={100}
-                  step={5}
-                  value={s.soundVolume}
-                  onChange={(e) => {
-                    set({ soundVolume: Number(e.currentTarget.value) });
-                    const first = [
-                      s.soundDone,
-                      s.soundWaiting,
-                      s.soundError,
-                    ].find((x) => x !== "none");
-                    if (first) setTimeout(() => previewSound(first), 50);
-                  }}
-                />
-              </label>
-              <label class="field">
-                <span>Duración de cada aviso</span>
-                <select
-                  data-field="sound-duration"
-                  value={String(s.soundDuration)}
-                  onChange={(e) =>
-                    set({ soundDuration: Number(e.currentTarget.value) })
-                  }
-                >
-                  {SOUND_DURATIONS.map((d) => (
-                    <option key={d} value={String(d)}>
-                      {d === 0
-                        ? "Una vez"
-                        : `Repetirlo seguido durante ${d} segundos`}
-                    </option>
-                  ))}
-                </select>
-                <small>
-                  Se corta apenas abres la sesión o le respondes. "Probar" la
-                  usa, y con un segundo clic se detiene.
-                </small>
-              </label>
-              <label class="field">
-                <span>Repetir</span>
-                <select
-                  data-field="sound-repeat"
-                  value={String(s.soundRepeat)}
-                  onChange={(e) =>
-                    set({ soundRepeat: Number(e.currentTarget.value) })
-                  }
-                >
-                  {SOUND_REPEATS.map((m) => (
-                    <option key={m} value={String(m)}>
-                      {m === 0
-                        ? "No repetir"
-                        : m === 1
-                          ? "Cada 1 minuto"
-                          : `Cada ${m} minutos`}
-                    </option>
-                  ))}
-                </select>
-                <small>
-                  Vuelve a sonar mientras nadie la atienda: hasta que la abras o
-                  le respondas.
-                </small>
-              </label>
-              <label class="check">
-                <input
-                  type="checkbox"
-                  data-field="sound-always"
-                  checked={s.soundAlways}
-                  onChange={(e) =>
-                    set({ soundAlways: e.currentTarget.checked })
-                  }
-                />
-                Sonar también si estoy mirando esa sesión
-              </label>
-              <label class="check">
-                <input
-                  type="checkbox"
-                  data-field="stale-marks"
-                  checked={s.staleMarks}
-                  onChange={(e) => set({ staleMarks: e.currentTarget.checked })}
-                />
-                Colorear las sesiones de Claude abiertas sin mensajes: amarillo
-                a la hora, naranja a las 5 horas y rojo al día
-              </label>
-            </section>
-
-            <section class="settings-section" data-section="claude">
-              <h3>Claude Code</h3>
-              <label class="field">
-                <span>Ruta de claude</span>
-                <div class="field-row">
-                  <DraftInput
-                    field="claude"
-                    value={s.claudePath}
-                    placeholder={info.claudePath ?? "No se encontró en el PATH"}
-                    onCommit={(v) => set({ claudePath: v.trim() })}
-                  />
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void api.pickFile().then((p) => {
-                        if (p) set({ claudePath: p });
-                      })
-                    }
-                  >
-                    Elegir
-                  </button>
-                </div>
-                <small>Déjala vacía para que Hilo la busque sola.</small>
-              </label>
-              {claudePathProblem(s.claudePath) ? (
-                <small class="warn block" data-warn="claude-path">
-                  {claudePathProblem(s.claudePath)} Mientras tanto, Hilo la
-                  ignora y busca claude por su cuenta.{" "}
-                  <button
-                    type="button"
-                    class="link"
-                    onClick={() => set({ claudePath: "" })}
-                  >
-                    Dejarla vacía
-                  </button>
-                </small>
-              ) : (
-                claudeMissing && (
-                  <small class="warn block">No existe ese archivo.</small>
-                )
-              )}
-              <div class="field-row setup-open">
-                <button
-                  type="button"
-                  onClick={() =>
-                    void api
-                      .toolsCheck()
-                      .then((tools) =>
-                        view.set({ modal: { type: "setup", tools } }),
-                      )
-                  }
-                >
-                  Ver requisitos
-                </button>
-              </div>
-              <label class="check">
-                <input
-                  type="checkbox"
-                  checked={s.useHooks}
-                  onChange={(e) => set({ useHooks: e.currentTarget.checked })}
-                />
-                Detectar el estado con hooks, solo en las sesiones de Hilo. Sin
-                esto el amarillo llega hasta 2 segundos tarde.
-              </label>
-              <label class="check">
-                <input
-                  type="checkbox"
-                  data-field="usage-meter"
-                  checked={s.usageMeter}
-                  disabled={!s.useHooks}
-                  onChange={(e) => set({ usageMeter: e.currentTarget.checked })}
-                />
-                Mostrar cuánto llevas usado de tu plan, en la barra lateral y
-                abajo en cada sesión. Reemplaza tu línea de estado de Claude,
-                solo en las sesiones de Hilo. Necesita los hooks y vale desde el
-                próximo despertar.
-              </label>
-              <label class="check">
-                <input
-                  type="checkbox"
-                  data-field="classic-renderer"
-                  checked={s.classicRenderer}
-                  onChange={(e) =>
-                    set({ classicRenderer: e.currentTarget.checked })
-                  }
-                />
-                Usar la pantalla clásica de Claude (como /tui default), para que
-                el historial se desplace con la rueda y la barra de Hilo. Vale
-                desde el próximo despertar.
-              </label>
-              <label class="check">
-                <input
-                  type="checkbox"
-                  data-field="skip-permissions"
-                  checked={s.skipPermissions}
-                  onChange={(e) =>
-                    set({ skipPermissions: e.currentTarget.checked })
-                  }
-                />
-                Abrir Claude sin pedir permisos
-                (--dangerously-skip-permissions). Claude ejecutaría todo sin
-                preguntar: déjalo apagado si no sabes lo que hace. Vale desde el
-                próximo despertar.
-              </label>
-            </section>
-
-            <UpdatesSection
-              version={info.version}
-              checkOnStart={s.checkUpdatesOnStart}
-              onCheckOnStart={(on) => set({ checkUpdatesOnStart: on })}
-            />
-            <section class="settings-section" data-section="news">
-              <h3>Novedades</h3>
-              {CHANGELOG.map((entry) => (
-                <div
-                  class={`news-entry${entry.version === info.version ? " current" : ""}`}
-                  key={entry.version}
-                  data-version={entry.version}
-                >
-                  <h4>
-                    {entry.version}
-                    {entry.version === info.version && (
-                      <span class="news-badge">la que tienes</span>
-                    )}
-                    <span class="news-date">{formatDate(entry.date)}</span>
-                  </h4>
-                  <ul>
-                    {entry.items.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </section>
-            <section class="settings-section" data-section="changes">
-              <h3>Panel de cambios</h3>
-              <label class="check">
-                <input
-                  type="checkbox"
-                  data-field="changes-signs"
-                  checked={s.changesShowSigns}
-                  onChange={(e) =>
-                    set({ changesShowSigns: e.currentTarget.checked })
-                  }
-                />
-                Mostrar + y − en los cambios, además del color de fondo
-              </label>
-            </section>
-
-            <section class="settings-section" data-section="shortcuts">
-              <h3>Atajos</h3>
-              <div class="shortcuts">
-                {SHORTCUTS.filter((d) => !/^go[2-9]$/.test(d.id)).map((d) => (
-                  <ShortcutRow
-                    key={d.id}
-                    id={d.id}
-                    label={
-                      d.id === "go1"
-                        ? "Ir a la sesión 1 (de la 2 a la 9, con Ctrl y su número)"
-                        : d.label
-                    }
-                    keys={s.shortcuts[d.id] ?? d.defaultKeys}
-                    note={conflicts[d.id]}
-                    onSet={setShortcut}
-                  />
-                ))}
-              </div>
-              <p class="about">
-                Hilo {info.version}. Sin telemetría. Solo se conecta a GitHub
-                para las actualizaciones.
-              </p>
-            </section>
-          </div>
-        </div>
-      </div>
-    </Backdrop>
-  );
-}
-
 function CopyCommand({ command }: { command: string }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -1833,6 +800,91 @@ function SetupGuide({ initial }: { initial: ToolCheck }) {
   );
 }
 
+/**
+ * Cambiar la carpeta de un proyecto (#7). La carpeta nueva ya está elegida y guardada en el proceso principal: aquí
+ * solo se ve, y lo único que sale de este diálogo es el código de un solo uso y qué sesiones se mueven.
+ */
+function RelocateDialog({ modal }: { modal: Extract<Modal, { type: "relocate" }> }) {
+  const { state } = useStore(app);
+  const project = state.projects.find((p) => p.id === modal.projectId);
+  const { pick } = modal;
+  // Con «mover también» marcado por defecto, como decidió el dueño.
+  const [chosen, setChosen] = useState(() => new Set(pick.sessions.map((s) => s.id)));
+  const ok = useRef<HTMLButtonElement>(null);
+  useEffect(() => ok.current?.focus(), []);
+  if (!project) return null;
+  const toggle = (id: string) => {
+    const next = new Set(chosen);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setChosen(next);
+  };
+  const apply = () => {
+    closeModal();
+    void applyProjectFolder(project.id, pick.token, [...chosen]);
+  };
+  return (
+    <Backdrop onClose={closeModal} labelledBy="relocate-title">
+      <h2 id="relocate-title">Cambiar la carpeta de «{project.name}»</h2>
+      <div class="relocate-paths" data-relocate="paths">
+        <span class="relocate-label">Antes</span>
+        <code title={pick.from}>{pick.from}</code>
+        <span class="relocate-label">Ahora</span>
+        <code title={pick.to}>{pick.to}</code>
+      </div>
+      {pick.sessions.length > 0 ? (
+        <>
+          <p class="dialog-body">
+            Estas sesiones estaban en la carpeta de antes o dentro de ella.
+            Marca las que se mueven también: seguirán su conversación desde la
+            carpeta nueva.
+          </p>
+          <div class="relocate-list" role="group" aria-label="Sesiones a mover">
+            {pick.sessions.map((s) => (
+              <label key={s.id} class="check relocate-item" data-relocate-session={s.id}>
+                <input
+                  type="checkbox"
+                  checked={chosen.has(s.id)}
+                  onChange={() => toggle(s.id)}
+                />
+                <span class="relocate-name">
+                  {s.name}
+                  {s.sub && <small title="Su subcarpeta"> · {s.sub}</small>}
+                </span>
+                {!s.exists && (
+                  <span class="relocate-gone" data-relocate-gone>
+                    su carpeta ya no existe
+                  </span>
+                )}
+              </label>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p class="dialog-body">
+          Ninguna sesión de este proyecto trabaja en la carpeta de antes, así que
+          solo cambia la carpeta del proyecto.
+        </p>
+      )}
+      {pick.outside > 0 && (
+        <p class="dialog-body" data-relocate="outside">
+          {pick.outside === 1
+            ? "Otra sesión trabaja en una carpeta distinta y no se toca."
+            : `Otras ${pick.outside} sesiones trabajan en carpetas distintas y no se tocan.`}
+          {pick.outsideMissing > 0 &&
+            ` ${pick.outsideMissing === 1 ? "A una" : `A ${pick.outsideMissing}`} no se le encuentra la carpeta: se arregla con «Cambiar carpeta…» en su menú.`}
+        </p>
+      )}
+      <div class="actions">
+        <button onClick={closeModal}>Cancelar</button>
+        <button ref={ok} class="primary" data-confirm="ok" onClick={apply}>
+          Cambiar carpeta
+        </button>
+      </div>
+    </Backdrop>
+  );
+}
+
 export function Modals() {
   const v = useStore(view);
   const m = v.modal;
@@ -1851,6 +903,8 @@ export function Modals() {
       return <SetupGuide initial={m.tools} />;
     case "ide":
       return <IdeDialog modal={m} />;
+    case "relocate":
+      return <RelocateDialog modal={m} />;
     case "settings":
       return <SettingsDialog modal={m} />;
     case "color":
@@ -1956,7 +1010,7 @@ export function ContextMenu() {
               void copyLastMessage(session.id);
             }}
           >
-            Copiar el último mensaje <kbd>{keysOf("copyLastMessage")}</kbd>
+            Copiar respuesta <kbd>{keysOf("copyLastMessage")}</kbd>
           </button>
         )}
         {session.kind === "claude" && (
@@ -2004,6 +1058,28 @@ export function ContextMenu() {
           }
         >
           {session.note ? "Editar la nota…" : "Dejar una nota…"}
+        </button>
+        <button
+          role="menuitem"
+          data-action="open-session-folder"
+          title={session.cwd}
+          onClick={() => {
+            close();
+            void openSessionFolder(session.id);
+          }}
+        >
+          Abrir su carpeta
+        </button>
+        <button
+          role="menuitem"
+          data-action="change-session-folder"
+          title={`Ahora: ${session.cwd}`}
+          onClick={() => {
+            close();
+            void changeSessionFolder(session.id);
+          }}
+        >
+          Cambiar carpeta…
         </button>
         {status === "asleep" ? (
           <button
@@ -2217,6 +1293,16 @@ export function ContextMenu() {
         }}
       >
         Abrir la carpeta
+      </button>
+      <button
+        role="menuitem"
+        data-action="menu-change-folder"
+        onClick={() => {
+          close();
+          void changeProjectFolder(project.id);
+        }}
+      >
+        Cambiar carpeta…
       </button>
       <button
         role="menuitem"

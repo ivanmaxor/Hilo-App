@@ -21,6 +21,8 @@ import {
   useStore,
   view,
   subagentsOf,
+  headOf,
+  sinceOf,
 } from '../controller';
 import { Chevron, FolderIcon, GearIcon, MoreIcon, NoteIcon, PanelIcon, PlusIcon, ShellMark, StatusIcon, SubagentsBadge, subagentsLabel } from './icons';
 import { UsageMeter } from './usage';
@@ -101,6 +103,28 @@ export function moveToast(session: SessionRecord, target: ProjectRecord, samePro
   }
 }
 
+/** Cuánto lleva en el estado, redondeado hacia arriba como el resto de la app (formatSpan). */
+export function sinceText(now: number, since: number): string {
+  return now - since < 60_000 ? 'ahora' : formatSpan(now - since);
+}
+
+/** Rama y tiempo en el estado, en letra chica. Es lo único que se repinta cada minuto: la fila no se toca. */
+function RowMeta({ id }: { id: string }) {
+  const { now } = useStore(clock);
+  const head = headOf(id);
+  const since = sinceOf(id);
+  return (
+    <span class="row-meta" data-meta={id}>
+      {head && (
+        <span class={`branch${head.kind === 'detached' ? ' detached' : ''}`} data-branch={head.name}>
+          {head.kind === 'detached' ? `(${head.name})` : head.name}
+        </span>
+      )}
+      {since !== undefined && <span class="since">{sinceText(now, since)}</span>}
+    </span>
+  );
+}
+
 function SessionRow({ session, project, index, globalIndex }: { session: SessionRecord; project: ProjectRecord; index: number; globalIndex: number }) {
   const { state } = useStore(app);
   const v = useStore(view);
@@ -114,14 +138,19 @@ function SessionRow({ session, project, index, globalIndex }: { session: Session
   const { now } = useStore(clock);
   const stale = staleClass(session);
   const lastMessage = session.kind === 'claude' && session.lastActiveAt ? `\nÚltimo mensaje hace ${formatSpan(now - session.lastActiveAt)}` : '';
+  const head = headOf(session.id);
+  const since = sinceOf(session.id);
+  const hasMeta = !renaming && (head !== undefined || since !== undefined);
+  const stateTime = since !== undefined ? ` desde hace ${now - since < 60_000 ? 'menos de 1 min' : formatSpan(now - since)}` : '';
+  const branchLine = head ? `\n${head.kind === 'detached' ? 'Commit suelto' : 'Rama'}: ${head.name}` : '';
 
   return (
     <div
-      class={`row${active ? ' active' : ''}${open && !active ? ' open' : ''}${unread ? ' unread' : ''}${stale}${status === 'asleep' ? ' dim' : ''}${drop ? ` drop-${drop}` : ''}`}
+      class={`row${hasMeta ? ' has-meta' : ''}${active ? ' active' : ''}${open && !active ? ' open' : ''}${unread ? ' unread' : ''}${stale}${status === 'asleep' ? ' dim' : ''}${drop ? ` drop-${drop}` : ''}`}
       style={session.color ? { '--seg': session.color } : undefined}
       data-session={session.id}
       draggable={!renaming}
-      title={`${session.name}\n${STATUS_LABEL[status]}${subagents ? `, ${subagentsLabel(subagents)}` : ''}${session.unread ? ', marcada como no leída' : ''}${lastMessage}\n${session.cwd}${session.note ? `\n\nNota: ${session.note}` : ''}`}
+      title={`${session.name}\n${STATUS_LABEL[status]}${stateTime}${subagents ? `, ${subagentsLabel(subagents)}` : ''}${session.unread ? ', marcada como no leída' : ''}${lastMessage}${branchLine}\n${session.cwd}${session.note ? `\n\nNota: ${session.note}` : ''}`}
       onClick={() => void selectSession(session.id, { delayWake: true })}
       onDblClick={(e) => {
         e.preventDefault();
@@ -169,7 +198,10 @@ function SessionRow({ session, project, index, globalIndex }: { session: Session
           }}
         />
       ) : (
-        <span class="name">{session.name}</span>
+        <span class="row-text">
+          <span class="name">{session.name}</span>
+          {hasMeta && <RowMeta id={session.id} />}
+        </span>
       )}
       {session.note && <NoteIcon />}
       {session.kind === 'shell' && <ShellMark />}

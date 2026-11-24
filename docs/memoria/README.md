@@ -9,6 +9,7 @@ Lo que una sesión de Claude Code (o una persona) necesita saber para trabajar e
 | [colaboracion.md](colaboracion.md) | Cómo se trabaja: Issues, ramas, PR, revisiones, versiones y privacidad | Cuando cambia el flujo |
 | [roadmap.md](roadmap.md) | Ideas pendientes, propuestas y lo que se descartó, con su porqué | Al proponer o descartar algo |
 | [sesiones/](sesiones/) | Un archivo por sesión: fecha, quién, qué se hizo, commits y lo que quedó pendiente | **Al terminar cada sesión** |
+| [bienvenida.md](bienvenida.md) | Pasos para sumarse: GitHub, clonar, correr la app y las pruebas, y el primer aporte | Cuando cambian los requisitos |
 | [../DECISIONES.md](../DECISIONES.md) | Cada decisión de diseño (D1, D2…) con su porqué | Con cada decisión nueva |
 
 ## Al empezar una sesión

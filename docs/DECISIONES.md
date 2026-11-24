@@ -283,11 +283,13 @@ Se lee de la conversación que Claude guarda (`~/.claude/projects/<carpeta>/<ses
 
 Es un archivo interno de Claude Code, sin contrato. Si cambia su formato, el botón avisa que no hay mensaje en vez de copiar algo equivocado.
 
-**Extensión: «Enviar su última respuesta a…» (propuesta, sin aprobar).** Clic derecho en una sesión de Claude > "Enviar su última respuesta a…" abre el selector rápido (el mismo de "Saltar a una sesión") con las demás sesiones de Claude **despiertas**. Al elegir, Hilo pega ahí el mensaje y deja esa sesión a la vista, sin Enter, para revisarlo antes de enviar.
+**Extensión: «Enviar su última respuesta a…» (propuesta, sin aprobar).** Clic derecho en una sesión de Claude > "Enviar su última respuesta a…" abre el selector rápido (el mismo de "Saltar a una sesión") con las demás sesiones de Claude. Al elegir, Hilo despierta la sesión si estaba dormida, pega ahí el mensaje y la deja a la vista, sin Enter, para revisarlo antes de enviar.
 - La lectura es la misma de D26 (`session:lastMessage`, ahora con `forSend` para el encabezado), solo al pedirlo: no se duplica ni se lee nada más. El texto va al terminal destino, no pasa por el portapapeles.
-- Formato: `De «Nombre»:`, una línea en blanco y el mensaje (`formatSentMessage`). Entra por `terminals.pasteInto(id, texto)`, el mismo camino de pegar: espera a que Claude atienda, `sanitizePaste()` y `term.paste()`.
-- Una sesión dormida no se despierta para esto, y una que espera una respuesta tuya (permiso o pregunta) tampoco recibe: sale un aviso (`replyTargetProblem`). No hay atajo de teclado.
-- Alternativas que se dejaron: (a) despertar el destino dormido (descartado: arrancar un Claude es lento y gasta; se avisa), (b) submenú dentro del menú contextual (un selector con búsqueda sirve mejor con muchas sesiones), (c) enviar con Enter (descartado por el pedido: se revisa antes), (d) un atajo propio, (e) permitir también PowerShell como destino. Decide el dueño.
+- Formato: el mismo de «Copiar respuesta» (`formatCopiedMessage`) con `De «Nombre»` de encabezado: `De «Nombre»:`, una línea en blanco y el mensaje (`formatSentMessage`). Entra por `terminals.pasteTextInto(id, texto)`, que es el único `paste(entry, given?)`: espera a que Claude atienda, `sanitizePaste()` y `term.paste()`, y respeta el detector de claves (#30) y la confirmación de varias líneas. Devuelve si se pegó: el aviso «Se pegó…» solo sale si fue así (la persona pudo cancelar el diálogo de una clave).
+- Un destino dormido se despierta antes de pegar (`paste()` espera el despertar); si al despertar Claude pregunta algo (confianza, permiso), no se pega. Una que espera una respuesta tuya (permiso o pregunta) tampoco recibe: sale un aviso (`replyTargetProblem`).
+- Solo sesiones de Claude: PowerShell no es destino, porque es una respuesta de Claude para otro Claude. No hay atajo de teclado por ahora.
+- Alternativas que se dejaron: (a) submenú dentro del menú contextual (un selector con búsqueda sirve mejor con muchas sesiones), (b) enviar con Enter (descartado por el pedido: se revisa antes), (c) un atajo propio, (d) no despertar al destino dormido y avisar. Decidido por el dueño: despertar sí, atajo no, PowerShell no, línea en blanco como «Copiar respuesta».
+- Cuando se junte con el resumen del día: su selector `QuickOpen` debe tener `const command = !sendFrom && ...`, para que el modo de enviar no trate el texto como un comando.
 
 ## D27. Novedades dentro de la app
 
@@ -345,3 +347,43 @@ Por eso **este repo es la única fuente de verdad**, y el historial privado qued
 - **Versiones de prueba:** `x.y.z-rc.N` se publica como pre-release. El actualizador no la ofrece (`allowPrerelease = false`) ni la instala (`isStableVersion`), así que a los usuarios no les llega.
 - **Riesgo que queda:** en un repo de cuenta personal, un colaborador tiene escritura completa, y eso incluye editar los archivos de una Release ya publicada. Las actualizaciones no van firmadas: la protección es la confianza hasta que se firme `latest.yml` (ver `docs/memoria/roadmap.md`).
 - **Commits sin firmas de IA:** por decisión del dueño, desde esta fecha.
+
+## D34. Ajustes por módulos, sonido propio y avisos de uso
+
+Pedidos del dueño (#15, #12 y #8).
+
+- **Ajustes** (`src/renderer/ui/settings.tsx`): un módulo a la vez en vez de una sola lista larga, con un buscador que filtra las opciones de todos los módulos (cada fila se esconde sola si no coincide) y "Restablecer este módulo", con confirmación en la misma pantalla para no cerrar el diálogo. Salieron de `dialogs.tsx`, así los cambios en menús y diálogos no chocan con los de Ajustes. El módulo nuevo **Avisos** junta notificaciones, sonidos, el sonido propio y los avisos de uso. En ventanas angostas, los módulos pasan a una fila arriba.
+- **Sonido propio**: la ruta sale del diálogo nativo en el proceso principal, que copia el archivo a `<datos>/sonidos/propio.<ext>` (mp3, wav u ogg, hasta 2 MB). El renderer nunca recibe una ruta: pide los bytes por IPC y los decodifica con Web Audio. Cada pasada suena hasta 15 s, con el mismo volumen general que los sintetizados. Si no se puede decodificar, suena la gota y se avisa. Al reemplazarlo, el nuevo se copia antes de borrar el anterior: si la copia falla, sigue el que había.
+- **Avisos de uso**: el proceso principal recibe cada lectura del medidor (D25, D29) y decide con `dueUsageAlerts` (`src/shared/usageAlerts.ts`) qué umbral avisar: el más alto cruzado, una vez por ventana (la ventana se identifica por su hora de renovación, redondeada al minuto). Activar un umbral menor que uno ya avisado no avisa. Solo se revisa cuando el renderer avisó que escucha (`usage:listen`), para que un aviso no quede marcado sin haberse mostrado. Lo ya avisado se guarda en `<datos>/avisos-uso.json`, para no repetir al reabrir. La notificación sale del proceso principal y el sonido y el aviso en pantalla, del renderer. No agrega lecturas ni conexiones.
+
+## D35. Rutas clicables en la terminal
+
+Pedido del dueño (#10): las rutas que escribe Claude se subrayan; un clic las muestra en el Explorador y Ctrl+clic las abre en el IDE del proyecto. Además, cada sesión tiene su botón para abrir su carpeta.
+
+- **Qué se detecta** (`src/shared/pathLinks.ts`): rutas relativas con `/` o `\`, absolutas con letra de unidad (también `/c/...`), nombres sueltos con extensión y la mención `@ruta` de Claude, con `:línea` o `#Llínea` detrás. Una ruta absoluta puede tener espacios: se prueban las palabras siguientes y gana la más larga que existe. No se toman enlaces web, rutas de red, opciones ni versiones. Se unen las filas que xterm partió por ancho; si un programa parte la ruta en dos líneas por su cuenta, no se une.
+- **Quién decide** (`src/main/pathOpen.ts`): el renderer manda el texto y el id de la sesión. El proceso principal resuelve desde la carpeta guardada de la sesión y solo mira si existe y si es carpeta (`stat`, con 1,5 s de tope); no lee el archivo. Rechaza rutas de red (`\\servidor`, `//`, `\\?\`), dispositivos (`CON`, `NUL`…), flujos alternativos (`a.txt:x`) y las rutas relativas de una sesión que trabaja en una carpeta de red: mirarlas sería una conexión. Una unidad de red con letra se mira como cualquier disco, porque la configuró la persona.
+- **Qué abre**: una carpeta, con `openPath`; un archivo se marca con `showItemInFolder` y nunca se abre con `openPath`, que ejecutaría un `.exe` o un `.bat`. Ctrl+clic usa el camino del panel Cambios: la ruta relativa al proyecto, validada con `checkRelativePath` y `resolveInside`. Fuera del proyecto, se muestra en el Explorador.
+- **Enlaces `file://`** (OSC 8) van por el mismo camino. Los enlaces web siguen pidiendo Ctrl+clic.
+- **Sin red ni lecturas nuevas**: solo `stat` sobre rutas locales que ya están en la pantalla. Lo preguntado se recuerda 15 s en el renderer, porque el ratón pasa muchas veces por la misma línea.
+
+## D36. Actualizaciones firmadas
+
+Pedido del dueño (#4). Hasta la 1.3.9 la única comprobación era el sha512 de `latest.yml` por HTTPS: quien pudiera editar una Release podía cambiar lo que reciben los usuarios. Firmar con un certificado de Windows cuesta dinero; esto es gratis.
+
+- **Qué se firma** (`src/shared/updateSignature.ts`): con Ed25519, el texto `hilo-update-v1`, la versión, el nombre del instalador y su sha512, uno por línea. Va el sha512 del archivo, así que un `latest.yml` cambiado que apunte a otro instalador no calza, y con la versión y el nombre, así que no sirve la firma de una versión vieja.
+- **Quién firma:** `scripts/publish-release.mjs --key <clave privada>`, con `scripts/update-signature.mjs`. Sube `Hilo-Setup-x.y.z.exe.sig` junto al instalador. No firma con una clave que esté dentro del repo, ni con una que Hilo no acepte: esa versión no se podría instalar.
+- **Quién verifica** (`src/main/updater.ts`): después de bajar, Hilo baja la firma por la misma sesión endurecida (D19: solo los hosts de GitHub, sin cookies), calcula el sha512 de lo bajado y la verifica. Sin firma o con una que no calza, borra lo bajado y no ofrece instalar. Justo antes de instalar vuelve a calcular el sha512: si el archivo cambió desde que se verificó, no lo lanza.
+- **Dos claves:** la principal y una de reserva. Cualquiera de las dos sirve, así que perder una no deja a nadie sin actualizaciones; la de reserva se guarda aparte. Las privadas están en la carpeta privada del dueño, nunca en el repo. Cambiar las claves es sacar una versión con la lista nueva, firmada con una de las viejas.
+- **Transición:** la 1.3.x no verifica nada, así que se actualiza a la primera versión que verifica como siempre. Desde ahí, toda versión tiene que ir firmada.
+- **Pruebas:** contra el servidor de pruebas de esta máquina (modo `local`, solo en pruebas) Hilo acepta solo la clave que da la prueba en `HILO_TEST_UPDATE_KEY`, nunca junto a las reales.
+- **Lo que no cubre:** si alguien obtiene una clave privada, puede firmar. Por eso viven fuera del repo y fuera de GitHub.
+
+## D37. Cambiar la carpeta de un proyecto o de una sesión
+
+Decisión del dueño (#7): «Cambiar carpeta…» en el clic derecho del proyecto y de cada sesión. Como Claude retoma por id desde cualquier carpeta (#6, #20), no se mueve ni se copia el historial.
+
+- **La ruta nunca viene del renderer.** Para una sesión suelta, `session:changeFolder(id)` abre el diálogo de Windows en el proceso principal. Para un proyecto son dos pasos: `project:pickFolder(id)` abre el diálogo, comprueba que la carpeta existe, **guarda la ruta en el proceso principal** con un código de un solo uso y devuelve el código, la ruta (solo para mostrarla) y las sesiones afectadas; `project:applyFolder(id, código, ids)` canjea el código. Un código inventado, ya usado o de otro proyecto no hace nada, y los ids que no sean del proyecto o no estuvieran dentro de la carpeta vieja se ignoran. `project/relocate` y `session/cwd` solo las dispara el proceso principal: no están en la lista blanca.
+- **«Dentro de la vieja»** (`src/shared/folderPaths.ts`, texto puro): se compara por segmentos, sin distinguir mayúsculas, con `\` o `/`; `C:\Proy` no contiene a `C:\Proyecto`, y valen la raíz de unidad y las rutas UNC. La carpeta de una sesión que estaba dentro se traslada con su subcarpeta (`C:\Viejo\src` pasa a `D:\Nuevo\src`); si esa subcarpeta no existe en la nueva, la sesión queda en la raíz del proyecto y se avisa.
+- **Atómico:** `project/relocate` cambia el `path` y los `cwd` en una sola acción del reducer. Las sesiones de otra carpeta no se tocan, y la nueva carpeta no puede ser la de otro proyecto (se avisa y no se duplica).
+- **Sesión despierta:** sigue corriendo en su carpeta vieja hasta que se duerma y despierte; Hilo avisa y no la apaga. Una dormida retoma por id desde la nueva. Una que no arrancaba por su carpeta inexistente vuelve a dormida (su panel de «carpeta inexistente» deja de valer); si se cambia desde su propio menú, se despierta, como hace su panel.
+- **Carpetas de red:** no se comprueban con `stat` (una caída congelaría la respuesta), igual que al lanzar una sesión.
