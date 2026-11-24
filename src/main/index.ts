@@ -1,16 +1,21 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, screen, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, screen, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
 import { checkTools } from './tools';
 import type { ToolCheck } from '../shared/types';
 import { mkdirSync } from 'node:fs';
-import { access } from 'node:fs/promises';
+import { access, stat } from 'node:fs/promises';
 import { release } from 'node:os';
 import { join } from 'node:path';
 import { STATUS_LABEL } from '../shared/statusMachine';
-import { soundFor } from '../shared/sounds';
+import { CUSTOM_SOUND, soundFor } from '../shared/sounds';
+import { BADGE_SCALE_FACTOR, BADGE_SIZE, badgeDescription, badgeLabel, renderBadge, attentionCount } from '../shared/taskbar';
+import { DEFAULT_SETTINGS } from '../shared/defaults';
+import { formatSpan, type PlanUsage } from '../shared/usage';
+import { CustomSound } from './customSound';
+import { UsageAlerter } from './usageAlerter';
 import { findSession } from '../shared/reducer';
-import { isSafeId, isValidAction, sanitizeSettings } from '../shared/validate';
+import { isPath, isSafeId, isValidAction, sanitizeSettings } from '../shared/validate';
 import { ideName, isValidIdePath, type DetectedIde, type IdeOpenResult } from '../shared/ide';
-import type { Action, AppInfo, PersistedState, SessionRecord, SessionStatus, WindowBounds } from '../shared/types';
+import type { Action, AppInfo, PersistedState, SessionRecord, SessionStatus, Settings, WindowBounds } from '../shared/types';
 import { resolveClaude } from './claude';
 import { createClipboard } from './clipboard';
 import { fileDiff, listChanges, resolveInside } from './git';
@@ -18,6 +23,7 @@ import { detectIdes, ideRootsFromEnv, launchIde } from './ide';
 import { installSharedConout } from './pty/sharedConout';
 import { APP_ORIGIN, applyNetworkSwitches, hardenSession, hardenWebContents, installEditMenu, openExternalSafe, registerAppScheme, serveRenderer } from './security';
 import { SessionController } from './sessions';
+import { isDirectory, resolveTerminalPath } from './pathOpen';
 import { Store } from './store';
 import { UpdateService } from './updater';
 import { resolveUpdateMode } from '../shared/updates';
@@ -47,6 +53,11 @@ const store = new Store(dataDir);
 store.onSaveError = (message) => send('app:notice', message);
 const clip = createClipboard();
 let win: BrowserWindow | null = null;
+/**
+ * El renderer ya escucha los avisos de uso (#8). Antes de eso un aviso se perdería y quedaría marcado como
+ * avisado; se revisa cuando avisa que escucha, y vuelve a false si la interfaz se recarga.
+ */
+let usageListening = false;
 let quitting = false;
 let crashNotice: string | null = null;
 
@@ -60,7 +71,41 @@ const NOTIFY_TEXT: Partial<Record<SessionStatus, string>> = {
   error: 'Terminó con error',
 };
 
-const sentNotifications: { id: string; name: string; status: SessionStatus; shown?: boolean; failed?: string }[] = [];
+const sentNotifications: { id: string; name: string; status: SessionStatus | 'usage'; body?: string; shown?: boolean; failed?: string }[] = [];
+
+/** Lo que se le pidió a la barra de tareas, para las pruebas (el aviso real no se puede mirar desde fuera). */
+const taskbarCalls: { overlays: ({ label: string; description: string } | null)[]; flashes: boolean[] } = { overlays: [], flashes: [] };
+/** En pruebas el foco lo manda el gancho `__hilo.focus`: la ventana oculta no tiene foco real. */
+let testFocused = true;
+let overlayKey = '';
+
+function windowHasFocus(): boolean {
+  return isTest ? testFocused : !!win && !win.isDestroyed() && win.isFocused();
+}
+
+function setFlash(on: boolean): void {
+  if (isTest) taskbarCalls.flashes.push(on);
+  if (win && !win.isDestroyed()) win.flashFrame(on);
+}
+
+/** Círculo con las sesiones que necesitan tu atención sobre el ícono de la barra de tareas. Solo se vuelve a pedir si cambia. */
+function updateTaskbarOverlay(count: number): void {
+  if (!win || win.isDestroyed()) return;
+  const label = badgeLabel(count);
+  const description = badgeDescription(count);
+  const key = `${label}|${description}`;
+  if (key === overlayKey) return;
+  overlayKey = key;
+  const pixels = renderBadge(label);
+  if (!pixels) {
+    if (isTest) taskbarCalls.overlays.push(null);
+    win.setOverlayIcon(null, '');
+    return;
+  }
+  if (isTest) taskbarCalls.overlays.push({ label, description });
+  const icon = nativeImage.createFromBitmap(Buffer.from(pixels), { width: BADGE_SIZE, height: BADGE_SIZE, scaleFactor: BADGE_SCALE_FACTOR });
+  win.setOverlayIcon(icon, description);
+}
 
 /** Sin una referencia, el recolector puede llevarse la notificación y su clic. */
 const liveNotifications = new Set<Notification>();
@@ -74,11 +119,51 @@ function focusSession(id: string): void {
   send('session:focus', id);
 }
 
+function showWindow(): void {
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+
+/** Cambiar ajustes desde el proceso principal, con la misma limpieza que los del renderer. */
+function patchSettings(patch: Partial<Settings>): void {
+  const current = store.get().settings;
+  store.dispatch({ type: 'settings/set', patch: sanitizeSettings({ ...current, ...patch }, current) });
+}
+
+const customSound = new CustomSound(dataDir);
+
+/** Avisos de uso del plan (#8): la notificación sale de aquí, y el sonido y el aviso en pantalla, del renderer. */
+const usageAlerter = new UsageAlerter(dataDir, () => store.get().settings, (alert) => {
+  const settings = store.get().settings;
+  const what = alert.window === 'session' ? 'de tu sesión de 5 horas' : 'de tu semana';
+  const body = `Llevas el ${Math.round(alert.used)} % ${what}. Se renueva en ${formatSpan(alert.resetsAt - Date.now())}.`;
+  send('usage:alert', { window: alert.window, threshold: alert.threshold, used: alert.used, body });
+  if (!settings.usageAlertNotify) return;
+  const record: (typeof sentNotifications)[number] = { id: alert.window, name: 'Uso del plan', status: 'usage', body };
+  if (isTest) sentNotifications.push(record);
+  if ((isTest && process.env.HILO_TEST_REAL_NOTIFY !== '1') || !Notification.isSupported()) return;
+  const n = new Notification({ title: 'Uso del plan', body, silent: settings.usageAlertSound !== 'none' });
+  liveNotifications.add(n);
+  n.on('click', () => {
+    liveNotifications.delete(n);
+    showWindow();
+  });
+  n.on('close', () => liveNotifications.delete(n));
+  n.show();
+});
+
 const sessions = new SessionController(store, dataDir, {
-  send,
+  send(channel: string, ...args: unknown[]) {
+    send(channel, ...args);
+    if (channel === 'usage:update' && usageListening) usageAlerter.check(args[0] as PlanUsage | null);
+  },
   statusChanged: updateWindowTitle,
   notify(session: SessionRecord, status: SessionStatus) {
     if (!store.get().settings.notifications) return;
+    // Parpadea solo si te necesita (espera o falló) y no estás en Hilo; se apaga al darle foco.
+    if ((status === 'waiting' || status === 'error') && !windowHasFocus()) setFlash(true);
     const record: (typeof sentNotifications)[number] = { id: session.id, name: session.name, status };
     if (isTest) sentNotifications.push(record);
     if ((isTest && process.env.HILO_TEST_REAL_NOTIFY !== '1') || !Notification.isSupported()) return;
@@ -116,6 +201,7 @@ const updates = new UpdateService(updateMode, {
 function updateWindowTitle(): void {
   if (!win || win.isDestroyed()) return;
   const map = sessions.runtimeMap();
+  const attention = attentionCount(Object.values(map).map((r) => r.status));
   let waiting = 0;
   let done = 0;
   let error = 0;
@@ -124,6 +210,7 @@ function updateWindowTitle(): void {
     else if (r.status === 'done') done++;
     else if (r.status === 'error') error++;
   }
+  updateTaskbarOverlay(attention);
   const parts: string[] = [];
   if (waiting) parts.push(`${waiting} esperando`);
   if (error) parts.push(`${error} con error`);
@@ -184,7 +271,11 @@ function createWindow(): void {
   installEditMenu(win.webContents);
   void win.webContents.setVisualZoomLevelLimits(1, 1).catch(() => undefined);
   win.webContents.on('did-finish-load', applyAppZoom);
+  win.webContents.on('did-start-loading', () => {
+    usageListening = false;
+  });
   win.webContents.on('render-process-gone', (_event, details) => {
+    usageListening = false;
     if (details.reason === 'clean-exit' || quitting) return;
     console.error('[hilo] se cayó la interfaz:', details.reason);
     // Las terminales vivían ahí: se duermen las sesiones (las conversaciones están guardadas) y se recarga.
@@ -213,7 +304,10 @@ function createWindow(): void {
   win.on('move', saveBounds);
   win.on('maximize', saveBounds);
   win.on('unmaximize', saveBounds);
-  win.on('focus', () => send('window:focus', true));
+  win.on('focus', () => {
+    setFlash(false);
+    send('window:focus', true);
+  });
   win.on('blur', () => send('window:focus', false));
 
   win.on('close', (event) => {
@@ -421,6 +515,34 @@ function registerIpc(): void {
     const result = await dialog.showOpenDialog(win, { properties: ['openDirectory'], title: 'Elige la carpeta del proyecto' });
     return result.canceled ? null : (result.filePaths[0] ?? null);
   });
+  // La carpeta de una sesión ya no existe (#6). La ruta nunca viene del renderer: sale del diálogo de Windows
+  // o del proyecto guardado. La conversación no se toca: se retoma por su id desde la carpeta nueva.
+  handle('session:fixFolder', async (id: unknown, mode: unknown): Promise<{ ok: boolean; message?: string }> => {
+    if (!isSafeId(id) || (mode !== 'pick' && mode !== 'project')) return { ok: false };
+    const found = findSession(store.get(), id);
+    if (!found) return { ok: false };
+    // Solo si la carpeta de la sesión faltaba de verdad al despertarla: no se cambia la de una sesión sana.
+    if (!sessions.hasMissingCwd(id)) return { ok: false, message: 'La carpeta de esta sesión sí existe.' };
+    let cwd: string | null;
+    if (mode === 'project') {
+      cwd = found.project.path;
+    } else {
+      if (!win) return { ok: false };
+      const result = await dialog.showOpenDialog(win, {
+        properties: ['openDirectory'],
+        title: `Elige dónde está ahora la carpeta de «${found.session.name}»`,
+      });
+      cwd = result.canceled ? null : (result.filePaths[0] ?? null);
+    }
+    if (!cwd) return { ok: false };
+    if (!isPath(cwd)) return { ok: false, message: 'Esa ruta no sirve.' };
+    const isDir = await stat(cwd).then((s) => s.isDirectory(), () => false);
+    if (!isDir) return { ok: false, message: mode === 'project' ? 'La carpeta del proyecto tampoco existe.' : 'Esa carpeta no existe.' };
+    store.dispatch({ type: 'session/cwd', id, cwd });
+    return { ok: true };
+  });
+  // Salida explícita cuando el historial existe pero Claude no lo retoma (#6): la persona decide empezar de nuevo.
+  handle('session:freshConversation', (id: unknown) => (isSafeId(id) ? sessions.startFreshConversation(id) : false));
   handle('dialog:pickFile', async () => {
     if (!win) return null;
     const result = await dialog.showOpenDialog(win, {
@@ -432,6 +554,37 @@ function registerIpc(): void {
   });
 
   handle('usage:get', () => sessions.planUsage());
+  handle('usage:listen', () => {
+    usageListening = true;
+    usageAlerter.check(sessions.planUsage());
+  });
+  // Sonido propio (#12): la ruta sale del diálogo nativo y nunca del renderer, que solo recibe los bytes.
+  handle('sound:pick', async () => {
+    let source = isTest ? process.env.HILO_TEST_SOUND_FILE : undefined;
+    if (!source) {
+      if (!win) return null;
+      const r = await dialog.showOpenDialog(win, {
+        properties: ['openFile'],
+        title: 'Elige un audio para los avisos',
+        filters: [{ name: 'Audio', extensions: ['mp3', 'wav', 'ogg'] }],
+      });
+      if (r.canceled || !r.filePaths[0]) return null;
+      source = r.filePaths[0];
+    }
+    const result = customSound.adopt(source);
+    if (result.ok) patchSettings({ customSoundName: result.name });
+    return result;
+  });
+  handle('sound:read', () => customSound.read());
+  handle('sound:clear', () => {
+    customSound.clear();
+    const current = store.get().settings;
+    const patch: Partial<Settings> = { customSoundName: '' };
+    for (const key of ['soundDone', 'soundWaiting', 'soundError', 'usageAlertSound'] as const) {
+      if (current[key] === CUSTOM_SOUND) patch[key] = DEFAULT_SETTINGS[key];
+    }
+    patchSettings(patch);
+  });
   handle('session:lastMessage', (id: unknown) => (isStr(id) ? sessions.lastMessage(id) : null));
   handle('session:markRead', (id: unknown) => (isStr(id) ? sessions.markRead(id) : undefined));
   // La ruta sale del estado guardado, nunca del renderer.
@@ -457,6 +610,46 @@ function registerIpc(): void {
   on('link:open', (url: unknown) => {
     if (isStr(url)) openExternalSafe(url);
   });
+  // Rutas que se ven en una terminal (#10, D35). El renderer manda el texto tal cual; la carpeta desde la que se
+  // resuelve sale de la sesión guardada. Solo se mira si existe: no se lee nada.
+  handle('path:resolve', async (id: unknown, paths: unknown) => {
+    const found = isSafeId(id) ? findSession(store.get(), id) : null;
+    if (!found || !Array.isArray(paths) || paths.length > 40) return [];
+    return Promise.all(paths.map((raw) => resolveTerminalPath(raw, found.session.cwd, found.project.path)));
+  });
+  handle('path:reveal', async (id: unknown, raw: unknown) => {
+    const found = isSafeId(id) ? findSession(store.get(), id) : null;
+    if (!found) return 'Esa sesión ya no está.';
+    const target = await resolveTerminalPath(raw, found.session.cwd, found.project.path);
+    if (!target) return 'Ese archivo ya no está ahí.';
+    return revealPath(target.abs, target.dir);
+  });
+  handle('session:openFolder', async (id: unknown) => {
+    const found = isSafeId(id) ? findSession(store.get(), id) : null;
+    if (!found) return 'Esa sesión ya no está.';
+    if (!(await isDirectory(found.session.cwd))) return `La carpeta de esta sesión ya no existe:\n${found.session.cwd}`;
+    return revealPath(found.session.cwd, true);
+  });
+}
+
+/** Lo que se mostró en el Explorador, para las pruebas: ahí no se abre nada. */
+const revealedPaths: { path: string; dir: boolean }[] = [];
+
+/**
+ * Muestra algo en el Explorador. Una carpeta se abre; un archivo se marca dentro de la suya y nunca se abre:
+ * con `openPath`, un `.exe` o un `.bat` se ejecutaría.
+ */
+async function revealPath(path: string, dir: boolean): Promise<string> {
+  if (isTest) {
+    revealedPaths.push({ path, dir });
+    return '';
+  }
+  if (!dir) {
+    shell.showItemInFolder(path);
+    return '';
+  }
+  const problem = await shell.openPath(path);
+  return problem ? `No se pudo abrir ${path}: ${problem}` : '';
 }
 
 function appInfo(): AppInfo {
@@ -509,9 +702,15 @@ app.whenReady().then(() => {
       store,
       updates,
       sentNotifications,
+      revealedPaths,
       focusSession,
       pidOf: (id: string) => (sessions as unknown as { live: Map<string, { pid: number }> }).live.get(id)?.pid,
-      focus: (focused: boolean) => send('window:focus', focused),
+      focus: (focused: boolean) => {
+        testFocused = focused;
+        if (focused) setFlash(false);
+        send('window:focus', focused);
+      },
+      taskbarCalls,
       statusOf: (id: string) => sessions.statusOf(id),
       findSession: (id: string) => findSession(store.get(), id),
     };

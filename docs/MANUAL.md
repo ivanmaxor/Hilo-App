@@ -39,9 +39,17 @@ Abajo en la barra lateral está cuánto llevas usado de la sesión de 5 horas y 
 
 Lo mismo sale abajo en cada sesión de Claude, en lugar de tu línea de estado. Si prefieres la tuya, apágalo en Ajustes, sección Claude Code. El bloque **Te necesitan**, abajo en la barra lateral, junta todo lo que requiere atención, ordenado por urgencia.
 
+## Ajustes
+
+Con Ctrl+, o el engranaje. Van por módulos: Apariencia, Terminal, Sesiones, Avisos, Claude Code, Cambios, Atajos, Actualizaciones y Novedades. El buscador de arriba encuentra cualquier opción en todos los módulos, y cada módulo tiene "Restablecer este módulo" para volver a los valores de fábrica.
+
 ## Sonidos
 
-Hilo suena cuando una sesión termina, te espera (un permiso o una pregunta) o falla. En Ajustes > Sesiones eliges un sonido para cada caso, o ninguno, y el volumen. Los marcados como largos duran unos 2 o 3 segundos. **Duración de cada aviso** repite el sonido seguido durante 3 a 30 segundos, y **Repetir** vuelve a avisar cada 1, 2, 5 o 10 minutos; los dos se cortan apenas abres la sesión o le respondes. Por defecto no suena si ya estás mirando esa sesión. Cuando Hilo toca su sonido, la notificación de Windows llega en silencio.
+Hilo suena cuando una sesión termina, te espera (un permiso o una pregunta) o falla. En Ajustes > Avisos eliges un sonido para cada caso, o ninguno, y el volumen. Los marcados como largos duran unos 2 o 3 segundos. **Duración de cada aviso** repite el sonido seguido durante 3 a 30 segundos, y **Repetir** vuelve a avisar cada 1, 2, 5 o 10 minutos; los dos se cortan apenas abres la sesión o le respondes. Por defecto no suena si ya estás mirando esa sesión. Cuando Hilo toca su sonido, la notificación de Windows llega en silencio.
+
+**Tu sonido:** en Ajustes > Avisos > Tu sonido puedes elegir un audio tuyo (mp3, wav u ogg de hasta 2 MB). Hilo guarda una copia en su carpeta, y aparece como "Tu sonido" en cada lista. Si no se puede reproducir, suena la gota y Hilo te avisa.
+
+**Avisos de uso del plan:** Hilo te avisa cuando la sesión de 5 horas o la semana cruzan los umbrales que elijas (50, 75, 80, 90 o 95 %), una vez por umbral en cada ventana, con una notificación, un sonido o los dos. Usa el mismo dato del medidor de la barra lateral, así que necesita "Mostrar el uso del plan" encendido.
 
 Si tenías un hook de sonido propio en la configuración de Claude Code, sigue sonando también en las sesiones de Hilo: Hilo no toca tu configuración. Para oír solo el de Hilo, quítalo de tu `settings.json`.
 
@@ -55,7 +63,20 @@ Si tenías un hook de sonido propio en la configuración de Claude Code, sigue s
 | Pegar imagen | Alt+V, como en tu terminal. Si solo hay imagen en el portapapeles, Ctrl+V también funciona |
 | Salto de línea sin enviar | Shift+Enter |
 | Copiar uniendo líneas que cortó Claude | Ctrl+Shift+J |
-| Copiar el último mensaje de Claude, con el nombre de la sesión delante | Ctrl+Shift+L, el botón **Copiar respuesta** o clic derecho en la sesión |
+| Copiar el último mensaje de Claude, con el nombre de la sesión delante | Ctrl+Shift+L, o **Copiar respuesta** en la barra de pestañas o en el clic derecho de la sesión |
+
+## Rutas y carpetas
+
+Cuando Claude, o cualquier programa, escribe la ruta de un archivo o una carpeta que existe (`src/app.ts:12`, `C:\Proyectos\informe final.pdf`), al pasar el ratón se subraya y abajo aparece qué hace cada clic:
+
+- **Clic:** la muestra en el Explorador de Windows. Una carpeta se abre; un archivo queda marcado en la suya, sin abrirlo ni ejecutarlo.
+- **Ctrl+clic:** abre el archivo en el IDE del proyecto, en su línea si venía. Si queda fuera del proyecto, se muestra en el Explorador.
+
+Las rutas relativas se buscan desde la carpeta de la sesión. Las de red (`\\servidor\...`) no se tocan.
+
+**Soltar archivos** del Explorador sobre una sesión pega su ruta, sin Enter. En Claude, `@ruta` si está dentro de la carpeta de la sesión, y la ruta completa entre comillas si no. En PowerShell, la ruta completa, entre comillas simples si tiene espacios. Sobre una sesión dormida solo avisa.
+
+El botón de la carpeta, arriba a la derecha, y **Abrir su carpeta** en el menú de una sesión abren la carpeta donde trabaja esa sesión, que puede no ser la del proyecto.
 
 ## Dormir sesiones
 
