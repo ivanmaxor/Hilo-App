@@ -4,8 +4,9 @@ import { join } from 'node:path';
 import { OscTitleScanner, classifyTitle, isClaudeTitle } from '../shared/oscScanner';
 import { findSession, allSessions } from '../shared/reducer';
 import { initialState, transition, type MachineEvent, type MachineState } from '../shared/statusMachine';
-import type { BackgroundProcess, RuntimeMap, SessionRecord, SessionRuntime, SessionStatus } from '../shared/types';
+import type { BackgroundProcess, GitHead, RuntimeMap, SessionRecord, SessionRuntime, SessionStatus } from '../shared/types';
 import { buildClaudeArgs, buildCommandLine, buildEnv, claudeConfigDir, commandFor, defaultShell, resolveClaude, transcriptExists, transcriptMtime } from './claude';
+import { branchOf } from './git';
 import { HookChannel } from './hooks';
 import type { PlanUsage } from '../shared/usage';
 import { formatCopiedMessage, lastAssistantText } from '../shared/lastMessage';
@@ -80,6 +81,10 @@ export interface SessionEvents {
 export class SessionController {
   private readonly machines = new Map<string, MachineState>();
   private readonly messages = new Map<string, string>();
+  /** Desde cuándo está cada sesión en su estado actual. No va en MachineState: es solo para mostrar. */
+  private readonly statusSince = new Map<string, number>();
+  private readonly branches = new Map<string, GitHead>();
+  private readonly branchChecks = new Set<string>();
   /** Sesiones que no arrancaron porque su carpeta ya no existe: el panel ofrece elegir otra (#6). */
   private readonly missingCwd = new Map<string, string>();
   /** Sesiones cuyo historial existe pero Claude no pudo retomar: el panel deja empezar una conversación nueva (#6). */
@@ -149,8 +154,11 @@ export class SessionController {
         live.claudePid = proc.pid;
         live.otherClaudeId = null;
         this.machines.set(id, { kind: 'claude', status: 'idle', stopLatchUntil: 0 });
+        this.statusSince.set(id, Date.now());
         this.store.dispatch({ type: 'session/active', id, at: Date.now() });
         this.publish(id);
+        // La carpeta real es la que dice el archivo de sesión de Claude, no la de la PowerShell.
+        void this.refreshBranch(id);
         this.events.send('app:notice', `«${session.name}» ahora es una sesión de Claude, en ${info.cwd}.`);
         adopted = true;
         return;
@@ -197,6 +205,13 @@ export class SessionController {
     const missing = this.missingCwd.get(id);
     if (missing) runtime.missingCwd = missing;
     if (this.unresumable.has(id)) runtime.unresumable = true;
+    // Una dormida no tiene ni tiempo en el estado ni rama que mostrar.
+    if (machine.status !== 'asleep') {
+      const since = this.statusSince.get(id);
+      if (since !== undefined) runtime.since = since;
+      const branch = this.branches.get(id);
+      if (branch) runtime.branch = branch;
+    }
     return runtime;
   }
 
@@ -233,6 +248,25 @@ export class SessionController {
     return true;
   }
 
+  /** La rama sale de la carpeta de la sesión que guarda el main, nunca de una ruta del renderer. Se publica solo si cambió. */
+  private async refreshBranch(id: string): Promise<void> {
+    if (this.branchChecks.has(id)) return;
+    const cwd = findSession(this.store.get(), id)?.session.cwd;
+    if (!cwd) return;
+    this.branchChecks.add(id);
+    try {
+      const next = await branchOf(cwd);
+      if (!findSession(this.store.get(), id)) return;
+      const prev = this.branches.get(id);
+      if (prev?.kind === next?.kind && prev?.name === next?.name) return;
+      if (next) this.branches.set(id, next);
+      else this.branches.delete(id);
+      this.events.send('runtime:update', id, this.runtimeOf(id));
+    } finally {
+      this.branchChecks.delete(id);
+    }
+  }
+
   private publish(id: string): void {
     this.events.send('runtime:update', id, this.runtimeOf(id));
     this.events.statusChanged();
@@ -244,12 +278,14 @@ export class SessionController {
     const next = transition(prev, ev, Date.now());
     if (next === prev) return;
     this.machines.set(id, next);
+    if (next.status !== prev.status) this.statusSince.set(id, Date.now());
     if (next.status !== prev.status || next.exitCode !== prev.exitCode) this.onStatusChange(id, prev.status, next.status);
     else if ((next.subagents ?? 0) !== (prev.subagents ?? 0)) this.publish(id);
   }
 
   private onStatusChange(id: string, from: SessionStatus, to: SessionStatus): void {
     this.publish(id);
+    if (to !== 'asleep') void this.refreshBranch(id);
     // Empezar a trabajar es un mensaje tuyo; terminar, uno de Claude.
     if (to === 'working' || from === 'working') this.store.dispatch({ type: 'session/active', id, at: Date.now() });
     const pending = this.notifyTimers.get(id);
@@ -336,6 +372,7 @@ export class SessionController {
     // La marca sigue: una carpeta en un disco sin conectar vuelve a intentarse la próxima vez.
     this.messages.set(session.id, message);
     this.machines.set(session.id, { kind: session.kind, status: 'error', stopLatchUntil: 0 });
+    this.statusSince.set(session.id, Date.now());
     this.publish(session.id);
   }
 
@@ -617,6 +654,8 @@ export class SessionController {
     }
     this.machines.delete(id);
     this.messages.delete(id);
+    this.statusSince.delete(id);
+    this.branches.delete(id);
     this.missingCwd.delete(id);
     this.unresumable.delete(id);
   }
