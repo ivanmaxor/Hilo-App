@@ -387,3 +387,13 @@ Decisión del dueño (#7): «Cambiar carpeta…» en el clic derecho del proyect
 - **Atómico:** `project/relocate` cambia el `path` y los `cwd` en una sola acción del reducer. Las sesiones de otra carpeta no se tocan, y la nueva carpeta no puede ser la de otro proyecto (se avisa y no se duplica).
 - **Sesión despierta:** sigue corriendo en su carpeta vieja hasta que se duerma y despierte; Hilo avisa y no la apaga. Una dormida retoma por id desde la nueva. Una que no arrancaba por su carpeta inexistente vuelve a dormida (su panel de «carpeta inexistente» deja de valer); si se cambia desde su propio menú, se despierta, como hace su panel.
 - **Carpetas de red:** no se comprueban con `stat` (una caída congelaría la respuesta), igual que al lanzar una sesión.
+
+## D38. Resumen del día
+
+Idea del #13, con la decisión del dueño de que baste el selector rápido: el comando `dailySummary` no tiene atajo, ni ajuste, ni botón; sale al final de `Ctrl+Shift+K` cuando lo escrito está en «Resumen del día». Abre un diálogo con un Markdown armado solo con datos de Hilo (`src/shared/dailySummary.ts`): las sesiones con `lastActiveAt` desde las 00:00 locales, por proyecto, con estado, marca y nota. No lee conversaciones ni `~/.claude`.
+
+- **Lo único de la tanda que escribe archivos.** «Guardar en una carpeta…» escribe `AAAA-MM-DD-resumen-hilo.md` (`src/main/summaryFile.ts`). Hilo no sabe dónde está el vault ni guarda una ruta: cada vez se elige la carpeta (una del vault, si se quiere) en el diálogo de Windows, que abre el proceso principal.
+- **La ruta nunca viene del renderer.** `summary:save` valida el remitente (`trusted()`) y solo recibe el texto (no vacío, hasta 200 000 caracteres, sin `\0`). El nombre es fijo y se escribe en esa carpeta y no en otra. Nunca pisa: si el archivo existe, agrega `-2`, `-3`… (se escribe a un temporal con fsync y se publica con `link`; si el disco no admite `link`, con `rename` tras comprobar que no existe).
+- **Notas y nombres escapados:** una nota con `#` o `**` no rompe la estructura del Markdown.
+- **No cubre:** guardado automático ni a una hora; recordar la carpeta; el tiempo «en trabajando» (Hilo no lo guarda); que el texto se calcule en el proceso principal (el renderer lo arma y lo manda, así que un renderer comprometido podría escribir texto cualquiera, pero solo en la carpeta que la persona eligió); sesiones de otros días ni rangos.
+- **Con «Enviar respuesta»:** el selector es el mismo. En el modo de enviar respuesta el comando no se ofrece ni se ejecuta con Enter (`!sendFrom`).
