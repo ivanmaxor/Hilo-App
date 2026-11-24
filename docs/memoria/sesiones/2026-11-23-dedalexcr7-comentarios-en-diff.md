@@ -8,7 +8,7 @@
   - **Solo sesiones de Claude en el selector** de destino: una terminal (PowerShell) no se ofrece aunque esté despierta. Si no hay ninguna de Claude despierta, la barra lo dice y «Enviar» queda desactivado. Nunca se despierta una sesión por enviar.
   - **Los comentarios viven solo en memoria**: no sobreviven a cerrar Hilo y no se guardan en disco ni en `state.json` (lo comprueba una e2e que busca el texto en todos los archivos de datos, antes y después de cerrar).
   - **Pegar con `term.paste()` tras `sanitizePaste()`, sin Enter**, respetando el detector de claves y la confirmación de varias líneas: un comentario con algo que parece una clave pide confirmar, y si se cancela los comentarios siguen pendientes.
-- **Commits / PR:** rama local `feature/idea-comentarios-en-diff`. PR de `Closes #N` (el número lo completa el dueño al abrirlo).
+- **Commits / PR:** rama `feature/idea-comentarios-en-diff`, PR de `Closes #44`.
 - **Probado:** `npm run typecheck`, `npm test`, `npm run privacy`; e2e `cambios-comentarios` (9: pegado sin Enter con una sesión de Claude falsa que ejecuta `sink.cjs`, cancelar/Quitar/Descartar, recarga y cambio de archivo, Ctrl+Intro, sin sesión de Claude despierta, selector solo con Claude, clave que pide confirmar, solo en memoria), y por tocar el panel y el pegado, `cambios`, `clipboard`, `pegar-clave`, `arrastrar-archivos` y `close`.
 - **Sin verificar:** con una sesión de Claude real (las e2e usan un `claude.cmd` falso que ejecuta el programa de prueba); teclado y lector de pantalla con personas; tema claro del cuadro y la barra (solo se miró el oscuro).
 - **Queda pendiente / decide el dueño:**
