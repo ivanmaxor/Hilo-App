@@ -44,10 +44,14 @@ test('rama y tiempo en el estado bajo el nombre de cada sesión', async () => {
 
     // El tiempo en el estado: recién cambiada dice "ahora", y la sin git también lo tiene.
     for (const id of ['a', 'b', 'c', 'd']) await expect(row(id).locator('.since')).toHaveText('ahora');
-    // Una dormida no muestra nada, y su fila sigue siendo de una línea.
+    // Una dormida no muestra nada. Ninguna fila crece: rama y tiempo van en la misma línea del nombre (28 px).
     await expect(row('e').locator('.row-meta')).toHaveCount(0);
-    expect((await row('e').boundingBox())!.height).toBeLessThan(30);
-    expect((await row('a').boundingBox())!.height).toBeGreaterThan(34);
+    for (const id of ['a', 'b', 'c', 'd', 'e']) expect((await row(id).boundingBox())!.height).toBeLessThan(30);
+    // La rama y el tiempo quedan a la derecha del nombre, en la misma línea.
+    const name = (await row('a').locator('.name').boundingBox())!;
+    const meta = (await row('a').locator('.row-meta').boundingBox())!;
+    expect(Math.abs(name.y + name.height / 2 - (meta.y + meta.height / 2))).toBeLessThan(6);
+    expect(meta.x).toBeGreaterThan(name.x);
 
     // El reloj de un minuto repinta solo el texto, no la fila: el nodo de la fila es el mismo.
     await page.evaluate(() => {
@@ -71,11 +75,14 @@ test('rama y tiempo en el estado bajo el nombre de cada sesión', async () => {
     await openSink(page, 'a');
     await expect(row('a').locator('.branch')).toHaveText('otra-rama');
 
-    await page.screenshot({ path: 'test-results/rama-y-tiempo-dos-lineas.png' });
-    // La alternativa, para que el dueño decida: todo en la misma fila de 28 px.
-    await page.evaluate(() => document.querySelector('.tree')!.classList.add('meta-inline'));
     await expect(row('a')).toHaveCSS('height', '28px');
-    await page.screenshot({ path: 'test-results/rama-y-tiempo-misma-fila.png' });
+    // Con una rama larga y un nombre largo el tiempo sigue entero y la fila no se desborda.
+    for (const id of ['a', 'b']) {
+      const r = (await row(id).boundingBox())!;
+      const since = (await row(id).locator('.since').boundingBox())!;
+      expect(since.x + since.width).toBeLessThanOrEqual(r.x + r.width + 1);
+    }
+    await page.screenshot({ path: 'test-results/rama-y-tiempo.png' });
   } finally {
     await ctx.close();
     cleanup(ctx.dataDir);
