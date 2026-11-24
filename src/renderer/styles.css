@@ -570,6 +570,26 @@ mark { background: none; color: var(--accent); font-weight: 600; }
 .dr-link { width: 100%; height: 100%; color: inherit; font: inherit; line-height: inherit; text-align: right; }
 .dr-link:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 .dr.add .dr-link:hover, .dr.del .dr-link:hover { color: var(--text); }
+.dr-cmt-cell { flex: none; width: 18px; }
+.dr-cmt { width: 100%; height: 100%; padding: 0; color: var(--accent); font-weight: 700; line-height: inherit; text-align: center; opacity: 0; }
+.dr:hover .dr-cmt, .dr-cmt:focus-visible, .dr-cmt.has { opacity: 1; }
+.dr-cmt:hover { color: var(--text); }
+.cm-editor { position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 4; display: flex; flex-direction: column; gap: 6px; max-width: 640px; padding: 8px; background: var(--raised); border: 1px solid var(--accent); border-radius: 6px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35); }
+.cm-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 12px; }
+.cm-place { flex: none; max-width: 60%; overflow: hidden; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.cm-code { min-width: 0; overflow: hidden; color: var(--faint); font-family: "Cascadia Mono", "Hilo Mono", monospace; white-space: nowrap; text-overflow: ellipsis; }
+.cm-text { width: 100%; min-height: 56px; resize: vertical; padding: 6px 8px; background: var(--bg); border: 1px solid var(--field-line); border-radius: 4px; user-select: text; outline: none; }
+.cm-text:focus { border-color: var(--accent); }
+.cm-actions { display: flex; align-items: center; gap: 6px; }
+.cm-actions .primary, .cm-actions .secondary { height: 26px; padding: 0 12px; font-size: 12px; }
+.cm-actions .primary:disabled { opacity: 0.5; }
+.cm-spacer { flex: 1; }
+.cm-bar { flex: none; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 5px 10px 5px 12px; border-top: 1px solid var(--line); background: var(--side); font-size: 12px; }
+.cm-count { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cm-none { color: var(--muted); }
+.cm-target select { height: 26px; max-width: 220px; padding: 0 6px; background: var(--bg); border: 1px solid var(--field-line); border-radius: 4px; }
+.cm-bar .primary, .cm-bar .secondary { height: 26px; padding: 0 12px; font-size: 12px; }
+.cm-bar .primary:disabled { opacity: 0.5; }
 .dr-sign { flex: none; width: 2ch; text-align: center; font-weight: 600; user-select: none; }
 .dr.add .dr-sign { color: var(--diff-add-text); }
 .dr.del .dr-sign { color: var(--diff-del-text); }
