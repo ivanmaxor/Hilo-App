@@ -1,0 +1,7 @@
+# 2026-11-24 · @dedalexcr7 · split.spec: el arrastre a veces no arranca
+
+- **Qué pasó:** `tests/e2e/split.spec.ts` falla a veces, sobre todo con la máquina cargada (una vez en la suite completa de una rama y 1 de 6 corridas en `main`): «arrastrar: centro reemplaza, borde suma…» espera `.drop-mark.edge.right .drop-plus` y no llega, o «la división y el reparto sobreviven a cerrar y abrir» termina con `panes` sin B.
+- **Causa (reproducida):** con carga, Chromium a veces no arranca el arrastre (nunca dispara `dragstart`) tras `mouse.down` y un pequeño movimiento. El resto de la prueba espera una marca que no va a llegar. Con 4 corridas en paralelo fallaban 3 de 20.
+- **Arreglo:** `dragOver` comprueba que `dragstart` se disparó y, si no, suelta el ratón **fuera de la fila** y repite el gesto (hasta 5 veces; si no arranca, falla con un mensaje claro). Soltar sobre la misma fila contaría como un clic: selecciona la sesión, deja el estado distinto al de la prueba y arrastrar una sesión sobre sí misma no marca nada. Eso se vio en una primera versión del arreglo que dejaba 2 de 24 fallas.
+- **Probado:** 10 rondas de 4 corridas en paralelo con el arreglo: 0 de 40 fallan; 5 corridas necesitaron reintentar el arrastre. Solo cambia la prueba; la app no cambia.
+- **Sin verificar:** que el CI quede estable (se ve en varias corridas). `organize.spec.ts` tiene su propio `dragTo` de proyectos que también falló una vez: no se tocó.

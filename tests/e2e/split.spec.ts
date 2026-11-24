@@ -21,19 +21,42 @@ function fresh() {
   return state;
 }
 
-/** Suelta a mano para poder ver la marca antes de soltar. */
+/**
+ * Suelta a mano para poder ver la marca antes de soltar.
+ * Con la máquina cargada Chromium a veces no arranca el arrastre (nunca dispara `dragstart`) y el resto de la prueba
+ * espera una marca que no va a llegar: se comprueba que arrancó y, si no, se suelta y se repite el gesto.
+ */
 async function dragOver(page: Page, fromSelector: string, pane: number, fx: number, fy: number): Promise<() => Promise<void>> {
-  const from = await page.locator(fromSelector).boundingBox();
-  const to = await page.locator(`[data-pane="${pane}"]`).boundingBox();
-  await page.mouse.move(from!.x + 20, from!.y + from!.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(from!.x + 40, from!.y + from!.height / 2 + 4, { steps: 3 });
-  await page.mouse.move(to!.x + to!.width * fx, to!.y + to!.height * fy, { steps: 6 });
-  await page.waitForTimeout(100);
-  return async () => {
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    await page.evaluate(() => {
+      (window as any).__dragStarted = false;
+      window.addEventListener('dragstart', () => ((window as any).__dragStarted = true), { once: true, capture: true });
+    });
+    const from = await page.locator(fromSelector).boundingBox();
+    const to = await page.locator(`[data-pane="${pane}"]`).boundingBox();
+    await page.mouse.move(from!.x + 20, from!.y + from!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from!.x + 40, from!.y + from!.height / 2 + 4, { steps: 3 });
+    const started = await page.waitForFunction(() => (window as any).__dragStarted === true, undefined, { timeout: 1500 }).then(
+      () => true,
+      () => false,
+    );
+    if (started) {
+      await page.mouse.move(to!.x + to!.width * fx, to!.y + to!.height * fy, { steps: 6 });
+      await page.waitForTimeout(100);
+      if (attempt > 1) console.log(`[dragOver] el arrastre arrancó al intento ${attempt}`);
+      return async () => {
+        await page.mouse.up();
+        await page.waitForTimeout(250);
+      };
+    }
+    // No arrancó: se suelta FUERA de la fila (soltar sobre ella contaría como un clic y seleccionaría la sesión, y el estado
+    // ya no sería el de la prueba) y se vuelve a empezar.
+    await page.mouse.move(to!.x + to!.width / 2, to!.y + to!.height / 2);
     await page.mouse.up();
-    await page.waitForTimeout(250);
-  };
+    await page.waitForTimeout(300);
+  }
+  throw new Error('dragOver: el arrastre no arrancó en 5 intentos');
 }
 const row = (id: string) => `.row[data-session="${id}"]`;
 
