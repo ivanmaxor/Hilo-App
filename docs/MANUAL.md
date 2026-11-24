@@ -74,6 +74,8 @@ Cuando Claude, o cualquier programa, escribe la ruta de un archivo o una carpeta
 
 Las rutas relativas se buscan desde la carpeta de la sesión. Las de red (`\\servidor\...`) no se tocan.
 
+**Soltar archivos** del Explorador sobre una sesión pega su ruta, sin Enter. En Claude, `@ruta` si está dentro de la carpeta de la sesión, y la ruta completa entre comillas si no. En PowerShell, la ruta completa, entre comillas simples si tiene espacios. Sobre una sesión dormida solo avisa.
+
 El botón de la carpeta, arriba a la derecha, y **Abrir su carpeta** en el menú de una sesión abren la carpeta donde trabaja esa sesión, que puede no ser la del proyecto.
 
 ## Dormir sesiones
