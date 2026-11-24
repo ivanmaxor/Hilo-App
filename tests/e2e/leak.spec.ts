@@ -33,16 +33,69 @@ test('cerrar con el foco en la terminal libera la terminal', async () => {
     const before = await liveTerminals();
     expect(before).toBe(ids.length);
 
+    const CLOSE_DOUBLE_PRESS_MS = 800;
+    let lastClosePress = 0;
     for (const id of ids.slice(0, 5)) {
       await page.evaluate((sid) => (window as any).__hiloTest.selectSession(sid), id);
       await page.waitForTimeout(250);
       await page.evaluate((sid) => (window as any).__hiloTest.terminals.focus(sid), id);
       await page.waitForTimeout(100);
+      // El atajo de cerrar ignora una pulsación que llega antes de 800 ms de la anterior (CLOSE_DOUBLE_PRESS_MS en
+      // controller.ts): así una tecla mantenida no cierra varias sesiones. Esta prueba pulsaba el atajo unos 450 a
+      // 700 ms después de la vuelta anterior: si esa sesión se había cerrado rápido, la pulsación se descartaba sin
+      // abrir diálogo ni aviso y la sesión nunca se cerraba (#3, visto en el diagnóstico de abajo).
+      const wait = CLOSE_DOUBLE_PRESS_MS + 100 - (Date.now() - lastClosePress);
+      if (wait > 0) await page.waitForTimeout(wait);
+      lastClosePress = Date.now();
       await page.keyboard.press('Control+Shift+W');
-      // Con un shell puede pedir confirmación: el botón principal la acepta.
-      const confirm = page.locator('.dialog button.danger, .dialog button.primary').first();
-      if (await confirm.isVisible().catch(() => false)) await confirm.click();
-      await expect.poll(() => page.evaluate((sid) => !(window as any).__hiloTest.terminals.debugEntry(sid), id)).toBe(true);
+      // Si aun así no se cierra, deja el estado de la app a la vista: es lo que falta para entender la falla.
+      const diagnostico = () =>
+        page
+          .evaluate((sid) => {
+            const t = (window as any).__hiloTest;
+            const v = t.view.get();
+            const a = t.app.get();
+            return JSON.stringify({
+              vuelta: sid,
+              activa: a.state.ui.activeSessionId,
+              estado: a.runtime[sid]?.status,
+              terminalViva: !!t.terminals.debugEntry(sid),
+              dialogo: v.modal?.type ?? null,
+              cerrando: v.closing,
+              ocupadas: v.busy,
+              avisos: v.toasts.map((x: any) => x.text),
+              foco: document.activeElement ? `${document.activeElement.tagName}.${document.activeElement.className}` : null,
+              sesiones: a.state.projects[0].sessions.length,
+            });
+          }, id)
+          .catch((e) => `sin diagnóstico: ${String(e)}`);
+      await expect
+        .poll(
+          async () => {
+            const confirm = page.locator('.dialog [data-confirm="ok"]');
+            if (await confirm.isVisible().catch(() => false)) await confirm.click().catch(() => undefined);
+            // Los 800 ms se miden en la app, no aquí: en el runner la tecla puede llegar tarde y caer dentro de la
+            // ventana de la anterior, y se descarta sin aviso (visto en el CI del #30). Si la sesión sigue activa y nadie
+            // la está cerrando, se pulsa otra vez, como haría una persona. Ya cerrándose, la marca `closing` se pone al
+            // instante y esta rama no vuelve a pulsar.
+            const ignored = await page.evaluate((sid) => {
+              const t = (window as any).__hiloTest;
+              const v = t.view.get();
+              return t.app.get().state.ui.activeSessionId === sid && !v.closing.includes(sid) && !v.modal && !!t.terminals.debugEntry(sid);
+            }, id);
+            if (ignored && Date.now() - lastClosePress > 2 * CLOSE_DOUBLE_PRESS_MS) {
+              lastClosePress = Date.now();
+              await page.keyboard.press('Control+Shift+W');
+            }
+            return page.evaluate((sid) => !(window as any).__hiloTest.terminals.debugEntry(sid), id);
+          },
+          { timeout: 25_000 },
+        )
+        .toBe(true)
+        .catch(async (error) => {
+          console.log('DIAGNÓSTICO al fallar:', await diagnostico());
+          throw error;
+        });
     }
     // Las entradas siguen en el controlador solo mientras viven: las 5 cerradas no deben quedar en memoria.
     await page.waitForTimeout(800);

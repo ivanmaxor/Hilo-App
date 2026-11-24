@@ -1,7 +1,10 @@
-import { existsSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { createReadStream, existsSync, writeFileSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { NsisUpdater } from 'electron-updater';
 import { describeUpdateError, isStableVersion, UPDATE_OWNER, UPDATE_REPO, type UpdateMode, type UpdatePhase, type UpdateStatus } from '../shared/updates';
+import { isInstallerName, MAX_SIGNATURE_CHARS, signatureFileName, signedMessage, UPDATE_PUBLIC_KEYS, verifyUpdateSignature } from '../shared/updateSignature';
 import { hardenUpdaterSession } from './security';
 
 export interface UpdateDeps {
@@ -16,6 +19,33 @@ export interface UpdateDeps {
 
 /** Tras abrir: las sesiones arrancan primero, escalonadas. */
 const STARTUP_DELAY_MS = 8000;
+const SIGNATURE_TIMEOUT_MS = 20_000;
+const UNSIGNED_MESSAGE = 'Esta versión no trae una firma válida de Hilo, así que no se instala. Puede ser un error al publicarla: avísale a quien publica Hilo.';
+
+/**
+ * Las claves que se aceptan (#4, D36). Contra el servidor de pruebas de esta máquina, solo la que da la prueba:
+ * el modo `local` existe solo en pruebas y solo con 127.0.0.1, y nunca se mezcla con las claves reales.
+ */
+function trustedKeys(mode: UpdateMode): readonly string[] {
+  if (mode.kind === 'local') return process.env.HILO_TEST_UPDATE_KEY ? [process.env.HILO_TEST_UPDATE_KEY] : [];
+  return mode.kind === 'github' ? UPDATE_PUBLIC_KEYS : [];
+}
+
+/** La firma va junto al instalador en la misma Release, y se baja por la misma sesión endurecida. */
+function signatureUrl(mode: UpdateMode, version: string, fileName: string): string | null {
+  const name = encodeURIComponent(signatureFileName(fileName));
+  if (mode.kind === 'local') return new URL(name, mode.feed).toString();
+  if (mode.kind === 'github') return `https://github.com/${UPDATE_OWNER}/${UPDATE_REPO}/releases/download/v${encodeURIComponent(version)}/${name}`;
+  return null;
+}
+
+async function sha512Of(file: string): Promise<string> {
+  const hash = createHash('sha512');
+  for await (const chunk of createReadStream(file)) hash.update(chunk as Buffer);
+  return hash.digest('base64');
+}
+
+type SignatureCheck = { ok: true; sha512: string } | { ok: false; error?: unknown };
 
 /**
  * Con el origen en el código: `app-update.yml` solo aporta la carpeta de caché y, si la hay, la firma esperada.
@@ -53,6 +83,10 @@ export class UpdateService {
   private startupTimer: NodeJS.Timeout | null = null;
   private installer: string | null = null;
   private handedOff = false;
+  /** Lo que anunció la última búsqueda: la versión y el nombre del instalador, que van en la firma. */
+  private offered: { version: string; fileName: string } | null = null;
+  /** El sha512 de lo bajado cuya firma se comprobó. Se vuelve a mirar justo antes de instalar. */
+  private verifiedSha512: string | null = null;
 
   constructor(
     private readonly mode: UpdateMode,
@@ -113,8 +147,11 @@ export class UpdateService {
     try {
       const u = await this.load();
       const result = await u.checkForUpdates();
-      if (result?.isUpdateAvailable) this.set({ state: 'available', version: result.updateInfo.version, auto });
-      else this.set({ state: 'current' });
+      if (result?.isUpdateAvailable) {
+        const info = result.updateInfo;
+        this.offered = { version: info.version, fileName: info.files?.[0]?.url ?? info.path };
+        this.set({ state: 'available', version: info.version, auto });
+      } else this.set({ state: 'current' });
     } catch (error) {
       this.fail('check', error);
     }
@@ -127,12 +164,62 @@ export class UpdateService {
     const version = s.version;
     if (!version) return;
     this.set({ state: 'downloading', version, percent: 0 });
+    this.verifiedSha512 = null;
     try {
-      await this.updater.downloadUpdate();
+      const files = await this.updater.downloadUpdate();
+      const exe = files.find((f) => f.toLowerCase().endsWith('.exe'));
+      if (exe) this.installer = exe;
+      const signed = await this.checkSignature(version);
+      if (!signed.ok) {
+        await this.discardInstaller();
+        if (signed.error !== undefined) this.fail('download', signed.error, version);
+        else this.set({ state: 'error', phase: 'download', message: UNSIGNED_MESSAGE, version });
+        return;
+      }
+      this.verifiedSha512 = signed.sha512;
       this.set({ state: 'ready', version });
     } catch (error) {
       this.fail('download', error, version);
     }
+  }
+
+  /**
+   * La firma (#4, D36): el sha512 de lo bajado, firmado junto con su versión y su nombre por una de las claves
+   * de Hilo. Sin firma publicada o con una que no calza, `ok: false` sin error; si no se pudo bajar, con él.
+   */
+  private async checkSignature(version: string): Promise<SignatureCheck> {
+    const offered = this.offered;
+    const installer = this.installer;
+    if (!this.updater || !offered || offered.version !== version || !isInstallerName(offered.fileName)) return { ok: false };
+    if (!installer || !existsSync(installer)) return { ok: false };
+    const url = signatureUrl(this.mode, version, offered.fileName);
+    const keys = trustedKeys(this.mode);
+    if (!url || keys.length === 0) return { ok: false };
+    let text: string;
+    try {
+      const res = await this.updater.netSession.fetch(url, { credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(SIGNATURE_TIMEOUT_MS) });
+      if (!res.ok) {
+        console.error('[actualizar] sin firma publicada:', res.status);
+        return { ok: false };
+      }
+      text = await res.text();
+    } catch (error) {
+      return { ok: false, error };
+    }
+    if (text.length > MAX_SIGNATURE_CHARS) return { ok: false };
+    const sha512 = await sha512Of(installer);
+    if (!verifyUpdateSignature(signedMessage(version, offered.fileName, sha512), text, keys)) {
+      console.error('[actualizar] la firma no calza');
+      return { ok: false };
+    }
+    return { ok: true, sha512 };
+  }
+
+  /** Lo bajado sin una firma válida no se deja a mano para instalarlo después. */
+  private async discardInstaller(): Promise<void> {
+    if (this.installer) await rm(this.installer, { force: true }).catch(() => undefined);
+    this.installer = null;
+    this.verifiedSha512 = null;
   }
 
   /** `needsConfirm`: hay sesiones trabajando y falta que la persona diga que sí. */
@@ -143,6 +230,13 @@ export class UpdateService {
     // Antes de apagar nada: sin instalador, las sesiones no tienen por qué morir.
     if (!this.installer || !existsSync(this.installer)) {
       this.set({ state: 'error', phase: 'install', message: 'El archivo bajado ya no está. Busca la versión de nuevo.', version: s.version });
+      return { needsConfirm: false };
+    }
+    // Lo que se lanza es lo que se verificó: si el archivo cambió desde entonces, no se instala.
+    const now = await sha512Of(this.installer).catch(() => null);
+    if (!this.verifiedSha512 || now !== this.verifiedSha512) {
+      await this.discardInstaller();
+      this.set({ state: 'error', phase: 'install', message: 'El archivo bajado cambió desde que se comprobó su firma. Busca la versión de nuevo.', version: s.version });
       return { needsConfirm: false };
     }
     this.set({ state: 'installing', version: s.version });

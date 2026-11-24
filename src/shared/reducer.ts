@@ -1,3 +1,4 @@
+import { isInsideFolder, samePath } from './folderPaths';
 import { changesPaneId, changesProjectOf, isChangesPane, sessionInPane } from './paneContent';
 import { insertLeaf, isValidTree, MAX_PANES, presetTree, removeLeaf, type PaneEdge, type PaneNode } from './paneLayout';
 import type { Action, LayoutCount, PersistedState, ProjectRecord, SessionRecord, UiState } from './types';
@@ -196,6 +197,22 @@ export function reduce(state: PersistedState, action: Action): PersistedState {
         }),
       };
 
+    case 'project/relocate': {
+      const project = state.projects.find((p) => p.id === action.id);
+      if (!project) return state;
+      // Dos proyectos con la misma carpeta no: se avisa antes, y aquí tampoco se deja pasar.
+      if (state.projects.some((p) => p.id !== project.id && samePath(p.path, action.path))) return state;
+      const cwds = new Map(action.sessions.map((s) => [s.id, s.cwd]));
+      const sessions = project.sessions.map((s) => {
+        const cwd = cwds.get(s.id);
+        // Solo las que estaban dentro de la carpeta vieja: las de otra carpeta no se tocan.
+        return cwd !== undefined && cwd !== s.cwd && isInsideFolder(s.cwd, project.path) ? { ...s, cwd } : s;
+      });
+      const moved = sessions.some((s, i) => s !== project.sessions[i]);
+      if (!moved && project.path === action.path) return state;
+      return { ...state, projects: state.projects.map((p) => (p.id === project.id ? { ...p, path: action.path, sessions } : p)) };
+    }
+
     case 'project/move': {
       const from = state.projects.findIndex((p) => p.id === action.id);
       if (from < 0) return state;
@@ -232,6 +249,9 @@ export function reduce(state: PersistedState, action: Action): PersistedState {
     case 'session/adopt':
       // Una PowerShell donde se abrió Claude: la misma fila pasa a ser esa sesión de Claude, en su carpeta.
       return mapSession(state, action.id, (s) => ({ ...s, kind: 'claude', claudeId: action.claudeId, cwd: action.cwd }));
+
+    case 'session/cwd':
+      return mapSession(state, action.id, (s) => (s.cwd === action.cwd ? s : { ...s, cwd: action.cwd }));
 
     case 'session/active':
       return mapSession(state, action.id, (s) => (action.at > (s.lastActiveAt ?? 0) ? { ...s, lastActiveAt: action.at } : s));

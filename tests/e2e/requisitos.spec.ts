@@ -47,6 +47,7 @@ test('con todo instalado no sale sola, y Ajustes la abre', async () => {
     await page.waitForTimeout(600);
     await expect(page.locator('#setup-title')).toHaveCount(0);
     await page.evaluate(() => (window as any).__hiloTest.runCommand('settings'));
+    await page.locator('.settings-nav button', { hasText: 'Claude Code' }).click();
     await page.getByRole('button', { name: 'Ver requisitos' }).click();
     await expect(page.locator('#setup-title')).toHaveText('Todo listo para usar Hilo');
     await expect(page.locator('.setup-command')).toHaveCount(0);

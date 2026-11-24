@@ -23,6 +23,8 @@ async function createShell(page: Page, name: string, projectIndex = 0) {
   await page.locator('.project').nth(projectIndex).locator('.project-head').hover();
   await page.locator('.project').nth(projectIndex).locator('.project-head .add').click();
   await page.locator('.seg button', { hasText: 'PowerShell' }).click();
+  // El nombre por defecto llega un momento después: escribir antes lo pisaba a medias ("PowerShellCuatro" en el CI).
+  await expect(page.locator('input[data-field="name"]')).toHaveValue(/^PowerShell/);
   await page.locator('input[data-field="name"]').fill(name);
   await page.keyboard.press('Enter');
   await expect(page.locator('.row .name', { hasText: new RegExp(`^${name}$`) })).toBeVisible();
@@ -34,6 +36,9 @@ test('crear, renombrar, colorear, mover, reordenar, colapsar, y sobrevive a rein
   // Encender lo que quedó encendido se prueba en restore.spec.ts.
   const empty = defaultState();
   empty.settings.startup = 'asleep';
+  // Sin esto, en un PC sin Claude (como el runner del CI) sale el diálogo de requisitos y tapa los clics (#3).
+  // Ese diálogo se prueba en requisitos.spec.ts, igual que hace makeState.
+  empty.settings.setupSeen = true;
   let ctx = await launch({ dataDir, state: empty });
   try {
     let { page } = ctx;
@@ -47,6 +52,7 @@ test('crear, renombrar, colorear, mover, reordenar, colapsar, y sobrevive a rein
     await page.locator('.empty .primary').click();
     await expect(page.locator('.dialog h2')).toHaveText('Nueva sesión');
     await page.locator('.seg button', { hasText: 'PowerShell' }).click();
+    await expect(page.locator('input[data-field="name"]')).toHaveValue(/^PowerShell/);
     await page.locator('input[data-field="name"]').fill('Uno');
     await page.keyboard.press('Enter');
     await expect(page.locator('.row .name', { hasText: 'Uno' })).toBeVisible();
@@ -92,6 +98,7 @@ test('crear, renombrar, colorear, mover, reordenar, colapsar, y sobrevive a rein
     await stubFolder(ctx, join(ROOT, 'docs'));
     await page.locator('.add-project').click();
     await page.locator('.seg button', { hasText: 'PowerShell' }).click();
+    await expect(page.locator('input[data-field="name"]')).toHaveValue(/^PowerShell/);
     await page.locator('input[data-field="name"]').fill('Cuatro');
     await page.keyboard.press('Enter');
     await expect(page.locator('.project')).toHaveCount(2);
@@ -203,12 +210,16 @@ test('dormir, despertar, cerrar con deshacer, selector, búsqueda, zoom y ajuste
     await expect(page.locator(`.row[data-session="${b}"]`)).toHaveCount(0);
     await page.locator('.toast .link').click();
     await expect(page.locator(`.row[data-session="${b}"]`)).toBeVisible();
-    expect(await status(page, b)).toBe('asleep');
+    // Vuelve sin su proceso viejo y, como era la activa, se vuelve a seleccionar: eso la despierta (wakeOnSelect).
+    // Mirar 'asleep' aquí era una carrera con ese despertar.
+    await expect.poll(async () => (await appState(page)).state.ui.activeSessionId).toBe(b);
+    await expect.poll(() => status(page, b), { timeout: 15_000 }).toBe('idle');
 
     // Ajustes: abrir, cambiar el historial, y que los atajos no se disparen dentro.
     await page.keyboard.press('Control+,');
     await expect(page.locator('.settings h2')).toHaveText('Ajustes');
     await page.screenshot({ path: join(SHOTS, 'ajustes.png') });
+    await page.locator('.settings-nav button', { hasText: 'Terminal' }).click();
     await page.locator('input[data-field="scrollback"]').fill('5000');
     await page.locator('input[data-field="scrollback"]').blur();
     await expect.poll(async () => (await appState(page)).state.settings.scrollback).toBe(5000);
@@ -318,7 +329,7 @@ test('claude no encontrado: error claro, y corregir la ruta lo resuelve', async 
   }
 });
 
-test('el zoom también le llega al tamaño del proceso de las terminales ocultas', async () => {
+test('el zoom le llega al proceso de una terminal que estaba oculta, al volver a verla', async () => {
   const [a, b] = ['aaaaaaaa-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000002'] as const;
   const ctx = await launch({ state: makeState([{ id: a, name: 'A' }, { id: b, name: 'B' }]) });
   try {
@@ -330,8 +341,12 @@ test('el zoom también le llega al tamaño del proceso de las terminales ocultas
     await page.keyboard.press('Control+=');
     await page.keyboard.press('Control+=');
     await page.keyboard.press('Control+=');
-    await expect.poll(() => cols(a)).toBeLessThan(before);
-    // Al volver a A, el proceso y xterm coinciden: se comprueba abriendo la sesión.
+    await page.waitForTimeout(400);
+    // Una terminal oculta no se reajusta: estacionada usa el renderer de DOM, cuyas celdas miden distinto que con
+    // WebGL, así que mediría otro ancho que a la vista, y xterm recorta las columnas que sobran (#11). Conserva su
+    // tamaño hasta que se vuelve a ver.
+    expect(await cols(a)).toBe(before);
+    // Al volver a A se ajusta, y el proceso y xterm coinciden: se comprueba abriendo la sesión.
     await page.keyboard.press('Control+1');
     await expect.poll(() => cols(a)).toBeLessThan(before);
     // El proceso recibe el tamaño un momento después (D23).

@@ -1,16 +1,23 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, screen, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, screen, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
 import { checkTools } from './tools';
 import type { ToolCheck } from '../shared/types';
 import { mkdirSync } from 'node:fs';
-import { access } from 'node:fs/promises';
+import { access, stat } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { release } from 'node:os';
 import { join } from 'node:path';
 import { STATUS_LABEL } from '../shared/statusMachine';
-import { soundFor } from '../shared/sounds';
+import { CUSTOM_SOUND, soundFor } from '../shared/sounds';
+import { BADGE_SCALE_FACTOR, BADGE_SIZE, badgeDescription, badgeLabel, renderBadge, attentionCount } from '../shared/taskbar';
+import { DEFAULT_SETTINGS } from '../shared/defaults';
+import { formatSpan, type PlanUsage } from '../shared/usage';
+import { CustomSound } from './customSound';
+import { UsageAlerter } from './usageAlerter';
 import { findSession } from '../shared/reducer';
-import { isSafeId, isValidAction, sanitizeSettings } from '../shared/validate';
+import { isInsideFolder, rebasePath, samePath, subfolderOf } from '../shared/folderPaths';
+import { isPath, isSafeId, isValidAction, sanitizeSettings } from '../shared/validate';
 import { ideName, isValidIdePath, type DetectedIde, type IdeOpenResult } from '../shared/ide';
-import type { Action, AppInfo, PersistedState, SessionRecord, SessionStatus, WindowBounds } from '../shared/types';
+import type { Action, AppInfo, ChangeFolderResult, PersistedState, RelocatePick, RelocateResult, SessionRecord, SessionStatus, Settings, WindowBounds } from '../shared/types';
 import { resolveClaude } from './claude';
 import { createClipboard } from './clipboard';
 import { fileDiff, listChanges, resolveInside } from './git';
@@ -18,6 +25,7 @@ import { detectIdes, ideRootsFromEnv, launchIde } from './ide';
 import { installSharedConout } from './pty/sharedConout';
 import { APP_ORIGIN, applyNetworkSwitches, hardenSession, hardenWebContents, installEditMenu, openExternalSafe, registerAppScheme, serveRenderer } from './security';
 import { SessionController } from './sessions';
+import { isDirectory, resolveTerminalPath } from './pathOpen';
 import { Store } from './store';
 import { isSummaryText, saveSummaryFile } from './summaryFile';
 import { UpdateService } from './updater';
@@ -48,6 +56,11 @@ const store = new Store(dataDir);
 store.onSaveError = (message) => send('app:notice', message);
 const clip = createClipboard();
 let win: BrowserWindow | null = null;
+/**
+ * El renderer ya escucha los avisos de uso (#8). Antes de eso un aviso se perdería y quedaría marcado como
+ * avisado; se revisa cuando avisa que escucha, y vuelve a false si la interfaz se recarga.
+ */
+let usageListening = false;
 let quitting = false;
 let crashNotice: string | null = null;
 
@@ -61,7 +74,41 @@ const NOTIFY_TEXT: Partial<Record<SessionStatus, string>> = {
   error: 'Terminó con error',
 };
 
-const sentNotifications: { id: string; name: string; status: SessionStatus; shown?: boolean; failed?: string }[] = [];
+const sentNotifications: { id: string; name: string; status: SessionStatus | 'usage'; body?: string; shown?: boolean; failed?: string }[] = [];
+
+/** Lo que se le pidió a la barra de tareas, para las pruebas (el aviso real no se puede mirar desde fuera). */
+const taskbarCalls: { overlays: ({ label: string; description: string } | null)[]; flashes: boolean[] } = { overlays: [], flashes: [] };
+/** En pruebas el foco lo manda el gancho `__hilo.focus`: la ventana oculta no tiene foco real. */
+let testFocused = true;
+let overlayKey = '';
+
+function windowHasFocus(): boolean {
+  return isTest ? testFocused : !!win && !win.isDestroyed() && win.isFocused();
+}
+
+function setFlash(on: boolean): void {
+  if (isTest) taskbarCalls.flashes.push(on);
+  if (win && !win.isDestroyed()) win.flashFrame(on);
+}
+
+/** Círculo con las sesiones que necesitan tu atención sobre el ícono de la barra de tareas. Solo se vuelve a pedir si cambia. */
+function updateTaskbarOverlay(count: number): void {
+  if (!win || win.isDestroyed()) return;
+  const label = badgeLabel(count);
+  const description = badgeDescription(count);
+  const key = `${label}|${description}`;
+  if (key === overlayKey) return;
+  overlayKey = key;
+  const pixels = renderBadge(label);
+  if (!pixels) {
+    if (isTest) taskbarCalls.overlays.push(null);
+    win.setOverlayIcon(null, '');
+    return;
+  }
+  if (isTest) taskbarCalls.overlays.push({ label, description });
+  const icon = nativeImage.createFromBitmap(Buffer.from(pixels), { width: BADGE_SIZE, height: BADGE_SIZE, scaleFactor: BADGE_SCALE_FACTOR });
+  win.setOverlayIcon(icon, description);
+}
 
 /** Sin una referencia, el recolector puede llevarse la notificación y su clic. */
 const liveNotifications = new Set<Notification>();
@@ -75,11 +122,51 @@ function focusSession(id: string): void {
   send('session:focus', id);
 }
 
+function showWindow(): void {
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+
+/** Cambiar ajustes desde el proceso principal, con la misma limpieza que los del renderer. */
+function patchSettings(patch: Partial<Settings>): void {
+  const current = store.get().settings;
+  store.dispatch({ type: 'settings/set', patch: sanitizeSettings({ ...current, ...patch }, current) });
+}
+
+const customSound = new CustomSound(dataDir);
+
+/** Avisos de uso del plan (#8): la notificación sale de aquí, y el sonido y el aviso en pantalla, del renderer. */
+const usageAlerter = new UsageAlerter(dataDir, () => store.get().settings, (alert) => {
+  const settings = store.get().settings;
+  const what = alert.window === 'session' ? 'de tu sesión de 5 horas' : 'de tu semana';
+  const body = `Llevas el ${Math.round(alert.used)} % ${what}. Se renueva en ${formatSpan(alert.resetsAt - Date.now())}.`;
+  send('usage:alert', { window: alert.window, threshold: alert.threshold, used: alert.used, body });
+  if (!settings.usageAlertNotify) return;
+  const record: (typeof sentNotifications)[number] = { id: alert.window, name: 'Uso del plan', status: 'usage', body };
+  if (isTest) sentNotifications.push(record);
+  if ((isTest && process.env.HILO_TEST_REAL_NOTIFY !== '1') || !Notification.isSupported()) return;
+  const n = new Notification({ title: 'Uso del plan', body, silent: settings.usageAlertSound !== 'none' });
+  liveNotifications.add(n);
+  n.on('click', () => {
+    liveNotifications.delete(n);
+    showWindow();
+  });
+  n.on('close', () => liveNotifications.delete(n));
+  n.show();
+});
+
 const sessions = new SessionController(store, dataDir, {
-  send,
+  send(channel: string, ...args: unknown[]) {
+    send(channel, ...args);
+    if (channel === 'usage:update' && usageListening) usageAlerter.check(args[0] as PlanUsage | null);
+  },
   statusChanged: updateWindowTitle,
   notify(session: SessionRecord, status: SessionStatus) {
     if (!store.get().settings.notifications) return;
+    // Parpadea solo si te necesita (espera o falló) y no estás en Hilo; se apaga al darle foco.
+    if ((status === 'waiting' || status === 'error') && !windowHasFocus()) setFlash(true);
     const record: (typeof sentNotifications)[number] = { id: session.id, name: session.name, status };
     if (isTest) sentNotifications.push(record);
     if ((isTest && process.env.HILO_TEST_REAL_NOTIFY !== '1') || !Notification.isSupported()) return;
@@ -117,6 +204,7 @@ const updates = new UpdateService(updateMode, {
 function updateWindowTitle(): void {
   if (!win || win.isDestroyed()) return;
   const map = sessions.runtimeMap();
+  const attention = attentionCount(Object.values(map).map((r) => r.status));
   let waiting = 0;
   let done = 0;
   let error = 0;
@@ -125,6 +213,7 @@ function updateWindowTitle(): void {
     else if (r.status === 'done') done++;
     else if (r.status === 'error') error++;
   }
+  updateTaskbarOverlay(attention);
   const parts: string[] = [];
   if (waiting) parts.push(`${waiting} esperando`);
   if (error) parts.push(`${error} con error`);
@@ -185,7 +274,11 @@ function createWindow(): void {
   installEditMenu(win.webContents);
   void win.webContents.setVisualZoomLevelLimits(1, 1).catch(() => undefined);
   win.webContents.on('did-finish-load', applyAppZoom);
+  win.webContents.on('did-start-loading', () => {
+    usageListening = false;
+  });
   win.webContents.on('render-process-gone', (_event, details) => {
+    usageListening = false;
     if (details.reason === 'clean-exit' || quitting) return;
     console.error('[hilo] se cayó la interfaz:', details.reason);
     // Las terminales vivían ahí: se duermen las sesiones (las conversaciones están guardadas) y se recarga.
@@ -214,7 +307,10 @@ function createWindow(): void {
   win.on('move', saveBounds);
   win.on('maximize', saveBounds);
   win.on('unmaximize', saveBounds);
-  win.on('focus', () => send('window:focus', true));
+  win.on('focus', () => {
+    setFlash(false);
+    send('window:focus', true);
+  });
   win.on('blur', () => send('window:focus', false));
 
   win.on('close', (event) => {
@@ -296,6 +392,106 @@ async function openInIde(projectId: unknown, file: unknown, line: unknown): Prom
     if (typeof line === 'number' && Number.isInteger(line) && line > 0 && line < 1e8) target.line = line;
   }
   return launchIde(project.ide.path, target);
+}
+
+/**
+ * Cambiar la carpeta de un proyecto (#7), en dos pasos para que la ruta nunca venga del renderer: el diálogo de
+ * Windows se abre aquí, la ruta elegida se guarda aquí con un código de un solo uso, y el renderer solo recibe el
+ * código (y la ruta, para mostrarla). El segundo paso canjea el código.
+ */
+const pendingRelocations = new Map<string, { projectId: string; from: string; to: string }>();
+const MAX_PENDING_RELOCATIONS = 8;
+
+/** Una carpeta de red no se comprueba (una caída congelaría la respuesta): se confía en lo que eligió la persona. */
+async function folderExists(path: string): Promise<boolean> {
+  return /^[\\/]{2}/.test(path) || isDirectory(path);
+}
+
+async function askFolder(title: string): Promise<string | null> {
+  if (!win) return null;
+  const result = await dialog.showOpenDialog(win, { properties: ['openDirectory'], title });
+  const path = result.canceled ? null : (result.filePaths[0] ?? null);
+  return path && isPath(path) ? path : null;
+}
+
+async function pickProjectFolder(projectId: unknown): Promise<RelocatePick> {
+  const first = projectById(projectId);
+  if (!first) return { status: 'problem', message: 'Ese proyecto ya no está.' };
+  const chosen = await askFolder(`Elige la nueva carpeta de «${first.name}»`);
+  if (!chosen) return { status: 'cancelled' };
+  // El diálogo es asíncrono: vale lo que hay ahora.
+  const project = projectById(first.id);
+  if (!project) return { status: 'problem', message: 'Ese proyecto ya no está.' };
+  if (!(await folderExists(chosen))) return { status: 'problem', message: 'Esa carpeta no existe.' };
+  if (samePath(chosen, project.path)) return { status: 'problem', message: `«${project.name}» ya usa esa carpeta.` };
+  const other = store.get().projects.find((p) => p.id !== project.id && samePath(p.path, chosen));
+  if (other) return { status: 'problem', message: `Esa carpeta ya es la del proyecto «${other.name}». Cambia o quita uno de los dos primero.` };
+
+  const inside = project.sessions.filter((s) => isInsideFolder(s.cwd, project.path));
+  const listed = await Promise.all(
+    inside.map(async (s) => ({ id: s.id, name: s.name, kind: s.kind, exists: await folderExists(s.cwd), sub: subfolderOf(s.cwd, project.path) ?? '' })),
+  );
+  const outside = project.sessions.filter((s) => !isInsideFolder(s.cwd, project.path));
+  const outsideMissing = (await Promise.all(outside.map((s) => folderExists(s.cwd)))).filter((ok) => !ok).length;
+
+  const token = randomUUID();
+  pendingRelocations.set(token, { projectId: project.id, from: project.path, to: chosen });
+  // Los códigos que nadie canjeó no se acumulan: se olvidan los más viejos.
+  for (const old of [...pendingRelocations.keys()].slice(0, Math.max(0, pendingRelocations.size - MAX_PENDING_RELOCATIONS))) pendingRelocations.delete(old);
+  return { status: 'ok', token, from: project.path, to: chosen, sessions: listed, outside: outside.length, outsideMissing };
+}
+
+async function applyProjectFolder(projectId: unknown, token: unknown, sessionIds: unknown): Promise<RelocateResult> {
+  const fail = (message: string): RelocateResult => ({ ok: false, message });
+  if (!isSafeId(projectId) || !isStr(token) || !Array.isArray(sessionIds) || sessionIds.length > 2000 || !sessionIds.every(isSafeId)) {
+    return fail('No se pudo cambiar la carpeta.');
+  }
+  // De un solo uso, salga bien o mal.
+  const pending = pendingRelocations.get(token);
+  pendingRelocations.delete(token);
+  if (!pending || pending.projectId !== projectId) return fail('No se pudo cambiar la carpeta: vuelve a elegirla.');
+  const project = projectById(projectId);
+  if (!project) return fail('Ese proyecto ya no está.');
+  if (!samePath(project.path, pending.from)) return fail('La carpeta del proyecto cambió mientras tanto: vuelve a elegirla.');
+  if (!(await folderExists(pending.to))) return fail('Esa carpeta ya no existe.');
+
+  // Solo las del proyecto que estaban dentro de la carpeta vieja: lo demás que mande el renderer se ignora.
+  const wanted = new Set(sessionIds);
+  const moves: { id: string; cwd: string }[] = [];
+  let fellBack = 0;
+  for (const s of project.sessions) {
+    if (!wanted.has(s.id) || !isInsideFolder(s.cwd, project.path)) continue;
+    let cwd = rebasePath(s.cwd, project.path, pending.to);
+    if (!cwd) continue;
+    // Si su subcarpeta no está en la nueva, se abre en la raíz del proyecto en vez de quedarse sin carpeta.
+    if (!(await folderExists(cwd))) {
+      cwd = pending.to;
+      fellBack++;
+    }
+    moves.push({ id: s.id, cwd });
+  }
+  // Tras los await otro cambio pudo mover o duplicar la carpeta: se comprueba otra vez, y hasta el dispatch no hay esperas.
+  const now = projectById(projectId);
+  if (!now || !samePath(now.path, pending.from)) return fail('La carpeta del proyecto cambió mientras tanto: vuelve a elegirla.');
+  if (store.get().projects.some((p) => p.id !== now.id && samePath(p.path, pending.to))) return fail('Esa carpeta ya es de otro proyecto.');
+  store.dispatch({ type: 'project/relocate', id: now.id, path: pending.to, sessions: moves });
+  const awake = moves.filter((m) => sessions.cwdChanged(m.id)).map((m) => m.id);
+  return { ok: true, moved: moves.length, fellBack, awake };
+}
+
+/** La carpeta de una sesión suelta (#7): lo mismo que `session:fixFolder`, sin su guarda de «faltaba». */
+async function changeSessionFolder(id: unknown): Promise<ChangeFolderResult> {
+  const first = isSafeId(id) ? findSession(store.get(), id) : null;
+  if (!first) return { ok: false, message: 'Esa sesión ya no está.' };
+  const chosen = await askFolder(`Elige la carpeta de «${first.session.name}»`);
+  if (!chosen) return { ok: false };
+  const found = findSession(store.get(), first.session.id);
+  if (!found) return { ok: false, message: 'Esa sesión ya no está.' };
+  if (!(await folderExists(chosen))) return { ok: false, message: 'Esa carpeta no existe.' };
+  if (samePath(chosen, found.session.cwd)) return { ok: false, message: 'Esa ya es la carpeta de esta sesión.' };
+  const wasMissing = sessions.hasMissingCwd(found.session.id);
+  store.dispatch({ type: 'session/cwd', id: found.session.id, cwd: chosen });
+  return { ok: true, awake: sessions.cwdChanged(found.session.id), wasMissing };
 }
 
 function registerIpc(): void {
@@ -430,6 +626,38 @@ function registerIpc(): void {
     if (!dir) return { ok: false, message: '' };
     return saveSummaryFile(dir, text, new Date());
   });
+  // La carpeta de una sesión ya no existe (#6). La ruta nunca viene del renderer: sale del diálogo de Windows
+  // o del proyecto guardado. La conversación no se toca: se retoma por su id desde la carpeta nueva.
+  handle('session:fixFolder', async (id: unknown, mode: unknown): Promise<{ ok: boolean; message?: string }> => {
+    if (!isSafeId(id) || (mode !== 'pick' && mode !== 'project')) return { ok: false };
+    const found = findSession(store.get(), id);
+    if (!found) return { ok: false };
+    // Solo si la carpeta de la sesión faltaba de verdad al despertarla: no se cambia la de una sesión sana.
+    if (!sessions.hasMissingCwd(id)) return { ok: false, message: 'La carpeta de esta sesión sí existe.' };
+    let cwd: string | null;
+    if (mode === 'project') {
+      cwd = found.project.path;
+    } else {
+      if (!win) return { ok: false };
+      const result = await dialog.showOpenDialog(win, {
+        properties: ['openDirectory'],
+        title: `Elige dónde está ahora la carpeta de «${found.session.name}»`,
+      });
+      cwd = result.canceled ? null : (result.filePaths[0] ?? null);
+    }
+    if (!cwd) return { ok: false };
+    if (!isPath(cwd)) return { ok: false, message: 'Esa ruta no sirve.' };
+    const isDir = await stat(cwd).then((s) => s.isDirectory(), () => false);
+    if (!isDir) return { ok: false, message: mode === 'project' ? 'La carpeta del proyecto tampoco existe.' : 'Esa carpeta no existe.' };
+    store.dispatch({ type: 'session/cwd', id, cwd });
+    return { ok: true };
+  });
+  // Cambiar la carpeta (#7). Las rutas salen del diálogo de Windows, abierto aquí: el renderer no manda ninguna.
+  handle('project:pickFolder', (projectId: unknown) => pickProjectFolder(projectId));
+  handle('project:applyFolder', (projectId: unknown, token: unknown, sessionIds: unknown) => applyProjectFolder(projectId, token, sessionIds));
+  handle('session:changeFolder', (id: unknown) => changeSessionFolder(id));
+  // Salida explícita cuando el historial existe pero Claude no lo retoma (#6): la persona decide empezar de nuevo.
+  handle('session:freshConversation', (id: unknown) => (isSafeId(id) ? sessions.startFreshConversation(id) : false));
   handle('dialog:pickFile', async () => {
     if (!win) return null;
     const result = await dialog.showOpenDialog(win, {
@@ -441,6 +669,37 @@ function registerIpc(): void {
   });
 
   handle('usage:get', () => sessions.planUsage());
+  handle('usage:listen', () => {
+    usageListening = true;
+    usageAlerter.check(sessions.planUsage());
+  });
+  // Sonido propio (#12): la ruta sale del diálogo nativo y nunca del renderer, que solo recibe los bytes.
+  handle('sound:pick', async () => {
+    let source = isTest ? process.env.HILO_TEST_SOUND_FILE : undefined;
+    if (!source) {
+      if (!win) return null;
+      const r = await dialog.showOpenDialog(win, {
+        properties: ['openFile'],
+        title: 'Elige un audio para los avisos',
+        filters: [{ name: 'Audio', extensions: ['mp3', 'wav', 'ogg'] }],
+      });
+      if (r.canceled || !r.filePaths[0]) return null;
+      source = r.filePaths[0];
+    }
+    const result = customSound.adopt(source);
+    if (result.ok) patchSettings({ customSoundName: result.name });
+    return result;
+  });
+  handle('sound:read', () => customSound.read());
+  handle('sound:clear', () => {
+    customSound.clear();
+    const current = store.get().settings;
+    const patch: Partial<Settings> = { customSoundName: '' };
+    for (const key of ['soundDone', 'soundWaiting', 'soundError', 'usageAlertSound'] as const) {
+      if (current[key] === CUSTOM_SOUND) patch[key] = DEFAULT_SETTINGS[key];
+    }
+    patchSettings(patch);
+  });
   handle('session:lastMessage', (id: unknown) => (isStr(id) ? sessions.lastMessage(id) : null));
   handle('session:markRead', (id: unknown) => (isStr(id) ? sessions.markRead(id) : undefined));
   // La ruta sale del estado guardado, nunca del renderer.
@@ -466,6 +725,46 @@ function registerIpc(): void {
   on('link:open', (url: unknown) => {
     if (isStr(url)) openExternalSafe(url);
   });
+  // Rutas que se ven en una terminal (#10, D35). El renderer manda el texto tal cual; la carpeta desde la que se
+  // resuelve sale de la sesión guardada. Solo se mira si existe: no se lee nada.
+  handle('path:resolve', async (id: unknown, paths: unknown) => {
+    const found = isSafeId(id) ? findSession(store.get(), id) : null;
+    if (!found || !Array.isArray(paths) || paths.length > 40) return [];
+    return Promise.all(paths.map((raw) => resolveTerminalPath(raw, found.session.cwd, found.project.path)));
+  });
+  handle('path:reveal', async (id: unknown, raw: unknown) => {
+    const found = isSafeId(id) ? findSession(store.get(), id) : null;
+    if (!found) return 'Esa sesión ya no está.';
+    const target = await resolveTerminalPath(raw, found.session.cwd, found.project.path);
+    if (!target) return 'Ese archivo ya no está ahí.';
+    return revealPath(target.abs, target.dir);
+  });
+  handle('session:openFolder', async (id: unknown) => {
+    const found = isSafeId(id) ? findSession(store.get(), id) : null;
+    if (!found) return 'Esa sesión ya no está.';
+    if (!(await isDirectory(found.session.cwd))) return `La carpeta de esta sesión ya no existe:\n${found.session.cwd}`;
+    return revealPath(found.session.cwd, true);
+  });
+}
+
+/** Lo que se mostró en el Explorador, para las pruebas: ahí no se abre nada. */
+const revealedPaths: { path: string; dir: boolean }[] = [];
+
+/**
+ * Muestra algo en el Explorador. Una carpeta se abre; un archivo se marca dentro de la suya y nunca se abre:
+ * con `openPath`, un `.exe` o un `.bat` se ejecutaría.
+ */
+async function revealPath(path: string, dir: boolean): Promise<string> {
+  if (isTest) {
+    revealedPaths.push({ path, dir });
+    return '';
+  }
+  if (!dir) {
+    shell.showItemInFolder(path);
+    return '';
+  }
+  const problem = await shell.openPath(path);
+  return problem ? `No se pudo abrir ${path}: ${problem}` : '';
 }
 
 function appInfo(): AppInfo {
@@ -518,9 +817,15 @@ app.whenReady().then(() => {
       store,
       updates,
       sentNotifications,
+      revealedPaths,
       focusSession,
       pidOf: (id: string) => (sessions as unknown as { live: Map<string, { pid: number }> }).live.get(id)?.pid,
-      focus: (focused: boolean) => send('window:focus', focused),
+      focus: (focused: boolean) => {
+        testFocused = focused;
+        if (focused) setFlash(false);
+        send('window:focus', focused);
+      },
+      taskbarCalls,
       statusOf: (id: string) => sessions.statusOf(id),
       findSession: (id: string) => findSession(store.get(), id),
     };

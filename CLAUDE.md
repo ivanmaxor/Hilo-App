@@ -24,7 +24,7 @@ npm run typecheck
 npm run e2e          # Playwright sobre la app real, sin Claude
 npm run privacy      # correos, rutas con usuario y claves: lo mismo que revisa el CI
 npm run dist         # release/Hilo-Setup-x.y.z.exe, .blockmap y latest.yml. No publica nada. Antes, las novedades en src/shared/changelog.ts
-node scripts/publish-release.mjs --dry-run   # solo el dueño: comprueba y muestra qué subiría; sin --dry-run publica
+node scripts/publish-release.mjs --key <clave privada> --dry-run   # solo el dueño: firma (D36), comprueba y muestra qué subiría; sin --dry-run publica
 ```
 
 Pruebas con Claude real (consumen poco, usan haiku):
