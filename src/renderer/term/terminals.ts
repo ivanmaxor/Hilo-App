@@ -697,24 +697,27 @@ export class TerminalManager {
     await this.copyText(entry, joinHardWrapped(entry.term.getSelection(), entry.term.cols, startCol));
   }
 
-  /** `given`: texto que no viene del portapapeles (archivos soltados). Pasa por el mismo camino. */
-  async paste(entry: Entry, given?: string): Promise<void> {
-    if (this.holdPaste(entry, given !== undefined)) return;
-    if (entry.confirming) return;
+  /**
+   * `given`: texto que no viene del portapapeles (archivos soltados, la respuesta de otra sesión). Pasa por el mismo camino.
+   * Devuelve si llegó a pegarse.
+   */
+  async paste(entry: Entry, given?: string): Promise<boolean> {
+    if (this.holdPaste(entry, given !== undefined)) return false;
+    if (entry.confirming) return false;
     // Lo tecleado antes de pedir este pegado sale antes, aunque el despertar tarde.
     const typedBefore = entry.heldInput.length;
     entry.pastePending++;
     try {
       if (entry.wakeDone) {
         await entry.wakeDone;
-        if (entry.startQuestion) return;
+        if (entry.startQuestion) return false;
       }
       const { text, hasImage } = given !== undefined ? { text: given, hasImage: false } : await api.clipRead();
-      if (!this.entries.has(entry.id)) return;
-      if (this.holdPaste(entry, given !== undefined)) return;
+      if (!this.entries.has(entry.id)) return false;
+      if (this.holdPaste(entry, given !== undefined)) return false;
       if (!entry.spawned) {
         if (text || hasImage) this.callbacks.toast('Esta terminal ya no tiene proceso: no se pegó nada.');
-        return;
+        return false;
       }
       if (!text) {
         // Solo hay imagen: es lo mismo que Alt+V en Claude.
@@ -725,20 +728,20 @@ export class TerminalManager {
         } else {
           this.callbacks.toast(hasImage ? 'El portapapeles solo tiene una imagen: esta terminal no puede pegarla.' : 'El portapapeles no tiene texto.');
         }
-        return;
+        return false;
       }
       const clean = sanitizePaste(text);
-      if (!clean) return;
+      if (!clean) return false;
       const multiline = /[\r\n]/.test(clean);
       // Claude activa el bracketed paste al arrancar: se le da tiempo. Pegar antes le llegaría
       // como teclas sueltas, y en el diálogo de confianza un salto sería responder.
       if (entry.kind === 'claude' && multiline) {
         await this.waitForBracketedPaste(entry);
-        if (!this.entries.has(entry.id)) return;
-        if (this.holdPaste(entry, given !== undefined)) return;
+        if (!this.entries.has(entry.id)) return false;
+        if (this.holdPaste(entry, given !== undefined)) return false;
         if (!entry.spawned) {
           this.callbacks.toast('Esta terminal ya no tiene proceso: no se pegó nada.');
-          return;
+          return false;
         }
       }
       // Una clave pegada va al modelo y queda en la conversación en disco: se avisa siempre, con o sin
@@ -747,7 +750,7 @@ export class TerminalManager {
       const runsLines = this.settings.confirmMultilinePaste && !entry.term.modes.bracketedPasteMode && multiline;
       if (secrets.length > 0 || runsLines) {
         // Otro pegado que ya había leído el portapapeles antes de abrirse este diálogo.
-        if (entry.confirming) return;
+        if (entry.confirming) return false;
         const lines = runsLines ? clean.split(/\r\n|\r|\n/).filter((l) => l !== '').length : 0;
         entry.confirming = true;
         let ok = false;
@@ -756,12 +759,12 @@ export class TerminalManager {
         } finally {
           entry.confirming = false;
         }
-        if (!ok) return;
+        if (!ok) return false;
         if (!this.entries.has(entry.id) || !entry.spawned) {
           this.callbacks.toast('Esta terminal ya no tiene proceso: no se pegó nada.');
-          return;
+          return false;
         }
-        if (this.holdPaste(entry, given !== undefined)) return;
+        if (this.holdPaste(entry, given !== undefined)) return false;
         entry.term.focus();
       }
       if (typedBefore > 0) api.write(entry.id, entry.heldInput.splice(0, typedBefore).join(''));
@@ -769,9 +772,11 @@ export class TerminalManager {
       entry.emittingPaste = true;
       entry.term.paste(clean);
       entry.emittingPaste = false;
+      return true;
     } catch (err) {
       console.error('[pegar]', err);
       this.callbacks.toast('No se pudo leer el portapapeles. Inténtalo otra vez.');
+      return false;
     } finally {
       entry.emittingPaste = false;
       entry.pastePending--;
@@ -1176,15 +1181,21 @@ export class TerminalManager {
     if (entry) await this.paste(entry);
   }
 
+  /** Pega un texto de Hilo (no el portapapeles) en una terminal concreta. Devuelve si llegó a pegarse. */
+  async pasteTextInto(id: string, text: string): Promise<boolean> {
+    const entry = this.entries.get(id);
+    return entry ? this.paste(entry, text) : false;
+  }
+
   /** Solo para pruebas automáticas. */
   debugEntry(id: string): { term: Terminal; hasGl: boolean; parked: boolean } | null {
     const entry = this.entries.get(id);
     return entry ? { term: entry.term, hasGl: !!entry.gl, parked: entry.host === null } : null;
   }
 
-  debugPaste(id: string): Promise<void> {
+  async debugPaste(id: string): Promise<void> {
     const entry = this.entries.get(id);
-    return entry ? this.paste(entry) : Promise.resolve();
+    if (entry) await this.paste(entry);
   }
 
   debugGlCount(): number {

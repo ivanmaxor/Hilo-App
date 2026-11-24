@@ -47,7 +47,7 @@ const api = {
   pathExists: (p: string) => ipcRenderer.invoke('path:exists', p),
   toolsCheck: () => ipcRenderer.invoke('tools:check'),
   usageGet: () => ipcRenderer.invoke('usage:get'),
-  lastMessage: (id: string) => ipcRenderer.invoke('session:lastMessage', id),
+  lastMessage: (id: string, forSend?: boolean) => ipcRenderer.invoke('session:lastMessage', id, forSend === true),
   markRead: (id: string) => ipcRenderer.invoke('session:markRead', id),
   openProjectFolder: (id: string) => ipcRenderer.invoke('project:openFolder', id),
   pathResolve: (id: string, paths: string[]) => ipcRenderer.invoke('path:resolve', id, paths),

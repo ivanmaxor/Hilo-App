@@ -9,6 +9,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { DEFAULT_SETTINGS } from '../shared/defaults';
 import { STATUS_PRIORITY } from '../shared/statusMachine';
 import { allSessions, findSession } from '../shared/reducer';
+import { replyTargetProblem } from '../shared/lastMessage';
 import { SECRET_LABELS } from '../shared/secretScan';
 import { buildKeymap, eventToKeys, isModifierOnly, prettyKeys, SHORTCUTS } from '../shared/shortcuts';
 import type {
@@ -62,6 +63,8 @@ export type Modal =
   | { type: 'settings'; section?: string }
   | { type: 'quick' }
   | { type: 'summary' }
+  /** El mismo selector que `quick`, pero para elegir a qué sesión pegarle la última respuesta de `fromId`. */
+  | { type: 'sendReply'; fromId: string }
   | { type: 'setup'; tools: ToolCheck }
   /** Elegir el IDE de un proyecto. Si se venía a abrir algo, se abre después de elegir. */
   | { type: 'ide'; projectId: string; file: string | null; line: number | null }
@@ -1120,6 +1123,52 @@ export async function copyLastMessage(id: string): Promise<void> {
   }
 }
 
+/**
+ * Pega la última respuesta de `fromId` en la sesión `toId`, con `De «Nombre»:` delante y sin Enter, y deja
+ * esa sesión a la vista para que la persona la revise antes de enviarla. Una sesión dormida se despierta antes:
+ * `paste()` espera a que Claude atienda. Pasa por el mismo `paste()` de siempre (detector de claves y confirmación
+ * de varias líneas incluidos), así que la persona puede cancelar el pegado: entonces no se avisa que se pegó.
+ */
+export async function sendLastReply(fromId: string, toId: string): Promise<void> {
+  const from = findSession(app.get().state, fromId);
+  const target = (): string | null => {
+    const to = findSession(app.get().state, toId);
+    if (!to) return 'Esa sesión ya no existe.';
+    if (toId === fromId) return 'Elige otra sesión: esa es la de la respuesta.';
+    const problem = replyTargetProblem(to.session.kind, statusOf(toId), to.session.name);
+    if (problem) return problem;
+    // Una dormida todavía no tiene terminal: se crea al despertarla.
+    return statusOf(toId) === 'asleep' || terminals.has(toId) ? null : `«${to.session.name}» no tiene terminal abierta.`;
+  };
+  if (!from) return;
+  if (from.session.kind !== 'claude') {
+    toast('Eso es una PowerShell: solo las sesiones de Claude tienen una respuesta para enviar.');
+    return;
+  }
+  const before = target();
+  if (before) {
+    toast(before);
+    return;
+  }
+  const text = await api.lastMessage(fromId, true).catch(() => null);
+  if (!text) {
+    toast(`«${from.session.name}» todavía no tiene un mensaje de Claude para enviar.`);
+    return;
+  }
+  // Pudo cerrarse o ponerse a esperar mientras se leía la conversación.
+  const after = target();
+  if (after) {
+    toast(after);
+    return;
+  }
+  const to = findSession(app.get().state, toId)!;
+  await selectSession(toId);
+  // Con "Despertar al seleccionar" ya la despertó `selectSession`; sin él, se despierta igual: es lo que se pidió.
+  if (statusOf(toId) === 'asleep') await wakeSession(toId);
+  const pasted = await terminals.pasteTextInto(toId, text);
+  if (pasted) toast(`Se pegó la respuesta de «${from.session.name}» en «${to.session.name}». Revísala y pulsa Enter para enviarla.`);
+}
+
 export function runCommand(action: string): void {
   const { state } = app.get();
   const active = state.ui.activeSessionId;
@@ -1475,6 +1524,6 @@ export async function initController(): Promise<void> {
   }
 
   if (initial.info.isTest) {
-    (window as unknown as { __hiloTest: unknown }).__hiloTest = { terminals, app, view, playedSounds, runCommand, selectSession, sleepSession, createSession, wakeSession, closeSession, clock };
+    (window as unknown as { __hiloTest: unknown }).__hiloTest = { terminals, app, view, playedSounds, runCommand, selectSession, sleepSession, createSession, wakeSession, closeSession, sendLastReply, clock };
   }
 }
