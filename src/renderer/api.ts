@@ -1,6 +1,6 @@
 import type { PlanUsage } from '../shared/usage';
 import type { TerminalPath } from '../shared/pathLinks';
-import type { Action, AppInfo, BackgroundProcess, PersistedState, RuntimeMap, SessionRuntime, SessionStatus, ToolCheck } from '../shared/types';
+import type { Action, AppInfo, BackgroundProcess, ChangeFolderResult, PersistedState, RelocatePick, RelocateResult, RuntimeMap, SessionRuntime, SessionStatus, ToolCheck } from '../shared/types';
 import type { UpdateStatus } from '../shared/updates';
 import type { ChangesList, FileDiffRequest, FileDiffResult } from '../shared/diff';
 import type { DetectedIde, IdeOpenResult } from '../shared/ide';
@@ -25,6 +25,12 @@ export interface HiloApi {
   pickFile(): Promise<string | null>;
   /** La carpeta de una sesión ya no existe: 'pick' abre el diálogo de Windows, 'project' usa la carpeta del proyecto. */
   fixFolder(id: string, mode: 'pick' | 'project'): Promise<{ ok: boolean; message?: string }>;
+  /** Cambiar la carpeta de un proyecto (#7), paso 1: el diálogo de Windows se abre en el proceso principal, que guarda la ruta y devuelve un código de un solo uso. */
+  pickProjectFolder(projectId: string): Promise<RelocatePick>;
+  /** Paso 2: canjea el código (nunca una ruta) y mueve las sesiones marcadas que estaban dentro de la carpeta vieja. */
+  applyProjectFolder(projectId: string, token: string, sessionIds: string[]): Promise<RelocateResult>;
+  /** Cambiar la carpeta de una sesión (#7), con el diálogo de Windows abierto en el proceso principal. */
+  changeSessionFolder(id: string): Promise<ChangeFolderResult>;
   /** Su historial existe pero Claude no lo retoma: empieza una conversación nueva en esta sesión. El historial viejo no se toca. */
   freshConversation(id: string): Promise<boolean>;
   pathExists(path: string): Promise<boolean>;

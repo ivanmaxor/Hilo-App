@@ -151,7 +151,7 @@ El botón **Cambios** de la barra de pestañas (Ctrl+Shift+G, o clic derecho en 
 ## Qué toca en tu sistema
 
 - Su única conexión a internet es con GitHub, para buscar y bajar versiones: una vez al abrir, si no la apagas, y cuando lo pides. No hay telemetría ni fuentes remotas, y no se envía nada aparte de pedir esos archivos. Claude Code se conecta por su cuenta, como en cualquier terminal.
-- Sin firma todavía: una actualización se comprueba contra el sha512 que publica GitHub, por HTTPS. Protege de una descarga dañada, no de que alguien tome la cuenta de GitHub.
+- Cada actualización viene firmada por quien publica Hilo, y Hilo comprueba la firma antes de ofrecer instalarla. Si alguien cambiara una versión publicada en GitHub, no se instalaría.
 - Nunca lee tu token ni tus credenciales.
 - No toca tu configuración global de Claude Code. Los hooks de estado van solo a las sesiones que abre Hilo, con `claude --settings`. El hook escribe únicamente el nombre del evento en un archivo de `%APPDATA%\Hilo\hooks`; no lee tu prompt ni tus comandos. Se puede apagar en Ajustes.
 - Sí lee, sin modificarlo, `~/.claude/sessions/<pid>.json` de sus propias sesiones, para saber cuándo una sesión dejó de esperarte.

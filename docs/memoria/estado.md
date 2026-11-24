@@ -39,4 +39,4 @@ Para probar como el CI en un PC que sí tiene Claude: `HILO_TEST_TOOLS='{"claude
 
 ## Lo que se sabe que falta
 
-- **Las actualizaciones no van firmadas.** Sin certificado (cuesta dinero), la única comprobación es el sha512 de `latest.yml` por HTTPS. Quien pueda editar una Release podría cambiar lo que reciben los usuarios. Ver la idea de firmar `latest.yml` en [roadmap.md](roadmap.md).
+- **Las actualizaciones van firmadas desde la 1.4.0** (D36), con Ed25519 y sin certificado de Windows: SmartScreen sigue avisando al instalar Hilo por primera vez. Las claves privadas están en la carpeta privada del dueño; si se pierden las dos, nadie se actualiza solo.

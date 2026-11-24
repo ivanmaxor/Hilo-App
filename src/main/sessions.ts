@@ -221,6 +221,21 @@ export class SessionController {
   }
 
   /**
+   * La carpeta de la sesión cambió (#7). Devuelve si tiene proceso: ese sigue en la carpeta vieja, y no se apaga ni se
+   * reinicia por su cuenta; recién al dormirla y despertarla retoma por id desde la nueva. Una que no pudo arrancar por
+   * su carpeta vuelve a dormida, y su aviso de carpeta inexistente deja de valer.
+   */
+  cwdChanged(id: string): boolean {
+    if (this.live.has(id)) return true;
+    if (this.missingCwd.has(id)) {
+      this.missingCwd.delete(id);
+      this.messages.delete(id);
+      this.apply(id, { t: 'sleep' });
+    }
+    return false;
+  }
+
+  /**
    * Salida explícita cuando el historial existe pero Claude no lo retoma: la persona elige empezar una conversación
    * nueva. El historial viejo no se toca ni se borra: sigue guardado por Claude. Hilo nunca lo hace por su cuenta.
    */
