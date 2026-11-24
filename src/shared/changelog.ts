@@ -20,6 +20,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       "El ícono de la barra de tareas muestra cuántas sesiones te necesitan, y parpadea cuando una te espera o falla.",
       "Un panel se puede agrandar a toda la ventana un momento, con su botón o con doble clic en la cabecera.",
       "Cada sesión muestra su rama de Git y cuánto lleva en su estado.",
+      "Enviar la última respuesta de una sesión de Claude a otra, desde su clic derecho: se pega sin Enter, para que la revises.",
+      "Comentarios en el panel Cambios: deja uno en cualquier línea del diff y envíalos todos juntos a una sesión de Claude, sin Enter.",
       "Cambiar la carpeta de un proyecto o de una sesión, desde su clic derecho. Las conversaciones se retoman aunque la carpeta se haya movido, y nunca se empieza una nueva sin preguntarte.",
       "Ajustes por módulos, con buscador. Tu propio sonido de aviso (mp3, wav u ogg) y avisos cuando llevas un porcentaje de tu sesión de 5 horas o de la semana.",
       "Las actualizaciones vienen firmadas: Hilo comprueba la firma antes de instalarlas.",

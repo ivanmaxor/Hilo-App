@@ -1,6 +1,6 @@
 # Estado
 
-Actualizado: 2026-11-23.
+Actualizado: 2026-11-24.
 
 ## Versión publicada
 
@@ -14,7 +14,7 @@ Hasta la 1.3.9 el código se escribía en un repo privado y se copiaba aquí lim
 
 ## Pruebas e2e
 
-El CI corre las e2e en `windows-latest` (89 pasan y 16 se omiten: las de Claude real y las de red). Las tres que fallaban a veces eran carreras de tiempo de las pruebas, no fallas de la app (#3):
+El CI corre las e2e en `windows-latest` (138 pasan y 19 se omiten: las de Claude real y las de red). Las tres que fallaban a veces eran carreras de tiempo de las pruebas, no fallas de la app (#3):
 
 - `pestanas`, "cerrar desde el menú": Escape llegaba antes de que el diálogo lo escuchara. Ahora espera a que "Cancelar" tenga el foco.
 - `leak`, "libera la terminal": el atajo de cerrar ignora una pulsación a menos de 800 ms de la anterior, y la prueba pulsaba antes. Ahora espera esa ventana.
@@ -22,6 +22,8 @@ El CI corre las e2e en `windows-latest` (89 pasan y 16 se omiten: las de Claude 
 - `ajustes-scroll`: falló 2 veces en tanda, pero no se pudo reproducir en más de 50 corridas. Sin cambios; si vuelve a fallar, abrir un Issue con el log.
 - `leak`, otra vez (CI del #30): la pulsación llegó a la app dentro de los 800 ms de la anterior, porque el reloj de la prueba no es el de la app. Ahora, si la sesión sigue activa y nadie la cierra, la prueba pulsa otra vez.
 - `cambios`, "vive en el árbol": se colgó una vez bajo la carga de 4 suites completas a la vez, y pasó 24 de 24 al repetirla. No reproducido.
+- `rutas`, el diálogo del IDE (#46): un Escape demasiado pronto se perdía y el fondo del diálogo tapaba el clic siguiente. Ahora insiste hasta que el diálogo se cierra.
+- `split`, arrastrar (#48): con carga, Chromium a veces no arranca el arrastre. Ahora lo comprueba y repite el gesto, soltando fuera de la fila.
 
 Para probar como el CI en un PC que sí tiene Claude: `HILO_TEST_TOOLS='{"claude":null,"git":null}' npx playwright test`. Al leer resultados de Playwright, no filtrar líneas: un filtro escondió fallas una vez.
 
@@ -35,6 +37,7 @@ Para probar como el CI en un PC que sí tiene Claude: `HILO_TEST_TOOLS='{"claude
 - Abrir en un IDE real (NetBeans y los demás solo con pruebas).
 - El 35 % de velocidad del touchpad no se calibró con hardware real.
 - Clic en una ruta de la terminal con el Explorador y un IDE reales (#10): las pruebas anotan lo que se abriría.
+- Enviar la última respuesta a otra sesión (#42) y los comentarios del diff (#44) con Claude real: las pruebas usan una sesión falsa.
 - La pantalla clásica de Claude (1.3.7) y cómo suenan los sonidos (1.3.8 y 1.3.9) en parlantes reales.
 
 ## Lo que se sabe que falta
