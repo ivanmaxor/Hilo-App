@@ -9,6 +9,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { DEFAULT_SETTINGS } from '../shared/defaults';
 import { STATUS_PRIORITY } from '../shared/statusMachine';
 import { allSessions, findSession } from '../shared/reducer';
+import { SECRET_LABELS } from '../shared/secretScan';
 import { buildKeymap, eventToKeys, isModifierOnly, prettyKeys, SHORTCUTS } from '../shared/shortcuts';
 import type {
   Action,
@@ -1291,12 +1292,21 @@ export async function initController(): Promise<void> {
     activate: (id) => {
       if (app.get().state.ui.activeSessionId !== id) void dispatch({ type: 'ui/select', id });
     },
-    confirmMultilinePaste: async (lines) => {
-      const ok = await confirmDialog({
-        title: lines > 1 ? `Vas a pegar ${lines} líneas` : 'Lo que vas a pegar termina en un salto de línea',
-        body: 'Esta terminal no distingue un pegado de lo que escribes: cada salto de línea se ejecuta como si pulsaras Enter. Esto se puede desactivar en Ajustes.',
-        ok: 'Pegar',
-      });
+    confirmPaste: async ({ lines, secrets }) => {
+      const multi = 'Esta terminal no distingue un pegado de lo que escribes: cada salto de línea se ejecuta como si pulsaras Enter. Esto se puede desactivar en Ajustes.';
+      const ok = secrets.length
+        ? await confirmDialog({
+            title: 'Esto parece una clave',
+            body: `Lo que pegas va a la terminal y, si es Claude, al modelo y a la conversación guardada en disco. Parece contener lo siguiente. ¿Pegarlo de todos modos?`,
+            list: [...secrets.map((k) => SECRET_LABELS[k]), ...(lines > 0 ? [`Además son ${lines} líneas y cada salto se ejecutaría como un Enter (se puede desactivar en Ajustes).`] : [])],
+            ok: 'Pegar',
+            danger: true,
+          })
+        : await confirmDialog({
+            title: lines > 1 ? `Vas a pegar ${lines} líneas` : 'Lo que vas a pegar termina en un salto de línea',
+            body: multi,
+            ok: 'Pegar',
+          });
       focusActive();
       return ok;
     },
