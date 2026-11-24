@@ -73,6 +73,9 @@ test("las rutas de la terminal se subrayan si existen, y el clic las muestra o l
   writeFileSync(join(project, "src", "app.ts"), "");
   writeFileSync(join(project, "docs", "mi informe.md"), "");
   const state = makeState([{ id: A, name: "Uno" }], project);
+  // Letra chica: en una pantalla de 1024 px (la del CI) la ventana se recorta, la línea con la ruta completa se parte en dos filas
+  // y `mi informe.md` queda cortado. Con 9 px (el mínimo) entra entera, y la prueba no depende del ancho ni de la carpeta temporal.
+  state.settings.fontSize = 9;
   state.ui = {
     ...state.ui,
     activeSessionId: A,
