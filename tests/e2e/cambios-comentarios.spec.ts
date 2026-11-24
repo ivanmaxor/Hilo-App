@@ -1,13 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cleanup, clearSink, launch, makeState, openSink, readSink, settle, waitForSink, type Launched } from './helpers';
+import { cleanup, clearSink, launch, makeState, newDataDir, openSink, readSink, ROOT, settle, waitForSink, type Launched } from './helpers';
 
 const A = 'aaaaaaaa-5555-4000-8000-00000000000a';
 const START = '\x1b[200~';
 const END = '\x1b[201~';
+const B = 'bbbbbbbb-5555-4000-8000-00000000000b';
+// Clave falsa armada por partes para que npm run privacy y el CI no la marquen.
+const KEY = ['sk-', 'ant-', 'x'.repeat(30)].join('');
 
 let realGit: string;
 const dirs: string[] = [];
@@ -46,12 +49,36 @@ function twoFileRepo(): string {
   return dir;
 }
 
-async function start(dir: string): Promise<Launched> {
-  const state = makeState([{ id: A, name: 'Uno' }], dir);
+/**
+ * Un `claude.cmd` falso que ejecuta el programa de prueba (`sink.cjs`): la sesión es de Claude, pero lo que recibe
+ * se anota en `sinkFile`. Los comentarios solo se ofrecen a sesiones de Claude.
+ */
+function fakeClaudeSink(scratch: string, sinkFile: string): string {
+  const file = join(scratch, 'claude.cmd');
+  writeFileSync(file, `@echo off\r\n"${process.execPath}" "${join(ROOT, 'tests', 'fixtures', 'sink.cjs')}" "${sinkFile}" --bracket\r\n`);
+  return file;
+}
+
+interface Opts {
+  /** Suma una terminal (PowerShell falsa) al proyecto. */
+  shell?: boolean;
+  /** No despierta la sesión de Claude: no hay a quién pegar. */
+  asleep?: boolean;
+}
+
+async function start(dir: string, opts: Opts = {}): Promise<Launched> {
+  const scratch = mkdtempSync(join(tmpdir(), 'hilo-claude-falso-'));
+  dirs.push(scratch);
+  const dataDir = newDataDir();
+  const state = makeState([{ id: A, name: 'Uno', kind: 'claude' }, ...(opts.shell ? [{ id: B, name: 'Terminal' }] : [])], dir);
+  state.settings.claudePath = fakeClaudeSink(scratch, join(dataDir, 'sink-out.bin'));
   state.ui = { ...state.ui, activeSessionId: A, panes: [A], layout: 1, activePane: 0 };
-  const run = await launch({ state, width: 1400, height: 860 });
-  await openSink(run.page, A);
-  clearSink(run.sinkFile);
+  if (opts.asleep) state.settings.wakeOnSelect = false;
+  const run = await launch({ dataDir, state, width: 1400, height: 860 });
+  if (!opts.asleep) {
+    await openSink(run.page, A);
+    clearSink(run.sinkFile);
+  }
   await run.page.locator('[data-action="toggle-changes"]').click();
   await expect(run.page.locator('.changes')).toBeVisible();
   await expect(run.page.locator('.changes')).toHaveAttribute('data-status', 'ok');
@@ -226,22 +253,148 @@ test('Ctrl+Intro dentro del panel envía; con el panel sin comentarios no hace n
   }
 });
 
-test('sin sesiones despiertas no se puede enviar y los comentarios quedan', async () => {
+test('sin sesiones de Claude despiertas no se puede enviar y los comentarios quedan', async () => {
   const dir = twoFileRepo();
-  const state = makeState([{ id: A, name: 'Uno' }], dir);
-  state.ui = { ...state.ui, activeSessionId: A, panes: [A], layout: 1, activePane: 0 };
-  state.settings.wakeOnSelect = false;
-  const run = await launch({ state, width: 1400, height: 860 });
+  const run = await start(dir, { asleep: true });
   try {
     const { page } = run;
-    await page.locator('[data-action="toggle-changes"]').click();
-    await expect(page.locator('.changes')).toHaveAttribute('data-status', 'ok');
     await comment(page, 'a.txt', 3, 'esperando');
-    await expect(bar(page).locator('.cm-none')).toBeVisible();
+    await expect(bar(page).locator('.cm-none')).toHaveText('No hay sesiones de Claude despiertas en este proyecto.');
+    await expect(page.locator('[data-field="comment-target"]')).toHaveCount(0);
     await expect(page.locator('[data-action="comments-send"]')).toBeDisabled();
     await expect(bar(page)).toHaveAttribute('data-comments', '1');
   } finally {
     await run.close();
+    cleanup(run.dataDir);
+  }
+});
+
+test('el selector solo ofrece sesiones de Claude: una terminal despierta no cuenta', async () => {
+  const dir = twoFileRepo();
+  const run = await start(dir, { shell: true });
+  try {
+    const { page } = run;
+    // La terminal también está despierta, pero no es de Claude.
+    await page.evaluate((id) => (window as any).__hiloTest.wakeSession(id), B);
+    await expect.poll(() => page.evaluate((id) => (window as any).__hiloTest.terminals.has(id), B)).toBe(true);
+    await comment(page, 'a.txt', 3, 'solo a Claude');
+    const options = page.locator('[data-field="comment-target"] option');
+    await expect(options).toHaveCount(1);
+    await expect(options.first()).toHaveText('Uno');
+    await expect(page.locator('[data-field="comment-target"]')).toHaveValue(A);
+    // Aunque la terminal sea la sesión activa, el destino sigue siendo la de Claude.
+    await page.evaluate((id) => (window as any).__hiloTest.selectSession(id), B);
+    await expect(page.locator('[data-field="comment-target"]')).toHaveValue(A);
+  } finally {
+    await run.close();
+    cleanup(run.dataDir);
+  }
+});
+
+test('con la sesión de Claude dormida y una terminal despierta, no hay a quién pegar', async () => {
+  const dir = twoFileRepo();
+  const run = await start(dir, { shell: true, asleep: true });
+  try {
+    const { page } = run;
+    await page.evaluate((id) => (window as any).__hiloTest.wakeSession(id), B);
+    await expect.poll(() => page.evaluate((id) => (window as any).__hiloTest.terminals.has(id), B)).toBe(true);
+    await comment(page, 'a.txt', 3, 'no a la terminal');
+    await expect(bar(page).locator('.cm-none')).toBeVisible();
+    await expect(page.locator('[data-action="comments-send"]')).toBeDisabled();
+  } finally {
+    await run.close();
+    cleanup(run.dataDir);
+  }
+});
+
+test('el envío pasa por el pegado de Hilo: una clave pide confirmar, y cancelar conserva los comentarios', async () => {
+  const dir = twoFileRepo();
+  const run = await start(dir);
+  try {
+    const { page } = run;
+    await comment(page, 'a.txt', 3, `usa esta clave ${KEY}`);
+    await page.locator('[data-action="comments-send"]').click();
+    await expect(page.locator('.dialog h2')).toHaveText('Esto parece una clave');
+    expect(await page.locator('.dialog').innerText()).not.toContain(KEY);
+    await settle();
+    expect(readSink(run.sinkFile).length).toBe(0);
+    // Cancelar: no se pegó nada, así que los comentarios siguen pendientes.
+    await page.locator('.dialog .actions button').first().click();
+    await expect(page.locator('.dialog')).toHaveCount(0);
+    await settle(400);
+    expect(readSink(run.sinkFile).length).toBe(0);
+    await expect(bar(page)).toHaveAttribute('data-comments', '1');
+    await expect(lineButton(page, 3)).toHaveClass(/has/);
+
+    // Confirmar: se pega con bracketed paste, sin Enter, y entonces sí se quitan.
+    await page.locator('[data-action="comments-send"]').click();
+    await expect(page.locator('.dialog h2')).toHaveText('Esto parece una clave');
+    await page.locator('[data-confirm="ok"]').click();
+    const want = pasted(`a.txt:3: usa esta clave ${KEY}\n    \`\` alfa tres \`cambiada\` \`\``);
+    const got = await waitForSink(run.sinkFile, (b) => b.includes(END));
+    expect(got.toString('utf8')).toBe(want);
+    await expect(bar(page)).toHaveCount(0);
+  } finally {
+    await run.close();
+    cleanup(run.dataDir);
+  }
+});
+
+/** Todos los archivos bajo una carpeta, menos lo que recibió el programa de prueba. */
+function dataFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const full = join(dir, name);
+    try {
+      if (statSync(full).isDirectory()) return dataFiles(full);
+      return full.endsWith('sink-out.bin') ? [] : [full];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/** Si el archivo tiene el texto. Chromium bloquea algunos de los suyos mientras corre: esos no se pueden leer. */
+function hasText(file: string, text: string): boolean {
+  try {
+    return readFileSync(file).toString('latin1').includes(text);
+  } catch {
+    return false;
+  }
+}
+
+test('los comentarios viven solo en memoria: ni en state.json ni en ningún archivo de datos, ni sobreviven a cerrar Hilo', async () => {
+  const dir = twoFileRepo();
+  const marker = 'MARCA-SOLO-MEMORIA-7431';
+  const run = await start(dir);
+  try {
+    const { page } = run;
+    await comment(page, 'a.txt', 3, marker);
+    await expect(bar(page)).toHaveAttribute('data-comments', '1');
+    // Obliga a Hilo a guardar su estado mientras el comentario está pendiente.
+    await page.locator('[data-action="toggle-changes"]').click();
+    await page.locator('[data-action="toggle-changes"]').click();
+    await expect(bar(page)).toHaveAttribute('data-comments', '1');
+    await settle(1500);
+    const files = dataFiles(run.dataDir);
+    expect(files.some((f) => f.endsWith('state.json'))).toBe(true);
+    for (const file of files) expect(hasText(file, marker), file).toBe(false);
+  } finally {
+    await run.close();
+  }
+  // Tras cerrar Hilo (el estado se guarda al salir) tampoco está, y al abrirlo otra vez no queda nada.
+  try {
+    for (const file of dataFiles(run.dataDir)) expect(hasText(file, marker), file).toBe(false);
+    const again = await launch({ dataDir: run.dataDir, width: 1400, height: 860 });
+    try {
+      await settle(500);
+      // El panel Cambios puede haber quedado abierto en el estado guardado; los comentarios, no.
+      if ((await again.page.locator('.changes').count()) === 0) await again.page.locator('[data-action="toggle-changes"]').click();
+      await expect(again.page.locator('.changes')).toHaveAttribute('data-status', 'ok');
+      await expect(bar(again.page)).toHaveCount(0);
+    } finally {
+      await again.close();
+    }
+  } finally {
     cleanup(run.dataDir);
   }
 });

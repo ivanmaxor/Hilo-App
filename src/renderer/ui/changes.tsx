@@ -413,9 +413,10 @@ function CommentEditor({ path, spot, initial, onSave, onCancel, onRemove }: { pa
   );
 }
 
-/** Las sesiones del proyecto a las que se puede pegar: las que tienen terminal viva. Nunca se despierta una. */
+/** Las sesiones del proyecto a las que se puede pegar: solo las de Claude con terminal viva. Nunca se despierta una. */
 function pasteTargets(project: ProjectRecord): ProjectRecord['sessions'] {
   return project.sessions.filter((s) => {
+    if (s.kind !== 'claude') return false;
     const status = statusOf(s.id);
     return status !== 'asleep' && status !== 'error' && status !== 'exited' && terminals.has(s.id);
   });
@@ -431,14 +432,14 @@ function CommentBar({ project, count, stale, targetId, onTarget, sending, onSend
         {stale > 0 && <span class="changes-note"> · {plural(stale, 'es de un archivo que ya no aparece en Cambios', 'son de archivos que ya no aparecen en Cambios')}</span>}
       </span>
       {none ? (
-        <span class="cm-none">No hay sesiones despiertas en este proyecto.</span>
+        <span class="cm-none">No hay sesiones de Claude despiertas en este proyecto.</span>
       ) : (
         <label class="cm-target">
           <span class="sr-only">Sesión que recibe los comentarios</span>
           <select value={targetId ?? ''} aria-label="Sesión que recibe los comentarios" data-field="comment-target" onChange={(e) => onTarget((e.target as HTMLSelectElement).value)}>
             {targets.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.kind === 'shell' ? `${t.name} (terminal)` : t.name}
+                {t.name}
               </option>
             ))}
           </select>
@@ -591,7 +592,6 @@ export function ChangesPanel({ project }: { project: ProjectRecord }) {
     awake.find((s) => s.id === target)?.id ??
     awake.find((s) => s.id === state.ui.activeSessionId)?.id ??
     awake.find((s) => paneSessions.includes(s.id))?.id ??
-    awake.find((s) => s.kind === 'claude')?.id ??
     awake[0]?.id ??
     null;
 
@@ -602,7 +602,7 @@ export function ChangesPanel({ project }: { project: ProjectRecord }) {
     if (!built.text) return;
     const session = project.sessions.find((s) => s.id === targetId);
     if (!session || !pasteTargets(project).some((s) => s.id === session.id)) {
-      toast('No hay ninguna sesión despierta de este proyecto para recibir los comentarios.');
+      toast('No hay ninguna sesión de Claude despierta en este proyecto para recibir los comentarios.');
       return;
     }
     setSending(true);
