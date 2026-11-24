@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 /**
- * Publica una versión en GitHub Releases: exactamente el instalador, su .blockmap y latest.yml.
+ * Publica una versión en GitHub Releases: exactamente el instalador, su .blockmap, latest.yml y la firma
+ * del instalador (#4, D36), que Hilo verifica antes de ofrecer instalar.
  *
  *   npm run dist
- *   node scripts/publish-release.mjs --dry-run     comprueba todo y muestra el comando, sin publicar
- *   node scripts/publish-release.mjs               publica
+ *   node scripts/publish-release.mjs --key <clave privada> --dry-run   firma y comprueba todo, sin publicar
+ *   node scripts/publish-release.mjs --key <clave privada>             publica
  *
+ * La clave privada está en la carpeta privada del dueño, nunca en el repo (también sirve HILO_UPDATE_KEY).
  * Opciones: --release-dir <carpeta> (por defecto release/), --notes-file <archivo>, --prerelease.
  * Una versión de prueba (x.y.z-rc.N) va con --prerelease: el actualizador de la gente no la ofrece ni la
  * instala (allowPrerelease = false e isStableVersion).
@@ -14,10 +16,11 @@
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readUpdateTarget } from './update-target.cjs';
+import { signRelease } from './update-signature.mjs';
 
 const { owner, repo } = readUpdateTarget();
 const SLUG = `${owner}/${repo}`;
@@ -63,6 +66,20 @@ if (ymlField(yml, 'version') !== version) fail(`latest.yml es de la versión ${y
 if (ymlField(yml, 'path') !== installer) fail(`latest.yml apunta a "${ymlField(yml, 'path')}" y el instalador es "${installer}".`);
 const hash = createHash('sha512').update(readFileSync(files[0])).digest('base64');
 if (ymlField(yml, 'sha512') !== hash) fail(`El sha512 de latest.yml no coincide con ${installer}: las actualizaciones lo rechazarían.`);
+
+// La firma (#4, D36): desde la 1.4.0, Hilo no instala una versión sin ella.
+const keyFile = option('--key') ?? process.env.HILO_UPDATE_KEY;
+if (!keyFile) fail('Falta la clave para firmar: --key <archivo .pem>. Está en la carpeta privada del dueño, nunca en el repo.');
+if (!existsSync(keyFile)) fail(`No está la clave ${keyFile}.`);
+let signature;
+try {
+  signature = signRelease({ keyFile, version, fileName: installer, sha512: hash });
+} catch (error) {
+  fail(`No se pudo firmar: ${error.message}.`);
+}
+const signatureFile = join(releaseDir, `${installer}.sig`);
+writeFileSync(signatureFile, `${signature}\n`);
+files.push(signatureFile);
 
 // Lo publicado tiene que salir de un commit, no de cambios a medias.
 const status = run('git', ['status', '--porcelain']);

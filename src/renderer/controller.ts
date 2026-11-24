@@ -9,6 +9,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { DEFAULT_SETTINGS } from '../shared/defaults';
 import { STATUS_PRIORITY } from '../shared/statusMachine';
 import { allSessions, findSession } from '../shared/reducer';
+import { SECRET_LABELS } from '../shared/secretScan';
 import { buildKeymap, eventToKeys, isModifierOnly, prettyKeys, SHORTCUTS } from '../shared/shortcuts';
 import type {
   Action,
@@ -170,6 +171,27 @@ export function startRename(id: string): void {
   if (document.querySelector(`[data-tab="${id}"]`)) open();
   // En el riel, una sesión de otro proyecto no tiene ni fila ni pestaña: primero se va a ella.
   else void dispatch({ type: 'ui/select', id }).then(() => requestAnimationFrame(open));
+}
+
+/**
+ * Un archivo soltado fuera de una terminal no debe abrirse en la ventana. Las terminales despiertas
+ * lo atienden ellas (pegan la ruta); sobre una sesión dormida solo se avisa.
+ */
+function watchFileDrops(): void {
+  const hasFiles = (e: DragEvent) => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files');
+  window.addEventListener('dragover', (e) => {
+    if (hasFiles(e)) e.preventDefault();
+  });
+  window.addEventListener('drop', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    const target = e.target instanceof Element ? e.target : null;
+    const pane = Number(target?.closest('[data-pane]')?.getAttribute('data-pane'));
+    const content = Number.isInteger(pane) ? app.get().state.ui.panes[pane] : null;
+    if (content && findSession(app.get().state, content) && statusOf(content) === 'asleep') {
+      toast('Esta sesión está dormida: despiértala y suelta el archivo otra vez.');
+    }
+  });
 }
 
 export function focusActive(): void {
@@ -1354,20 +1376,32 @@ export async function initController(): Promise<void> {
     openPath: (id, path, line, ide) => void openTerminalPath(id, path, line, ide),
     windowFocused: () => view.get().focused,
     statusOf: (id) => statusOf(id),
+    cwdOf: (id) => findSession(app.get().state, id)?.session.cwd ?? null,
+    kindOf: (id) => findSession(app.get().state, id)?.session.kind ?? null,
     activate: (id) => {
       if (app.get().state.ui.activeSessionId !== id) void dispatch({ type: 'ui/select', id });
     },
-    confirmMultilinePaste: async (lines) => {
-      const ok = await confirmDialog({
-        title: lines > 1 ? `Vas a pegar ${lines} líneas` : 'Lo que vas a pegar termina en un salto de línea',
-        body: 'Esta terminal no distingue un pegado de lo que escribes: cada salto de línea se ejecuta como si pulsaras Enter. Esto se puede desactivar en Ajustes.',
-        ok: 'Pegar',
-      });
+    confirmPaste: async ({ lines, secrets }) => {
+      const multi = 'Esta terminal no distingue un pegado de lo que escribes: cada salto de línea se ejecuta como si pulsaras Enter. Esto se puede desactivar en Ajustes.';
+      const ok = secrets.length
+        ? await confirmDialog({
+            title: 'Esto parece una clave',
+            body: `Lo que pegas va a la terminal y, si es Claude, al modelo y a la conversación guardada en disco. Parece contener lo siguiente. ¿Pegarlo de todos modos?`,
+            list: [...secrets.map((k) => SECRET_LABELS[k]), ...(lines > 0 ? [`Además son ${lines} líneas y cada salto se ejecutaría como un Enter (se puede desactivar en Ajustes).`] : [])],
+            ok: 'Pegar',
+            danger: true,
+          })
+        : await confirmDialog({
+            title: lines > 1 ? `Vas a pegar ${lines} líneas` : 'Lo que vas a pegar termina en un salto de línea',
+            body: multi,
+            ok: 'Pegar',
+          });
       focusActive();
       return ok;
     },
   });
   terminals.setWindowsBuild(initial.info.windowsBuild);
+  watchFileDrops();
 
   api.onState((state) => {
     const prev = app.get().state;

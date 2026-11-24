@@ -6,7 +6,9 @@ import { WebglAddon } from '@xterm/addon-webgl';
 import { fileUriToPath, findPathCandidates, pickLinks, type TerminalPath } from '../../shared/pathLinks';
 import { WheelThinner, type WheelLike } from '../../shared/wheel';
 import { Terminal, type ILink, type ITheme } from '@xterm/xterm';
+import { buildDropText, MAX_DROPPED } from '../../shared/dropPaths';
 import { cleanCopy, isBlankSelection, joinHardWrapped, sanitizePaste } from '../../shared/paste';
+import { scanSecrets, type SecretKind } from '../../shared/secretScan';
 import { eventToKeys } from '../../shared/shortcuts';
 import type { SessionKind, Settings, ThemeName } from '../../shared/types';
 import { api } from '../api';
@@ -160,10 +162,15 @@ export interface TerminalCallbacks {
   openPath(id: string, path: string, line: number | null, ide: boolean): void;
   /** Un clic derecho en un panel lo activa, igual que el izquierdo. */
   activate(id: string): void;
-  confirmMultilinePaste(lines: number): Promise<boolean>;
+  /** Antes de pegar: `lines` > 0 si cada salto se ejecutaría, `secrets` con los tipos de clave detectados (nunca el valor). */
+  confirmPaste(info: { lines: number; secrets: SecretKind[] }): Promise<boolean>;
   windowFocused(): boolean;
   /** En qué anda el proceso. "waiting": está preguntando algo, como el diálogo de confianza. */
   statusOf(id: string): string;
+  /** La carpeta de la sesión, para pegar rutas relativas a ella. */
+  cwdOf(id: string): string | null;
+  /** Qué es la sesión ahora: una PowerShell donde se abrió Claude pasa a ser de Claude (D30). */
+  kindOf(id: string): SessionKind | null;
 }
 
 /** Cuánto se recuerda si una ruta existe: lo bastante para no preguntar en cada movimiento del ratón. */
@@ -418,6 +425,7 @@ export class TerminalManager {
       },
       true,
     );
+    this.watchFileDrop(entry);
     el.addEventListener(
       'copy',
       (event) => {
@@ -590,10 +598,61 @@ export class TerminalManager {
     api.write(entry.id, held);
   }
 
+  /**
+   * Archivos soltados desde el Explorador: se pega su ruta, sin Enter. Solo con 'Files': el arrastre
+   * interno de sesiones y paneles no lleva archivos y sigue su camino.
+   */
+  private watchFileDrop(entry: Entry): void {
+    const { el } = entry;
+    const hasFiles = (event: DragEvent) => !!event.dataTransfer && Array.from(event.dataTransfer.types).includes('Files');
+    el.addEventListener(
+      'dragover',
+      (event) => {
+        if (!hasFiles(event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.dataTransfer!.dropEffect = 'copy';
+        el.classList.add('file-drop');
+      },
+      true,
+    );
+    el.addEventListener(
+      'dragleave',
+      (event) => {
+        if (event.relatedTarget instanceof Node && el.contains(event.relatedTarget)) return;
+        el.classList.remove('file-drop');
+      },
+      true,
+    );
+    el.addEventListener(
+      'drop',
+      (event) => {
+        el.classList.remove('file-drop');
+        if (!hasFiles(event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const status = this.callbacks.statusOf(entry.id);
+        if (status === 'asleep') {
+          this.callbacks.toast('Esta sesión está dormida: despiértala y suelta el archivo otra vez.');
+          return;
+        }
+        const paths = api.pathsOfFiles(Array.from(event.dataTransfer!.files));
+        const { text, overLimit, rejected } = buildDropText(paths, this.callbacks.cwdOf(entry.id), this.callbacks.kindOf(entry.id) ?? entry.kind);
+        if (overLimit > 0) this.callbacks.toast(`Solo se pegan ${MAX_DROPPED} archivos de una vez: faltaron ${overLimit}.`);
+        else if (rejected > 0 || (!text && event.dataTransfer!.files.length > 0)) this.callbacks.toast('Algún archivo no se pudo pegar: su ruta no es válida.');
+        if (!text) return;
+        entry.term.focus();
+        void this.paste(entry, text);
+      },
+      true,
+    );
+  }
+
   /** Cerrándose, un pegado queda en la cola y la sesión que quede lo pega por su propio camino. */
-  private holdPaste(entry: Entry): boolean {
+  private holdPaste(entry: Entry, discard = false): boolean {
     if (!entry.closingHold) return false;
-    entry.closingHold.push(null);
+    // Un null en la cola significa "pega el portapapeles": un texto ajeno al portapapeles se descarta.
+    if (!discard) entry.closingHold.push(null);
     return true;
   }
 
@@ -638,8 +697,9 @@ export class TerminalManager {
     await this.copyText(entry, joinHardWrapped(entry.term.getSelection(), entry.term.cols, startCol));
   }
 
-  async paste(entry: Entry): Promise<void> {
-    if (this.holdPaste(entry)) return;
+  /** `given`: texto que no viene del portapapeles (archivos soltados). Pasa por el mismo camino. */
+  async paste(entry: Entry, given?: string): Promise<void> {
+    if (this.holdPaste(entry, given !== undefined)) return;
     if (entry.confirming) return;
     // Lo tecleado antes de pedir este pegado sale antes, aunque el despertar tarde.
     const typedBefore = entry.heldInput.length;
@@ -649,9 +709,9 @@ export class TerminalManager {
         await entry.wakeDone;
         if (entry.startQuestion) return;
       }
-      const { text, hasImage } = await api.clipRead();
+      const { text, hasImage } = given !== undefined ? { text: given, hasImage: false } : await api.clipRead();
       if (!this.entries.has(entry.id)) return;
-      if (this.holdPaste(entry)) return;
+      if (this.holdPaste(entry, given !== undefined)) return;
       if (!entry.spawned) {
         if (text || hasImage) this.callbacks.toast('Esta terminal ya no tiene proceso: no se pegó nada.');
         return;
@@ -675,21 +735,24 @@ export class TerminalManager {
       if (entry.kind === 'claude' && multiline) {
         await this.waitForBracketedPaste(entry);
         if (!this.entries.has(entry.id)) return;
-        if (this.holdPaste(entry)) return;
+        if (this.holdPaste(entry, given !== undefined)) return;
         if (!entry.spawned) {
           this.callbacks.toast('Esta terminal ya no tiene proceso: no se pegó nada.');
           return;
         }
       }
-      // Sin bracketed paste cada salto es un Enter: en PowerShell, ejecutar.
-      if (this.settings.confirmMultilinePaste && !entry.term.modes.bracketedPasteMode && multiline) {
+      // Una clave pegada va al modelo y queda en la conversación en disco: se avisa siempre, con o sin
+      // bracketed paste. Sin él, además, cada salto es un Enter (en PowerShell, ejecutar): un solo diálogo.
+      const secrets = scanSecrets(clean);
+      const runsLines = this.settings.confirmMultilinePaste && !entry.term.modes.bracketedPasteMode && multiline;
+      if (secrets.length > 0 || runsLines) {
         // Otro pegado que ya había leído el portapapeles antes de abrirse este diálogo.
         if (entry.confirming) return;
-        const lines = clean.split(/\r\n|\r|\n/).filter((l) => l !== '').length;
+        const lines = runsLines ? clean.split(/\r\n|\r|\n/).filter((l) => l !== '').length : 0;
         entry.confirming = true;
         let ok = false;
         try {
-          ok = await this.callbacks.confirmMultilinePaste(lines);
+          ok = await this.callbacks.confirmPaste({ lines, secrets });
         } finally {
           entry.confirming = false;
         }
@@ -698,7 +761,7 @@ export class TerminalManager {
           this.callbacks.toast('Esta terminal ya no tiene proceso: no se pegó nada.');
           return;
         }
-        if (this.holdPaste(entry)) return;
+        if (this.holdPaste(entry, given !== undefined)) return;
         entry.term.focus();
       }
       if (typedBefore > 0) api.write(entry.id, entry.heldInput.splice(0, typedBefore).join(''));

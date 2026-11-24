@@ -1,6 +1,6 @@
 # 2026-11-23 · @dedalexcr7 · Cambiar la carpeta de un proyecto o de una sesión
 
-- **Qué se hizo:** #7, según la decisión del dueño (ver D36). Rama `feature/7-cambiar-carpeta`, desde `origin/main` con los PR #17 a #24.
+- **Qué se hizo:** #7, según la decisión del dueño (ver D37). Rama `feature/7-cambiar-carpeta`, desde `origin/main` con los PR #17 a #24.
   - «Cambiar carpeta…» en el menú de cada proyecto y de cada sesión (Claude o PowerShell).
   - Proyecto: diálogo con la carpeta de antes y la nueva, y la lista de sesiones que estaban dentro de la vieja, con casilla marcada por defecto y la marca «su carpeta ya no existe». Las de otra carpeta no se tocan y se cuentan en una línea.
   - La ruta nunca viene del renderer: `project:pickFolder` abre el diálogo en el proceso principal y guarda la ruta con un código de un solo uso; `project:applyFolder` canjea el código. Sesión suelta: `session:changeFolder`.
@@ -18,8 +18,4 @@
   - El diálogo real de carpetas de Windows (se simula con `dialog.showOpenDialog`).
   - Una carpeta de red (UNC) como carpeta nueva: solo la función pura, con pruebas.
   - Lo visual solo con una captura en tema oscuro.
-- **Queda pendiente / preguntas para el dueño:**
-  - ¿Conservar la subcarpeta al mover una sesión (lo que se hizo), o mandarlas todas a la raíz de la carpeta nueva?
-  - El nombre del proyecto no cambia con la carpeta.
-  - Al cambiar la carpeta de una sesión suelta que no arrancaba, se despierta sola (como su panel); desde el diálogo del proyecto no se despierta ninguna.
-  - D36 puede chocar en número con otro PR que agregue decisiones.
+- **Decidido por el dueño en el #7:** se conserva la subcarpeta (y se avisa cuántas cayeron en la raíz); el nombre del proyecto no cambia con la carpeta; una sesión suelta que no arrancaba se despierta sola al cambiarle la carpeta.

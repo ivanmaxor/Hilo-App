@@ -74,6 +74,19 @@ test('cerrar con el foco en la terminal libera la terminal', async () => {
           async () => {
             const confirm = page.locator('.dialog [data-confirm="ok"]');
             if (await confirm.isVisible().catch(() => false)) await confirm.click().catch(() => undefined);
+            // Los 800 ms se miden en la app, no aquí: en el runner la tecla puede llegar tarde y caer dentro de la
+            // ventana de la anterior, y se descarta sin aviso (visto en el CI del #30). Si la sesión sigue activa y nadie
+            // la está cerrando, se pulsa otra vez, como haría una persona. Ya cerrándose, la marca `closing` se pone al
+            // instante y esta rama no vuelve a pulsar.
+            const ignored = await page.evaluate((sid) => {
+              const t = (window as any).__hiloTest;
+              const v = t.view.get();
+              return t.app.get().state.ui.activeSessionId === sid && !v.closing.includes(sid) && !v.modal && !!t.terminals.debugEntry(sid);
+            }, id);
+            if (ignored && Date.now() - lastClosePress > 2 * CLOSE_DOUBLE_PRESS_MS) {
+              lastClosePress = Date.now();
+              await page.keyboard.press('Control+Shift+W');
+            }
             return page.evaluate((sid) => !(window as any).__hiloTest.terminals.debugEntry(sid), id);
           },
           { timeout: 25_000 },

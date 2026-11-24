@@ -74,6 +74,8 @@ Cuando Claude, o cualquier programa, escribe la ruta de un archivo o una carpeta
 
 Las rutas relativas se buscan desde la carpeta de la sesión. Las de red (`\\servidor\...`) no se tocan.
 
+**Soltar archivos** del Explorador sobre una sesión pega su ruta, sin Enter. En Claude, `@ruta` si está dentro de la carpeta de la sesión, y la ruta completa entre comillas si no. En PowerShell, la ruta completa, entre comillas simples si tiene espacios. Sobre una sesión dormida solo avisa.
+
 El botón de la carpeta, arriba a la derecha, y **Abrir su carpeta** en el menú de una sesión abren la carpeta donde trabaja esa sesión, que puede no ser la del proyecto.
 
 ## Dormir sesiones
@@ -149,7 +151,7 @@ El botón **Cambios** de la barra de pestañas (Ctrl+Shift+G, o clic derecho en 
 ## Qué toca en tu sistema
 
 - Su única conexión a internet es con GitHub, para buscar y bajar versiones: una vez al abrir, si no la apagas, y cuando lo pides. No hay telemetría ni fuentes remotas, y no se envía nada aparte de pedir esos archivos. Claude Code se conecta por su cuenta, como en cualquier terminal.
-- Sin firma todavía: una actualización se comprueba contra el sha512 que publica GitHub, por HTTPS. Protege de una descarga dañada, no de que alguien tome la cuenta de GitHub.
+- Cada actualización viene firmada por quien publica Hilo, y Hilo comprueba la firma antes de ofrecer instalarla. Si alguien cambiara una versión publicada en GitHub, no se instalaría.
 - Nunca lee tu token ni tus credenciales.
 - No toca tu configuración global de Claude Code. Los hooks de estado van solo a las sesiones que abre Hilo, con `claude --settings`. El hook escribe únicamente el nombre del evento en un archivo de `%APPDATA%\Hilo\hooks`; no lee tu prompt ni tus comandos. Se puede apagar en Ajustes.
 - Sí lee, sin modificarlo, `~/.claude/sessions/<pid>.json` de sus propias sesiones, para saber cuándo una sesión dejó de esperarte.

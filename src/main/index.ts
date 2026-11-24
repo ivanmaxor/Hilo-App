@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, screen, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, screen, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
 import { checkTools } from './tools';
 import type { ToolCheck } from '../shared/types';
 import { mkdirSync } from 'node:fs';
@@ -8,6 +8,7 @@ import { release } from 'node:os';
 import { join } from 'node:path';
 import { STATUS_LABEL } from '../shared/statusMachine';
 import { CUSTOM_SOUND, soundFor } from '../shared/sounds';
+import { BADGE_SCALE_FACTOR, BADGE_SIZE, badgeDescription, badgeLabel, renderBadge, attentionCount } from '../shared/taskbar';
 import { DEFAULT_SETTINGS } from '../shared/defaults';
 import { formatSpan, type PlanUsage } from '../shared/usage';
 import { CustomSound } from './customSound';
@@ -74,6 +75,40 @@ const NOTIFY_TEXT: Partial<Record<SessionStatus, string>> = {
 
 const sentNotifications: { id: string; name: string; status: SessionStatus | 'usage'; body?: string; shown?: boolean; failed?: string }[] = [];
 
+/** Lo que se le pidió a la barra de tareas, para las pruebas (el aviso real no se puede mirar desde fuera). */
+const taskbarCalls: { overlays: ({ label: string; description: string } | null)[]; flashes: boolean[] } = { overlays: [], flashes: [] };
+/** En pruebas el foco lo manda el gancho `__hilo.focus`: la ventana oculta no tiene foco real. */
+let testFocused = true;
+let overlayKey = '';
+
+function windowHasFocus(): boolean {
+  return isTest ? testFocused : !!win && !win.isDestroyed() && win.isFocused();
+}
+
+function setFlash(on: boolean): void {
+  if (isTest) taskbarCalls.flashes.push(on);
+  if (win && !win.isDestroyed()) win.flashFrame(on);
+}
+
+/** Círculo con las sesiones que necesitan tu atención sobre el ícono de la barra de tareas. Solo se vuelve a pedir si cambia. */
+function updateTaskbarOverlay(count: number): void {
+  if (!win || win.isDestroyed()) return;
+  const label = badgeLabel(count);
+  const description = badgeDescription(count);
+  const key = `${label}|${description}`;
+  if (key === overlayKey) return;
+  overlayKey = key;
+  const pixels = renderBadge(label);
+  if (!pixels) {
+    if (isTest) taskbarCalls.overlays.push(null);
+    win.setOverlayIcon(null, '');
+    return;
+  }
+  if (isTest) taskbarCalls.overlays.push({ label, description });
+  const icon = nativeImage.createFromBitmap(Buffer.from(pixels), { width: BADGE_SIZE, height: BADGE_SIZE, scaleFactor: BADGE_SCALE_FACTOR });
+  win.setOverlayIcon(icon, description);
+}
+
 /** Sin una referencia, el recolector puede llevarse la notificación y su clic. */
 const liveNotifications = new Set<Notification>();
 
@@ -129,6 +164,8 @@ const sessions = new SessionController(store, dataDir, {
   statusChanged: updateWindowTitle,
   notify(session: SessionRecord, status: SessionStatus) {
     if (!store.get().settings.notifications) return;
+    // Parpadea solo si te necesita (espera o falló) y no estás en Hilo; se apaga al darle foco.
+    if ((status === 'waiting' || status === 'error') && !windowHasFocus()) setFlash(true);
     const record: (typeof sentNotifications)[number] = { id: session.id, name: session.name, status };
     if (isTest) sentNotifications.push(record);
     if ((isTest && process.env.HILO_TEST_REAL_NOTIFY !== '1') || !Notification.isSupported()) return;
@@ -166,6 +203,7 @@ const updates = new UpdateService(updateMode, {
 function updateWindowTitle(): void {
   if (!win || win.isDestroyed()) return;
   const map = sessions.runtimeMap();
+  const attention = attentionCount(Object.values(map).map((r) => r.status));
   let waiting = 0;
   let done = 0;
   let error = 0;
@@ -174,6 +212,7 @@ function updateWindowTitle(): void {
     else if (r.status === 'done') done++;
     else if (r.status === 'error') error++;
   }
+  updateTaskbarOverlay(attention);
   const parts: string[] = [];
   if (waiting) parts.push(`${waiting} esperando`);
   if (error) parts.push(`${error} con error`);
@@ -267,7 +306,10 @@ function createWindow(): void {
   win.on('move', saveBounds);
   win.on('maximize', saveBounds);
   win.on('unmaximize', saveBounds);
-  win.on('focus', () => send('window:focus', true));
+  win.on('focus', () => {
+    setFlash(false);
+    send('window:focus', true);
+  });
   win.on('blur', () => send('window:focus', false));
 
   win.on('close', (event) => {
@@ -769,7 +811,12 @@ app.whenReady().then(() => {
       revealedPaths,
       focusSession,
       pidOf: (id: string) => (sessions as unknown as { live: Map<string, { pid: number }> }).live.get(id)?.pid,
-      focus: (focused: boolean) => send('window:focus', focused),
+      focus: (focused: boolean) => {
+        testFocused = focused;
+        if (focused) setFlash(false);
+        send('window:focus', focused);
+      },
+      taskbarCalls,
       statusOf: (id: string) => sessions.statusOf(id),
       findSession: (id: string) => findSession(store.get(), id),
     };

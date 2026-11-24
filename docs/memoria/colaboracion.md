@@ -34,7 +34,7 @@ Cuando hay que elegir diseño, números o comportamiento, el PR (o el Issue) tra
 Solo el dueño saca versiones, porque le llegan solas a los usuarios.
 
 1. **PR de versión** (`chore/version-1.4.0`): sube `version` en `package.json` y `package-lock.json`, y escribe su entrada en `src/shared/changelog.ts` (una prueba lo exige). El borrador sale de `node scripts/novedades.mjs`, que lista los PR fusionados desde la última versión.
-2. Con ese PR fusionado y `main` limpio: `npm run dist`, luego `node scripts/scan-installer.mjs --terms <lista personal> --except "<nombres comunes>"`, y al final `node scripts/publish-release.mjs --notes-file <notas>`.
+2. Con ese PR fusionado y `main` limpio: `npm run dist`, luego `node scripts/scan-installer.mjs --terms <lista personal> --except "<nombres comunes>"`, y al final `node scripts/publish-release.mjs --key <clave privada> --notes-file <notas>`. Sin la firma (D36), las versiones desde la 1.4.0 no instalan la nueva.
 3. **Versión de prueba antes de la final:** `1.4.0-rc.1` en `package.json` y `publish-release.mjs --prerelease`. A los usuarios no les llega: el actualizador tiene `allowPrerelease = false` y además rechaza todo lo que no sea `x.y.z` (`isStableVersion`). Los dos la instalan a mano desde la Release.
 4. **Guía de prueba** en un Issue fijado por cada versión de prueba: cada cambio con en qué fijarse al usarla, y respuestas con ✅ / ⚠️ / ❌. Cada ⚠️ o ❌ se vuelve un Issue nuevo.
 
