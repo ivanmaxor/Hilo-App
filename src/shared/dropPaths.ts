@@ -1,5 +1,6 @@
 import { sanitizePaste } from './paste';
 import { checkRelativePath } from './safePath';
+import type { SessionKind } from './types';
 
 /** Lo máximo que se pega de una sola vez: más sería un pegado enorme sin intención. */
 export const MAX_DROPPED = 20;
@@ -24,8 +25,23 @@ export function relativeInside(file: string, cwd: string | null): string | null 
   return checkRelativePath(target.slice(base.length + 1));
 }
 
-/** `@ruta` dentro de la carpeta de la sesión; fuera, la ruta completa entre comillas. */
-export function dropReference(file: string, cwd: string | null): string {
+/** Lo que PowerShell lee tal cual, sin comillas: letras, números y los separadores de una ruta. */
+const SHELL_PLAIN = /^[A-Za-z0-9_\-.:\\/]+$/;
+
+/**
+ * En PowerShell, la ruta completa. Con espacios u otros caracteres va entre comillas simples, que PowerShell
+ * no interpreta (en las dobles, `$` y el acento grave sí): una comilla del nombre se escribe doble.
+ */
+export function shellReference(file: string): string {
+  return SHELL_PLAIN.test(file) ? file : `'${file.replace(/'/g, "''")}'`;
+}
+
+/**
+ * Claude: `@ruta` dentro de la carpeta de la sesión; fuera, la ruta completa entre comillas.
+ * PowerShell no conoce `@ruta` (ahí `@` es otra cosa): recibe la ruta completa (`shellReference`).
+ */
+export function dropReference(file: string, cwd: string | null, kind: SessionKind = 'claude'): string {
+  if (kind === 'shell') return shellReference(file);
   const rel = relativeInside(file, cwd);
   if (rel !== null) return /\s/.test(rel) ? `@"${rel}"` : `@${rel}`;
   return `"${file}"`;
@@ -46,7 +62,7 @@ export interface DropText {
  * Arma el texto de un arrastre: una referencia por archivo, separadas por un espacio y sin Enter.
  * El resultado pasa por `sanitizePaste` aunque ya no deba quedar nada que quitar.
  */
-export function buildDropText(paths: string[], cwd: string | null): DropText {
+export function buildDropText(paths: string[], cwd: string | null, kind: SessionKind = 'claude'): DropText {
   const refs: string[] = [];
   let rejected = 0;
   let overLimit = 0;
@@ -59,7 +75,7 @@ export function buildDropText(paths: string[], cwd: string | null): DropText {
       overLimit++;
       continue;
     }
-    refs.push(dropReference(file, cwd));
+    refs.push(dropReference(file, cwd, kind));
   }
   return { text: sanitizePaste(refs.join(' ')), used: refs.length, overLimit, rejected };
 }

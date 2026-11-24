@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDropText, dropReference, MAX_DROPPED, relativeInside } from '../../src/shared/dropPaths';
+import { buildDropText, dropReference, MAX_DROPPED, relativeInside, shellReference } from '../../src/shared/dropPaths';
 
 const CWD = 'C:\\Datos\\persona\\proyecto';
 
@@ -97,5 +97,17 @@ describe('archivos soltados: texto a pegar', () => {
 
   it('acentos, ñ, emojis y paréntesis llegan intactos', () => {
     expect(buildDropText(['C:\\Datos\\persona\\proyecto\\ñandú (1) 😀.txt'], CWD).text).toBe('@"ñandú (1) 😀.txt"');
+  });
+});
+
+describe('archivos soltados en una PowerShell', () => {
+  it('va la ruta completa, sin @, y entre comillas simples solo si hace falta', () => {
+    expect(dropReference('C:\\Datos\\persona\\proyecto\\src\\app.ts', CWD, 'shell')).toBe('C:\\Datos\\persona\\proyecto\\src\\app.ts');
+    expect(dropReference('C:\\Datos\\persona\\otro\\a.txt', CWD, 'shell')).toBe('C:\\Datos\\persona\\otro\\a.txt');
+    expect(shellReference('C:\\Program Files\\App\\antigravity.exe')).toBe("'C:\\Program Files\\App\\antigravity.exe'");
+    // En comillas dobles PowerShell expandiría $HOME y el acento grave; en simples no. Una comilla se duplica.
+    expect(shellReference('C:\\x\\$HOME (1).txt')).toBe("'C:\\x\\$HOME (1).txt'");
+    expect(shellReference("C:\\x\\it's.txt")).toBe("'C:\\x\\it''s.txt'");
+    expect(buildDropText(['C:\\Datos\\persona\\proyecto\\a.ts', 'D:\\x\\y z.png'], CWD, 'shell').text).toBe("C:\\Datos\\persona\\proyecto\\a.ts 'D:\\x\\y z.png'");
   });
 });

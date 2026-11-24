@@ -1310,6 +1310,7 @@ export async function initController(): Promise<void> {
     windowFocused: () => view.get().focused,
     statusOf: (id) => statusOf(id),
     cwdOf: (id) => findSession(app.get().state, id)?.session.cwd ?? null,
+    kindOf: (id) => findSession(app.get().state, id)?.session.kind ?? null,
     activate: (id) => {
       if (app.get().state.ui.activeSessionId !== id) void dispatch({ type: 'ui/select', id });
     },

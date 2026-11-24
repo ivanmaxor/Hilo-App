@@ -167,6 +167,8 @@ export interface TerminalCallbacks {
   statusOf(id: string): string;
   /** La carpeta de la sesión, para pegar rutas relativas a ella. */
   cwdOf(id: string): string | null;
+  /** Qué es la sesión ahora: una PowerShell donde se abrió Claude pasa a ser de Claude (D30). */
+  kindOf(id: string): SessionKind | null;
 }
 
 /** Cuánto se recuerda si una ruta existe: lo bastante para no preguntar en cada movimiento del ratón. */
@@ -633,7 +635,7 @@ export class TerminalManager {
           return;
         }
         const paths = api.pathsOfFiles(Array.from(event.dataTransfer!.files));
-        const { text, overLimit, rejected } = buildDropText(paths, this.callbacks.cwdOf(entry.id));
+        const { text, overLimit, rejected } = buildDropText(paths, this.callbacks.cwdOf(entry.id), this.callbacks.kindOf(entry.id) ?? entry.kind);
         if (overLimit > 0) this.callbacks.toast(`Solo se pegan ${MAX_DROPPED} archivos de una vez: faltaron ${overLimit}.`);
         else if (rejected > 0 || (!text && event.dataTransfer!.files.length > 0)) this.callbacks.toast('Algún archivo no se pudo pegar: su ruta no es válida.');
         if (!text) return;
