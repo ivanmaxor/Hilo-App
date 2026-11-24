@@ -735,7 +735,7 @@ export class TerminalManager {
       if (entry.kind === 'claude' && multiline) {
         await this.waitForBracketedPaste(entry);
         if (!this.entries.has(entry.id)) return;
-        if (this.holdPaste(entry)) return;
+        if (this.holdPaste(entry, given !== undefined)) return;
         if (!entry.spawned) {
           this.callbacks.toast('Esta terminal ya no tiene proceso: no se pegó nada.');
           return;
@@ -761,7 +761,7 @@ export class TerminalManager {
           this.callbacks.toast('Esta terminal ya no tiene proceso: no se pegó nada.');
           return;
         }
-        if (this.holdPaste(entry)) return;
+        if (this.holdPaste(entry, given !== undefined)) return;
         entry.term.focus();
       }
       if (typedBefore > 0) api.write(entry.id, entry.heldInput.splice(0, typedBefore).join(''));

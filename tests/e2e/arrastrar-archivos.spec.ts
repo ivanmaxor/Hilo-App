@@ -2,7 +2,11 @@ import { expect, test } from '@playwright/test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { shellReference } from '../../src/shared/dropPaths';
 import { cleanup, clearSink, focusTerm, launch, makeState, openSink, readSink, settle, waitForSink, type Launched } from './helpers';
+
+// Estas sesiones son PowerShell (las de Claude necesitan Claude real): pegan la ruta completa. El `@ruta` de Claude
+// lo prueban las unitarias de `dropPaths` y, con Claude real, `claude-arrastrar-espacios.spec.ts`.
 
 const ID = 'aaaaaaaa-0000-4000-8000-000000000001';
 const SLEEPING = 'aaaaaaaa-0000-4000-8000-000000000002';
@@ -99,25 +103,28 @@ test.describe('arrastrar archivos a una sesión', () => {
     expect(got.nothing).toEqual([]);
   });
 
-  test('un archivo dentro de la carpeta de la sesión pega @ruta, sin Enter', async () => {
+  test('un archivo dentro de la carpeta de una PowerShell pega su ruta completa, sin @ ni Enter', async () => {
     const r = await drop(ctx, 'term', ID, [join(project, 'a.txt')]);
     expect(r.types).toContain('Files');
     expect(r.prevented).toBe(true);
     const got = await waitForSink(ctx.sinkFile, (b) => b.includes(END));
-    expect(got.toString('utf8')).toBe(`${START}@a.txt${END}`);
+    expect(got.toString('utf8')).toBe(`${START}${shellReference(join(project, 'a.txt'))}${END}`);
+    expect(got.toString('utf8')).not.toContain('@');
     expect(got.toString('utf8')).not.toContain('\r');
   });
 
-  test('uno de fuera pega la ruta completa entre comillas', async () => {
+  test('uno de fuera pega la ruta completa', async () => {
     await drop(ctx, 'term', ID, [join(outside, 'otro.txt')]);
     const got = await waitForSink(ctx.sinkFile, (b) => b.includes(END));
-    expect(got.toString('utf8')).toBe(`${START}"${join(outside, 'otro.txt')}"${END}`);
+    expect(got.toString('utf8')).toBe(`${START}${shellReference(join(outside, 'otro.txt'))}${END}`);
   });
 
-  test('varios, con espacios en el nombre, van separados por un espacio y se pegan intactos', async () => {
-    await drop(ctx, 'term', ID, [join(project, 'a.txt'), join(project, 'sub dir', 'con espacio.txt'), join(outside, 'otro con espacio.txt')]);
+  test('varios, con espacios en el nombre, van separados por un espacio y entre comillas simples', async () => {
+    const files = [join(project, 'a.txt'), join(project, 'sub dir', 'con espacio.txt'), join(outside, 'otro con espacio.txt')];
+    await drop(ctx, 'term', ID, files);
     const got = await waitForSink(ctx.sinkFile, (b) => b.includes(END));
-    expect(got.toString('utf8')).toBe(`${START}@a.txt @"sub dir/con espacio.txt" "${join(outside, 'otro con espacio.txt')}"${END}`);
+    expect(got.toString('utf8')).toBe(`${START}${files.map(shellReference).join(' ')}${END}`);
+    expect(got.toString('utf8')).toContain(`'${join(project, 'sub dir', 'con espacio.txt')}'`);
   });
 
   test('con más de 20 se pegan 20 y se avisa', async () => {
@@ -126,7 +133,7 @@ test.describe('arrastrar archivos a una sesión', () => {
     const got = await waitForSink(ctx.sinkFile, (b) => b.includes(END));
     const text = got.toString('utf8');
     expect(text.slice(START.length, -END.length).split(' ')).toHaveLength(20);
-    expect(text).toContain('@f19.txt');
+    expect(text).toContain('f19.txt');
     expect(text).not.toContain('f20');
     await expect(ctx.page.locator('.toast').last()).toContainText('Solo se pegan 20');
   });
