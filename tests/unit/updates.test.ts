@@ -165,7 +165,8 @@ describe('empaquetado', () => {
 
 describe('scripts/publish-release.mjs, antes de tocar git o la red', () => {
   const version = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version as string;
-  const run = (dir: string) => spawnSync(process.execPath, [join(ROOT, 'scripts/publish-release.mjs'), '--dry-run', '--release-dir', dir], { encoding: 'utf8', cwd: ROOT });
+  // Una versión de prueba (x.y.z-rc.N) solo sigue con --prerelease: si no, se corta antes de lo que se prueba.
+  const run = (dir: string) => spawnSync(process.execPath, [join(ROOT, 'scripts/publish-release.mjs'), '--dry-run', '--release-dir', dir, ...(version.includes('-') ? ['--prerelease'] : [])], { encoding: 'utf8', cwd: ROOT });
 
   function release(opts: { yml?: (exe: Buffer) => string; skip?: string } = {}): string {
     const dir = mkdtempSync(join(tmpdir(), 'hilo-release-'));
