@@ -1,10 +1,12 @@
 # Estado
 
-Actualizado: 2026-11-24.
+Actualizado: 2026-11-25.
 
 ## Versión publicada
 
-**1.3.9** (22-nov-2026), en las Releases de este repo. Lo que trae cada versión está en `src/shared/changelog.ts` y se ve en Ajustes > Novedades.
+**1.3.9** (22-nov-2026), en las Releases de este repo. **Versión de prueba: 1.4.0-rc.1** (25-nov-2026), la primera firmada (D36). No les llega a los usuarios: se instala a mano desde su Release, y la guía de prueba está en el Issue #54, fijado. Después de probarla, un PR deja `package.json` en `1.4.0` para la final.
+
+Lo que trae cada versión está en `src/shared/changelog.ts` y se ve en Ajustes > Novedades.
 
 Hilo se actualiza sola desde las Releases y la usan personas reales todos los días: lo que se publica les llega. Por eso las versiones las saca solo el dueño (ver [colaboracion.md](colaboracion.md)).
 
