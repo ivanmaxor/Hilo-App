@@ -62,6 +62,7 @@ export type Modal =
   | { type: 'newSession'; kind: SessionKind; projectId: string | null }
   | { type: 'settings'; section?: string }
   | { type: 'quick' }
+  | { type: 'summary' }
   /** El mismo selector que `quick`, pero para elegir a qué sesión pegarle la última respuesta de `fromId`. */
   | { type: 'sendReply'; fromId: string }
   | { type: 'setup'; tools: ToolCheck }
@@ -1204,6 +1205,9 @@ export function runCommand(action: string): void {
       return;
     case 'quickOpen':
       view.set({ modal: { type: 'quick' } });
+      return;
+    case 'dailySummary':
+      view.set({ modal: { type: 'summary' }, menu: null });
       return;
     case 'nextSession':
       cycle(1);

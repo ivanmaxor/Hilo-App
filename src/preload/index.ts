@@ -37,6 +37,7 @@ const api = {
     return out;
   },
   pickFolder: () => ipcRenderer.invoke('dialog:pickFolder'),
+  summarySave: (text: string) => ipcRenderer.invoke('summary:save', text),
   pickFile: () => ipcRenderer.invoke('dialog:pickFile'),
   fixFolder: (id: string, mode: 'pick' | 'project') => ipcRenderer.invoke('session:fixFolder', id, mode),
   pickProjectFolder: (projectId: string) => ipcRenderer.invoke('project:pickFolder', projectId),

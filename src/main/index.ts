@@ -27,6 +27,7 @@ import { APP_ORIGIN, applyNetworkSwitches, hardenSession, hardenWebContents, ins
 import { SessionController } from './sessions';
 import { isDirectory, resolveTerminalPath } from './pathOpen';
 import { Store } from './store';
+import { isSummaryText, saveSummaryFile } from './summaryFile';
 import { UpdateService } from './updater';
 import { resolveUpdateMode } from '../shared/updates';
 
@@ -616,6 +617,14 @@ function registerIpc(): void {
     if (!win) return null;
     const result = await dialog.showOpenDialog(win, { properties: ['openDirectory'], title: 'Elige la carpeta del proyecto' });
     return result.canceled ? null : (result.filePaths[0] ?? null);
+  });
+  // La carpeta sale del diálogo del sistema y el nombre es fijo: del renderer solo viene el texto.
+  handle('summary:save', async (text: unknown) => {
+    if (!win || !isSummaryText(text)) return { ok: false, message: 'No hay nada que guardar.' };
+    const result = await dialog.showOpenDialog(win, { properties: ['openDirectory'], title: 'Elige la carpeta donde guardar el resumen del día' });
+    const dir = result.canceled ? null : (result.filePaths[0] ?? null);
+    if (!dir) return { ok: false, message: '' };
+    return saveSummaryFile(dir, text, new Date());
   });
   // La carpeta de una sesión ya no existe (#6). La ruta nunca viene del renderer: sale del diálogo de Windows
   // o del proyecto guardado. La conversación no se toca: se retoma por su id desde la carpeta nueva.

@@ -22,6 +22,8 @@ export interface HiloApi {
   /** Las rutas de los archivos o carpetas soltados desde el Explorador. Vacío si no están en disco. Un arreglo: un FileList no cruza el puente. */
   pathsOfFiles(files: File[]): string[];
   pickFolder(): Promise<string | null>;
+  /** Pregunta la carpeta con el diálogo del sistema y guarda ahí el resumen del día. `message` vacío: canceló. */
+  summarySave(text: string): Promise<{ ok: true; path: string } | { ok: false; message: string }>;
   pickFile(): Promise<string | null>;
   /** La carpeta de una sesión ya no existe: 'pick' abre el diálogo de Windows, 'project' usa la carpeta del proyecto. */
   fixFolder(id: string, mode: 'pick' | 'project'): Promise<{ ok: boolean; message?: string }>;
