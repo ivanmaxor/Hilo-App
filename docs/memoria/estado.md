@@ -4,7 +4,7 @@ Actualizado: 2026-11-25.
 
 ## Versión publicada
 
-**1.3.9** (22-nov-2026), en las Releases de este repo. **Versión de prueba: 1.4.0-rc.1** (25-nov-2026), la primera firmada (D36). No les llega a los usuarios: se instala a mano desde su Release, y la guía de prueba está en el Issue #54, fijado. Después de probarla, un PR deja `package.json` en `1.4.0` para la final.
+**1.4.0** (25-nov-2026), en las Releases de este repo, la primera firmada (D36). El mismo día salió antes la 1.4.0-rc.1 como versión de prueba; el dueño publicó la final sin esperar la prueba con personas, así que la guía del Issue #54 sigue pendiente y sirve para la 1.4.0.
 
 Lo que trae cada versión está en `src/shared/changelog.ts` y se ve en Ajustes > Novedades.
 
