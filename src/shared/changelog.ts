@@ -12,7 +12,7 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: "1.4.0",
-    date: "2026-11-24",
+    date: "2026-11-25",
     items: [
       "Las rutas que escribe Claude se pueden tocar: un clic las muestra en el Explorador y Ctrl+clic las abre en el IDE del proyecto, en su línea. Cada sesión tiene un botón para abrir su carpeta.",
       "Arrastrar archivos del Explorador a una sesión pega su ruta, sin Enter.",
