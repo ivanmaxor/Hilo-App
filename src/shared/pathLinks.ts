@@ -22,8 +22,11 @@ const LINE_SUFFIX =
 const WIN_ABS = /^[A-Za-z]:[\\/]/;
 /** `/c/Proyectos/...`, como escriben las rutas Git Bash y a veces Claude. */
 const DRIVE_POSIX = /^\/([A-Za-z])\//;
+/** Una ruta que empieza por una carpeta de la persona (`Documentos/...`, `~/...`): su nombre puede tener espacios. */
+const USER_START =
+  /^(?:~|documentos|documents|escritorio|desktop|descargas|downloads|im[aá]genes|pictures|m[uú]sica|music|v[ií]deos|videos)[\\/]/i;
 const MAX_LENGTH = 400;
-/** Cuántas palabras más se prueban tras una ruta absoluta, por si su nombre tiene espacios. */
+/** Cuántas palabras más se prueban tras una ruta absoluta o de una carpeta de la persona, por si su nombre tiene espacios. */
 const MAX_SPACED_WORDS = 5;
 /** Una línea con más candidatas que esto es otra cosa (un volcado, una tabla): no se mira entera. */
 const MAX_CANDIDATES = 40;
@@ -90,7 +93,8 @@ export function findPathCandidates(text: string): PathCandidate[] {
         line: parsed.line,
       });
     const raw = match[0].startsWith("@") ? match[0].slice(1) : match[0];
-    if (!WIN_ABS.test(raw) && !DRIVE_POSIX.test(raw)) continue;
+    if (!WIN_ABS.test(raw) && !DRIVE_POSIX.test(raw) && !USER_START.test(raw))
+      continue;
     // `C:\Mis documentos\informe final.pdf`: se agregan palabras mientras las separe un solo espacio.
     let end = start + match[0].length;
     for (

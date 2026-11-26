@@ -10,6 +10,7 @@ import {
 import {
   relativeToProject,
   resolveTerminalPath,
+  userFolders,
   toAbsolute,
 } from "../../src/main/pathOpen";
 
@@ -139,5 +140,95 @@ describe("qué ruta abre el proceso principal (#10)", () => {
     expect(
       relativeToProject(join(project, ".git", "config"), project),
     ).toBeNull();
+  });
+});
+
+describe("rutas relativas que no son de la carpeta de la sesión (#10)", () => {
+  const root = mkdtempSync(join(tmpdir(), "hilo-rutas-rel-"));
+  const repo = join(root, "repo");
+  const sub = join(repo, "app", "web");
+  const home = join(root, "casa");
+  const drive = join(root, "OneDrive");
+  mkdirSync(join(repo, ".git"), { recursive: true });
+  mkdirSync(join(repo, "src"), { recursive: true });
+  mkdirSync(sub, { recursive: true });
+  writeFileSync(join(repo, "src", "a.ts"), "");
+  writeFileSync(join(repo, "app", "b.ts"), "");
+  writeFileSync(join(root, "fuera.md"), "");
+  mkdirSync(join(home, "Documents", "Aulen"), { recursive: true });
+  writeFileSync(join(home, "Documents", "Aulen", "informe final.md"), "");
+  writeFileSync(join(home, "x.md"), "");
+  mkdirSync(join(drive, "Escritorio"), { recursive: true });
+  writeFileSync(join(drive, "Escritorio", "notas.txt"), "");
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+  const folders = { home, oneDrive: [drive] };
+  const abs = async (raw: string, cwd = sub, project = sub) =>
+    (await resolveTerminalPath(raw, cwd, project, folders))?.abs ?? null;
+
+  it("prueba desde las carpetas de arriba hasta la raíz del repositorio, y desde el proyecto", async () => {
+    expect(await abs("src/a.ts")).toBe(join(repo, "src", "a.ts"));
+    expect(await abs("app/b.ts")).toBe(join(repo, "app", "b.ts"));
+    expect(await abs("b.ts")).toBe(join(repo, "app", "b.ts"));
+    expect(await resolveTerminalPath("src/a.ts", sub, repo, folders)).toEqual({
+      abs: join(repo, "src", "a.ts"),
+      dir: false,
+      rel: "src/a.ts",
+    });
+    // Si está en las dos, gana la de la carpeta de la sesión.
+    writeFileSync(join(sub, "b.ts"), "");
+    expect(await abs("b.ts")).toBe(join(sub, "b.ts"));
+  });
+
+  it("no sube más allá de la raíz del repositorio", async () => {
+    expect(await abs("fuera.md")).toBeNull();
+    expect(await abs("fuera.md", sub, root)).toBe(join(root, "fuera.md"));
+  });
+
+  it("Documentos/..., Escritorio/... y ~/... van a las carpetas de la persona, también las de OneDrive", async () => {
+    expect(await abs("Documentos/Aulen/informe final.md")).toBe(
+      join(home, "Documents", "Aulen", "informe final.md"),
+    );
+    expect(await abs(String.raw`documents\Aulen`)).toBe(
+      join(home, "Documents", "Aulen"),
+    );
+    expect(await abs("Escritorio/notas.txt")).toBe(
+      join(drive, "Escritorio", "notas.txt"),
+    );
+    expect(await abs("~/x.md")).toBe(join(home, "x.md"));
+    expect(
+      await resolveTerminalPath("~/x.md", sub, sub, {
+        home: null,
+        oneDrive: [],
+      }),
+    ).toBeNull();
+    expect(await abs("Documentos/no-existe.md")).toBeNull();
+  });
+
+  it("una ruta de una carpeta de la persona puede tener espacios", () => {
+    expect(
+      paths("revisa Documentos/Aulen/informe final.md por favor").map(
+        (p) => p[1],
+      ),
+    ).toContain("Documentos/Aulen/informe final.md");
+  });
+
+  it("solo toma carpetas de un disco local", () => {
+    expect(
+      userFolders(
+        {
+          OneDrive: String.raw`C:\Users\x\OneDrive`,
+          OneDriveConsumer: String.raw`C:\Users\x\OneDrive`,
+          OneDriveCommercial: String.raw`\\servidor\od`,
+        },
+        String.raw`C:\Users\x`,
+      ),
+    ).toEqual({
+      home: String.raw`C:\Users\x`,
+      oneDrive: [String.raw`C:\Users\x\OneDrive`],
+    });
+    expect(userFolders({}, String.raw`\\servidor\casa`)).toEqual({
+      home: null,
+      oneDrive: [],
+    });
   });
 });
