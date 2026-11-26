@@ -1,7 +1,7 @@
 {
   "name": "hilo",
   "productName": "Hilo",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Gestor de sesiones de Claude Code para Windows",
   "private": true,
   "main": "dist/main/index.js",

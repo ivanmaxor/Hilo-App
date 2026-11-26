@@ -11,6 +11,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.4.1",
+    date: "2026-11-25",
+    items: [
+      "Perfil de cada sesión, con un clic en el ícono de la hoja de su fila: nombre, descripción, el id de la conversación para copiarlo y una bitácora de notas con fecha, que se editan o borran una por una. La nota que ya tenías queda como la primera.",
+      "Las rutas que Claude escribe desde la raíz del repositorio, desde el proyecto o desde tus carpetas (Documentos/…, Escritorio/…, también en OneDrive) ya se pueden tocar, no solo las completas.",
+      "Resumen del día: en el buscador (Ctrl+Shift+K) escribe «resumen». Arma un Markdown con las sesiones de hoy, su estado y las notas del día, para copiar o guardar.",
+    ],
+  },
+  {
     version: "1.4.0",
     date: "2026-11-25",
     items: [

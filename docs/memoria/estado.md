@@ -4,7 +4,7 @@ Actualizado: 2026-11-25.
 
 ## Versión publicada
 
-**1.4.0** (25-nov-2026), en las Releases de este repo, la primera firmada (D36). El mismo día salió antes la 1.4.0-rc.1 como versión de prueba; el dueño publicó la final sin esperar la prueba con personas, así que la guía del Issue #54 sigue pendiente y sirve para la 1.4.0.
+**1.4.1** (25-nov-2026), en las Releases de este repo: perfil de la sesión con bitácora (D39), rutas relativas desde el repositorio y las carpetas de la persona, y el resumen del día (D38). La 1.4.0, del mismo día, fue la primera firmada (D36); la guía de prueba del Issue #54 sigue pendiente y sirve para las dos. Con esta, cada instalación en la 1.4.0 hace la primera actualización firmada real.
 
 Lo que trae cada versión está en `src/shared/changelog.ts` y se ve en Ajustes > Novedades.
 
