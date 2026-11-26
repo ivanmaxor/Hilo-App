@@ -15,13 +15,15 @@ function session(id: string, extra: Partial<SessionRecord> = {}): SessionRecord 
 function project(name: string, sessions: SessionRecord[]): ProjectRecord {
   return { id: `p-${name}`, name, path: `C:\\${name}`, color: null, collapsed: false, sessions };
 }
+/** Una bitácora de una sola nota, escrita hoy a las 10:30 si no se dice otra hora. */
+const n = (text: string, when = at(10, 30)) => [{ id: `n${text.length}`, at: when, text }];
 const rt = (m: Record<string, SessionStatus>): RuntimeMap => Object.fromEntries(Object.entries(m).map(([k, status]) => [k, { status }]));
 
 describe('resumen del día', () => {
   it('agrupa por proyecto, con estado, hora, marca y nota, solo lo de hoy', () => {
     const projects = [
       project('Tienda', [
-        session('s1', { name: 'Login', mark: '✅', lastActiveAt: at(11, 30), note: 'Falta probar con Google' }),
+        session('s1', { name: 'Login', mark: '✅', lastActiveAt: at(11, 30), notes: n('Falta probar con Google') }),
         session('s2', { name: 'Pagos', lastActiveAt: at(13, 0) }),
         session('s3', { name: 'Ayer', lastActiveAt: at(23, 59, -1) }),
         session('s4', { name: 'Sin actividad' }),
@@ -124,14 +126,14 @@ describe('resumen del día', () => {
     const one = (extra: Partial<SessionRecord>) => buildDailySummary({ projects: [project('P', [session('a', { lastActiveAt: at(10), ...extra })])] }, {}, NOW);
 
     it('una nota con saltos de línea sigue dentro de su sesión, como cita', () => {
-      const out = one({ note: 'primera\r\nsegunda\n\n\n\ntercera\r\n  \n' });
+      const out = one({ notes: n('primera\r\nsegunda\n\n\n\ntercera\r\n  \n') });
       expect(out).toContain('  > **Nota:** primera\n  > segunda\n  >\n  > tercera\n');
       // Nada de lo que escribió puede cerrar la lista ni empezar un bloque fuera de la cita.
       for (const line of out.split('\n').slice(8)) expect(line === '' || line.startsWith('- ') || line.startsWith('  >')).toBe(true);
     });
 
     it('escapa lo que Markdown interpreta', () => {
-      const out = one({ note: '# Título\n- item\n1. uno\n```\ncódigo\n```\n> cita\n| a | b |\n**negrita** _cursiva_ [enlace](http://x) <b>html</b> snake_case ~~tachado~~\n---\n===' });
+      const out = one({ notes: n('# Título\n- item\n1. uno\n```\ncódigo\n```\n> cita\n| a | b |\n**negrita** _cursiva_ [enlace](http://x) <b>html</b> snake_case ~~tachado~~\n---\n===') });
       const lines = out.split('\n').filter((l) => l.startsWith('  >'));
       expect(lines).toContain('  > **Nota:** \\# Título');
       expect(lines).toContain('  > \\- item');
@@ -152,13 +154,19 @@ describe('resumen del día', () => {
     });
 
     it('quita caracteres de control y de dirección de lectura', () => {
-      const out = one({ name: 'a\u0007b\u202ec', note: 'x\u0000y\u2067z' });
+      const out = one({ name: 'a\u0007b\u202ec', notes: n('x\u0000y\u2067z') });
       expect(out).toContain('**abc**');
       expect(out).toContain('**Nota:** xyz');
     });
 
+    it('trae solo las notas de hoy, cada una como cita', () => {
+      const out = one({ notes: [{ id: 'v', at: at(18, 0, -1), text: 'de ayer' }, { id: 'h1', at: at(9), text: 'primera de hoy' }, { id: 'h2', at: at(12), text: 'segunda de hoy' }] });
+      expect(out).not.toContain('de ayer');
+      expect(out).toContain('  > **Nota:** primera de hoy\n  > **Nota:** segunda de hoy\n');
+    });
+
     it('una nota solo de espacios no deja nada', () => {
-      expect(one({ note: '  \n \r\n' })).not.toContain('Nota');
+      expect(one({ notes: n('  \n \r\n') })).not.toContain('Nota');
     });
   });
 });

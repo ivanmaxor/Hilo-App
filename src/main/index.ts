@@ -371,7 +371,7 @@ const isCells = (v: unknown): v is number => isInt(v) && v <= 2000;
 
 const ALLOWED_ACTIONS = new Set<Action['type']>([
   'project/add', 'project/rename', 'project/color', 'project/collapse', 'project/remove', 'project/move',
-  'session/add', 'session/rename', 'session/color', 'session/mark', 'session/unread', 'session/note', 'session/remove', 'session/move',
+  'session/add', 'session/rename', 'session/color', 'session/mark', 'session/unread', 'session/describe', 'session/noteAdd', 'session/noteEdit', 'session/noteRemove', 'session/remove', 'session/move',
   'ui/select', 'ui/layout', 'ui/pane', 'ui/paneInsert', 'ui/paneRemove', 'ui/activePane', 'ui/tabClose', 'ui/tree', 'ui/sidebar', 'settings/set',
 ]);
 

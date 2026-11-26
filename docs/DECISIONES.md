@@ -397,3 +397,13 @@ Idea del #13, con la decisión del dueño de que baste el selector rápido: el c
 - **Notas y nombres escapados:** una nota con `#` o `**` no rompe la estructura del Markdown.
 - **No cubre:** guardado automático ni a una hora; recordar la carpeta; el tiempo «en trabajando» (Hilo no lo guarda); que el texto se calcule en el proceso principal (el renderer lo arma y lo manda, así que un renderer comprometido podría escribir texto cualquiera, pero solo en la carpeta que la persona eligió); sesiones de otros días ni rangos.
 - **Con «Enviar respuesta»:** el selector es el mismo. En el modo de enviar respuesta el comando no se ofrece ni se ejecuta con Enter (`!sendFrom`).
+
+## D39. Perfil de la sesión y bitácora de notas
+
+Pedido del dueño: una nota suelta no alcanzaba, quería ir anotando como en una bitácora, y tener a mano el id de cada sesión para no perderlo.
+
+- **Datos** (`SessionRecord`): `description` (hasta 1000 caracteres) y `notes`, una lista de `{ id, at, text }` de la más vieja a la más nueva, hasta 200 por sesión (al pasar, se va la más vieja). La `note` única de antes de la 1.4.1 se convierte al cargar en la primera entrada, con la hora del último mensaje.
+- **Acciones** en la lista blanca: `session/describe`, `session/noteAdd`, `session/noteEdit` (vacía la borra) y `session/noteRemove`. El id y la hora de la nota los pone el renderer y se validan (`isSafeId`, número positivo); agregar una nota con un id que ya está no hace nada, así Deshacer no duplica.
+- **Interfaz:** el diálogo «Perfil de…» (`ProfileDialog`) se abre con el ícono de la hoja en la fila, sin pasar por el menú. Muestra el id de la conversación con un botón para copiarlo: con él, `claude --resume` la retoma desde cualquier carpeta (#6).
+- **Dónde se ve:** la última nota en el tooltip de la fila y en el panel de una sesión dormida; el resumen del día (D38) trae las notas escritas hoy.
+- **No cubre:** buscar dentro de las notas ni exportarlas aparte.

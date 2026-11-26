@@ -16,7 +16,7 @@ import { allSessions, findSession, reduce } from '../../src/shared/reducer';
 import { buildKeymap, CLAUDE_RESERVED, eventToKeys, shortcutProblem, SHORTCUTS } from '../../src/shared/shortcuts';
 import type { Action, PersistedState, ProjectRecord, SessionRecord } from '../../src/shared/types';
 import { buildClaudeArgs, buildCmdLine, buildEnv, quoteArg } from '../../src/main/claude';
-import { isSafeId, isValidAction, isValidModel, sanitizeSettings } from '../../src/shared/validate';
+import { isSafeId, isValidAction, isValidModel, sanitizeSettings, MAX_NOTES } from '../../src/shared/validate';
 import { buildHookSettings, parseEvents } from '../../src/main/hooks';
 import { backgroundProcesses, descendants, parseSnapshot } from '../../src/main/processes';
 import { sanitize, Store } from '../../src/main/store';
@@ -565,28 +565,57 @@ describe('novedades', () => {
   });
 });
 
-describe('marca, nota y no leída', () => {
+describe('marca, perfil, bitácora y no leída', () => {
   it('se ponen y se quitan, y abrir la sesión la da por leída', () => {
     let s = stateWith([project('p', [session('a'), session('b')])]);
     s = reduce(s, { type: 'session/mark', id: 'a', mark: '🔥' });
-    s = reduce(s, { type: 'session/note', id: 'a', note: 'revisar el login  \n' });
+    s = reduce(s, { type: 'session/noteAdd', id: 'a', note: { id: 'n1', at: 100, text: 'revisar el login  \n' } });
+    s = reduce(s, { type: 'session/describe', id: 'a', description: 'El login con Google  ' });
     s = reduce(s, { type: 'session/unread', id: 'a', unread: true });
-    expect(findSession(s, 'a')!.session).toMatchObject({ mark: '🔥', note: 'revisar el login', unread: true });
+    expect(findSession(s, 'a')!.session).toMatchObject({ mark: '🔥', description: 'El login con Google', notes: [{ id: 'n1', at: 100, text: 'revisar el login' }], unread: true });
     s = reduce(s, { type: 'ui/select', id: 'a' });
     expect(findSession(s, 'a')!.session.unread).toBeUndefined();
     s = reduce(s, { type: 'session/mark', id: 'a', mark: null });
-    s = reduce(s, { type: 'session/note', id: 'a', note: '   ' });
-    expect(Object.keys(findSession(s, 'a')!.session)).not.toEqual(expect.arrayContaining(['mark']));
-    expect(findSession(s, 'a')!.session.note).toBeUndefined();
+    s = reduce(s, { type: 'session/describe', id: 'a', description: '   ' });
+    expect(Object.keys(findSession(s, 'a')!.session)).not.toEqual(expect.arrayContaining(['mark', 'description']));
+  });
+
+  it('la bitácora agrega, edita y borra una nota por vez, sin repetir', () => {
+    let s = stateWith([project('p', [session('a')])]);
+    const notes = () => findSession(s, 'a')!.session.notes;
+    s = reduce(s, { type: 'session/noteAdd', id: 'a', note: { id: 'n1', at: 100, text: 'uno' } });
+    s = reduce(s, { type: 'session/noteAdd', id: 'a', note: { id: 'n2', at: 200, text: 'dos' } });
+    // Deshacer un borrado vuelve a mandar la misma nota: si ya está, no se duplica.
+    s = reduce(s, { type: 'session/noteAdd', id: 'a', note: { id: 'n2', at: 200, text: 'dos' } });
+    expect(notes()!.map((n) => n.text)).toEqual(['uno', 'dos']);
+    s = reduce(s, { type: 'session/noteEdit', id: 'a', noteId: 'n1', text: 'uno, corregido\n' });
+    expect(notes()![0]).toEqual({ id: 'n1', at: 100, text: 'uno, corregido' });
+    // Editar dejándola vacía la borra.
+    s = reduce(s, { type: 'session/noteEdit', id: 'a', noteId: 'n1', text: '  ' });
+    s = reduce(s, { type: 'session/noteRemove', id: 'a', noteId: 'n2' });
+    expect(notes()).toBeUndefined();
+    for (let i = 0; i < MAX_NOTES + 5; i++) s = reduce(s, { type: 'session/noteAdd', id: 'a', note: { id: `m${i}`, at: 1000 + i, text: String(i) } });
+    expect(notes()).toHaveLength(MAX_NOTES);
+    expect(notes()![0]!.text).toBe('5');
   });
 
   it('valida lo que llega del renderer y lo guardado', () => {
     expect(isValidAction({ type: 'session/mark', id: 'a', mark: '⭐' })).toBe(true);
     expect(isValidAction({ type: 'session/mark', id: 'a', mark: ' x' })).toBe(false);
     expect(isValidAction({ type: 'session/mark', id: 'a', mark: 'a\u0007' })).toBe(false);
-    expect(isValidAction({ type: 'session/note', id: 'a', note: 'x'.repeat(5000) })).toBe(false);
-    const loaded = sanitize({ projects: [{ id: 'p', name: 'P', path: 'C:\p', sessions: [{ id: 'a', claudeId: 'a', cwd: 'C:\p', mark: 123, note: 'hola', unread: 'sí' }] }] });
-    expect(loaded.projects[0]!.sessions[0]).toMatchObject({ note: 'hola' });
+    expect(isValidAction({ type: 'session/noteAdd', id: 'a', note: { id: 'n', at: 1, text: 'x'.repeat(5000) } })).toBe(false);
+    expect(isValidAction({ type: 'session/noteAdd', id: 'a', note: { id: 'n', at: 1, text: '   ' } })).toBe(false);
+    expect(isValidAction({ type: 'session/noteAdd', id: 'a', note: { id: '../n', at: 1, text: 'x' } })).toBe(false);
+    expect(isValidAction({ type: 'session/noteAdd', id: 'a', note: { id: 'n', at: Number.NaN, text: 'x' } })).toBe(false);
+    expect(isValidAction({ type: 'session/noteAdd', id: 'a', note: { id: 'n', at: 1, text: 'x' } })).toBe(true);
+    expect(isValidAction({ type: 'session/noteEdit', id: 'a', noteId: 'n', text: '' })).toBe(true);
+    expect(isValidAction({ type: 'session/describe', id: 'a', description: 'x'.repeat(1001) })).toBe(false);
+    // Hasta la 1.4.0 había una sola nota: pasa a ser la primera entrada de la bitácora, con la hora del último mensaje.
+    const loaded = sanitize({ projects: [{ id: 'p', name: 'P', path: 'C:\p', sessions: [{ id: 'a', claudeId: 'a', cwd: 'C:\p', mark: 123, note: 'hola', unread: 'sí', lastActiveAt: 500 }] }] });
+    expect(loaded.projects[0]!.sessions[0]!.notes).toEqual([{ id: expect.any(String), at: 500, text: 'hola' }]);
+    expect('note' in loaded.projects[0]!.sessions[0]!).toBe(false);
+    const kept = sanitize({ projects: [{ id: 'p', name: 'P', path: 'C:\p', sessions: [{ id: 'a', claudeId: 'a', cwd: 'C:\p', description: 'para qué', notes: [{ id: 'n1', at: 1, text: 'sí' }, { id: 'mala', at: 'ayer', text: 'no' }, { id: 'n2', at: 2, text: ' ' }] }] }] });
+    expect(kept.projects[0]!.sessions[0]).toMatchObject({ description: 'para qué', notes: [{ id: 'n1', at: 1, text: 'sí' }] });
     expect(loaded.projects[0]!.sessions[0]!.mark).toBeUndefined();
     expect(loaded.projects[0]!.sessions[0]!.unread).toBeUndefined();
     expect(sanitizeSettings({ recentColors: ['#AABBCC', 'rojo', '#aabbcc', '#123456'] }).recentColors).toEqual(['#aabbcc', '#123456']);

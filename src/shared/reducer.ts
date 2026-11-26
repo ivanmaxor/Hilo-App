@@ -1,7 +1,8 @@
 import { isInsideFolder, samePath } from './folderPaths';
 import { changesPaneId, changesProjectOf, isChangesPane, sessionInPane } from './paneContent';
 import { insertLeaf, isValidTree, MAX_PANES, presetTree, removeLeaf, type PaneEdge, type PaneNode } from './paneLayout';
-import type { Action, LayoutCount, PersistedState, ProjectRecord, SessionRecord, UiState } from './types';
+import type { Action, LayoutCount, PersistedState, ProjectRecord, SessionNote, SessionRecord, UiState } from './types';
+import { MAX_NOTES } from './validate';
 
 export function findSession(
   state: Pick<PersistedState, 'projects'>,
@@ -256,10 +257,25 @@ export function reduce(state: PersistedState, action: Action): PersistedState {
     case 'session/active':
       return mapSession(state, action.id, (s) => (action.at > (s.lastActiveAt ?? 0) ? { ...s, lastActiveAt: action.at } : s));
 
-    case 'session/note': {
-      const note = action.note.replace(/\s+$/, '');
-      return mapSession(state, action.id, ({ note: _, ...s }) => (note.trim() ? { ...s, note } : s));
+    case 'session/describe': {
+      const description = action.description.replace(/\s+$/, '');
+      return mapSession(state, action.id, ({ description: _, ...s }) => (description.trim() ? { ...s, description } : s));
     }
+
+    case 'session/noteAdd': {
+      const note = { ...action.note, text: action.note.text.replace(/\s+$/, '') };
+      return mapSession(state, action.id, (s) => (s.notes?.some((n) => n.id === note.id) ? s : withNotes(s, [...(s.notes ?? []), note].slice(-MAX_NOTES))));
+    }
+
+    case 'session/noteEdit': {
+      const text = action.text.replace(/\s+$/, '');
+      return mapSession(state, action.id, (s) =>
+        withNotes(s, (s.notes ?? []).flatMap((n) => (n.id !== action.noteId ? [n] : text.trim() ? [{ ...n, text }] : []))),
+      );
+    }
+
+    case 'session/noteRemove':
+      return mapSession(state, action.id, (s) => withNotes(s, (s.notes ?? []).filter((n) => n.id !== action.noteId)));
 
     case 'session/remove': {
       // Se sigue en el mismo proyecto: primero la de abajo, después la de arriba.
@@ -372,4 +388,10 @@ export function reduce(state: PersistedState, action: Action): PersistedState {
     case 'window/bounds':
       return { ...state, window: action.bounds };
   }
+}
+
+/** La bitácora sin entradas no se guarda. */
+function withNotes(s: SessionRecord, notes: SessionNote[]): SessionRecord {
+  const { notes: _, ...rest } = s;
+  return notes.length > 0 ? { ...rest, notes } : rest;
 }

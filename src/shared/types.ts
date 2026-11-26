@@ -13,6 +13,14 @@ export type SessionStatus =
   | 'error'
   | 'exited';
 
+/** Una entrada de la bitácora de una sesión. */
+export interface SessionNote {
+  id: string;
+  /** Cuándo se escribió, en milisegundos. */
+  at: number;
+  text: string;
+}
+
 export interface SessionRecord {
   id: string;
   /** El `--session-id` de Claude Code. Normalmente igual a `id`. */
@@ -29,8 +37,10 @@ export interface SessionRecord {
   mark?: string;
   /** Marcada a mano como no leída: se quita al abrirla. */
   unread?: boolean;
-  /** Una nota de la persona, que se ve aunque la sesión esté dormida. */
-  note?: string;
+  /** Para qué es la sesión, en pocas líneas. Se ve en su perfil. */
+  description?: string;
+  /** La bitácora de la persona, de la más vieja a la más nueva. Se ve aunque la sesión esté dormida. */
+  notes?: SessionNote[];
   /** El último mensaje, de la persona o de Claude, en milisegundos. */
   lastActiveAt?: number;
 }
@@ -213,7 +223,10 @@ export type Action =
   | { type: 'session/color'; id: string; color: string | null }
   | { type: 'session/mark'; id: string; mark: string | null }
   | { type: 'session/unread'; id: string; unread: boolean }
-  | { type: 'session/note'; id: string; note: string }
+  | { type: 'session/describe'; id: string; description: string }
+  | { type: 'session/noteAdd'; id: string; note: SessionNote }
+  | { type: 'session/noteEdit'; id: string; noteId: string; text: string }
+  | { type: 'session/noteRemove'; id: string; noteId: string }
   /** Solo las dispara el proceso principal: no están en la lista blanca del IPC. */
   | { type: 'session/adopt'; id: string; claudeId: string; cwd: string }
   | { type: 'session/active'; id: string; at: number }
