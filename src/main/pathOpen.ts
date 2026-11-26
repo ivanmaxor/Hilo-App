@@ -116,21 +116,23 @@ const MAX_UP = 8;
 const REPO_CACHE_MS = 60_000;
 const repoRoots = new Map<string, { at: number; root: string | null }>();
 
-/** La carpeta con `.git` que contiene a `cwd`, o null. Solo se mira si existe. */
+/**
+ * La carpeta con `.git` más cercana que contiene a `cwd`, o null. Solo se mira si existe. Todas las de arriba
+ * se miran a la vez: una respuesta lenta hace que xterm no subraye la ruta hasta que el ratón se mueva otra vez.
+ */
 async function repoRoot(cwd: string): Promise<string | null> {
   const hit = repoRoots.get(cwd);
   if (hit && Date.now() - hit.at < REPO_CACHE_MS) return hit.root;
-  let root: string | null = null;
-  let dir = cwd;
-  for (let i = 0; i <= MAX_UP; i++) {
-    if (await statWithTimeout(join(dir, ".git"))) {
-      root = dir;
-      break;
-    }
-    const up = dirname(dir);
-    if (up === dir) break;
-    dir = up;
+  const dirs = [cwd];
+  while (dirs.length <= MAX_UP) {
+    const up = dirname(dirs[dirs.length - 1]!);
+    if (up === dirs[dirs.length - 1]) break;
+    dirs.push(up);
   }
+  const found = await Promise.all(
+    dirs.map((dir) => statWithTimeout(join(dir, ".git"))),
+  );
+  const root = dirs[found.findIndex((f) => f !== null)] ?? null;
   if (repoRoots.size > 200) repoRoots.clear();
   repoRoots.set(cwd, { at: Date.now(), root });
   return root;
@@ -183,19 +185,31 @@ export async function resolveTerminalPath(
   folders: UserFolders = userFolders(),
 ): Promise<ResolvedPath | null> {
   if (typeof raw !== "string") return null;
-  const list = ABSOLUTE.test(raw)
-    ? [toAbsolute(raw, cwd)].filter((p): p is string => p !== null)
-    : await relativeCandidates(raw, cwd, projectPath, folders);
+  const result = (abs: string, found: { dir: boolean }): ResolvedPath => ({
+    abs,
+    dir: found.dir,
+    rel: relativeToProject(abs, projectPath),
+  });
+  const direct = toAbsolute(raw, cwd);
+  if (ABSOLUTE.test(raw)) {
+    const found = direct ? await statWithTimeout(direct) : null;
+    return direct && found ? result(direct, found) : null;
+  }
+  // Lo de siempre, desde la carpeta de la sesión, responde sin esperar a lo demás. La raíz del repositorio se
+  // busca mientras tanto, para que una ruta que no existe ahí tampoco tarde.
+  const relativeDirect = /^~[\\/]/.test(raw) ? null : direct;
+  const [first] = await Promise.all([
+    relativeDirect ? statWithTimeout(relativeDirect) : null,
+    /^[\\/]{2}/.test(cwd) ? null : repoRoot(cwd),
+  ]);
+  if (relativeDirect && first) return result(relativeDirect, first);
+  const list = (
+    await relativeCandidates(raw, cwd, projectPath, folders)
+  ).filter((p) => p !== relativeDirect);
   // Se miran todas a la vez y gana la primera que existe, en el orden de arriba.
   const found = await Promise.all(list.map(statWithTimeout));
   const index = found.findIndex((f) => f !== null);
-  if (index === -1) return null;
-  const abs = list[index]!;
-  return {
-    abs,
-    dir: found[index]!.dir,
-    rel: relativeToProject(abs, projectPath),
-  };
+  return index === -1 ? null : result(list[index]!, found[index]!);
 }
 
 /** Si es una carpeta que existe. Sin esperar a un disco que no responde. */
