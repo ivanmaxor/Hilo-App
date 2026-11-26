@@ -7,7 +7,7 @@ import { isValidIdePath } from '../shared/ide';
 import { changesProjectOf, sessionInPane } from '../shared/paneContent';
 import { reduce } from '../shared/reducer';
 import type { Action, PersistedState, ProjectRecord, SessionRecord } from '../shared/types';
-import { isClaudeId, isColor, isMark, isNote, isPath, isSafeId, isValidEffort, isValidModel, MAX_NAME, sanitizeSettings } from '../shared/validate';
+import { isClaudeId, isColor, isDescription, isMark, isNote, isPath, isSessionNote, MAX_NOTES, isSafeId, isValidEffort, isValidModel, MAX_NAME, sanitizeSettings } from '../shared/validate';
 
 const SAVE_DELAY_MS = 300;
 const RETRIES = 6;
@@ -252,7 +252,14 @@ function sanitizeSession(raw: unknown): SessionRecord | null {
   if (isMark(raw.mark)) session.mark = raw.mark;
   if (raw.unread === true) session.unread = true;
   if (typeof raw.lastActiveAt === 'number' && Number.isFinite(raw.lastActiveAt) && raw.lastActiveAt > 0) session.lastActiveAt = raw.lastActiveAt;
-  if (isNote(raw.note) && raw.note.trim()) session.note = raw.note;
+  if (isDescription(raw.description) && raw.description.trim()) session.description = raw.description;
+  if (Array.isArray(raw.notes)) {
+    const notes = raw.notes.filter(isSessionNote).slice(-MAX_NOTES);
+    if (notes.length > 0) session.notes = notes;
+  } else if (isNote(raw.note) && raw.note.trim()) {
+    // Hasta la 1.4.0 había una sola nota: pasa a ser la primera entrada de la bitácora.
+    session.notes = [{ id: randomUUID(), at: session.lastActiveAt ?? session.createdAt, text: raw.note }];
+  }
   return session;
 }
 

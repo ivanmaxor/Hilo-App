@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { STATUS_LABEL, STATUS_PRIORITY } from '../../shared/statusMachine';
 import { allSessions, findSession } from '../../shared/reducer';
 import type { ProjectRecord, SessionRecord } from '../../shared/types';
+import { latestNote } from '../../shared/sessionNotes';
 import {
   app,
   attentionSessions,
@@ -143,6 +144,8 @@ function SessionRow({ session, project, index, globalIndex }: { session: Session
   const hasMeta = !renaming && (head !== undefined || since !== undefined);
   const stateTime = since !== undefined ? ` desde hace ${now - since < 60_000 ? 'menos de 1 min' : formatSpan(now - since)}` : '';
   const branchLine = head ? `\n${head.kind === 'detached' ? 'Commit suelto' : 'Rama'}: ${head.name}` : '';
+  const latest = latestNote(session);
+  const hasProfile = latest !== undefined || !!session.description;
 
   return (
     <div
@@ -150,7 +153,7 @@ function SessionRow({ session, project, index, globalIndex }: { session: Session
       style={session.color ? { '--seg': session.color } : undefined}
       data-session={session.id}
       draggable={!renaming}
-      title={`${session.name}\n${STATUS_LABEL[status]}${stateTime}${subagents ? `, ${subagentsLabel(subagents)}` : ''}${session.unread ? ', marcada como no leída' : ''}${lastMessage}${branchLine}\n${session.cwd}${session.note ? `\n\nNota: ${session.note}` : ''}`}
+      title={`${session.name}\n${STATUS_LABEL[status]}${stateTime}${subagents ? `, ${subagentsLabel(subagents)}` : ''}${session.unread ? ', marcada como no leída' : ''}${lastMessage}${branchLine}\n${session.cwd}${session.description ? `\n\n${session.description}` : ''}${latest ? `\n\nÚltima nota: ${latest.text}` : ''}`}
       onClick={() => void selectSession(session.id, { delayWake: true })}
       onDblClick={(e) => {
         e.preventDefault();
@@ -203,7 +206,21 @@ function SessionRow({ session, project, index, globalIndex }: { session: Session
           {hasMeta && <RowMeta id={session.id} />}
         </span>
       )}
-      {session.note && <NoteIcon />}
+      {!renaming && (
+        <button
+          class={`row-profile${hasProfile ? '' : ' empty'}`}
+          data-action="profile"
+          title={hasProfile ? 'Perfil y notas: ver la bitácora y agregar una nota' : 'Perfil y notas'}
+          aria-label={`Perfil y notas de ${session.name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            view.set({ menu: null, modal: { type: 'profile', id: session.id } });
+          }}
+          onDblClick={(e) => e.stopPropagation()}
+        >
+          <NoteIcon />
+        </button>
+      )}
       {session.kind === 'shell' && <ShellMark />}
       <SubagentsBadge count={subagents} />
       {unread && <span class="unread-dot" aria-hidden="true" />}
@@ -389,7 +406,7 @@ function Rail() {
               key={s.id}
               class={`rail-cell${state.ui.activeSessionId === s.id ? ' active' : ''}${staleClass(s)}`}
               data-session={s.id}
-              title={`${s.mark ? `${s.mark} ` : ''}${s.name}\n${STATUS_LABEL[statusOf(s.id)]}${s.note ? `\n\nNota: ${s.note}` : ''}`}
+              title={`${s.mark ? `${s.mark} ` : ''}${s.name}\n${STATUS_LABEL[statusOf(s.id)]}${latestNote(s) ? `\n\nÚltima nota: ${latestNote(s)!.text}` : ''}`}
               aria-label={`${s.name}: ${STATUS_LABEL[statusOf(s.id)]}`}
               onClick={() => void selectSession(s.id)}
               onContextMenu={(e) => {

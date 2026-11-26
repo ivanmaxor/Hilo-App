@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { hexToHsv, hsvToHex, normalizeHex, type Hsv } from "../../shared/color";
 import { findSession } from "../../shared/reducer";
-import { isMark, MAX_NOTE } from "../../shared/validate";
+import type { SessionNote } from "../../shared/types";
+import { noteTime } from "../../shared/sessionNotes";
+import {
+  isMark,
+  MAX_DESCRIPTION,
+  MAX_NAME,
+  MAX_NOTE,
+} from "../../shared/validate";
 import { api } from "../api";
 import {
   app,
@@ -194,61 +201,226 @@ export function ColorDialog({
   );
 }
 
-export function NoteDialog({
+/** Un id para una nota nueva: solo letras, números y guiones, como pide `isSafeId`. */
+function newNoteId(): string {
+  return typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+async function copyToClipboard(text: string, what: string): Promise<void> {
+  try {
+    await api.clipWrite(text);
+    toast(`Se copió ${what}.`);
+  } catch {
+    toast("No se pudo copiar: otro programa está usando el portapapeles.");
+  }
+}
+
+/**
+ * El perfil de una sesión: su nombre, para qué es, con qué id se retoma su conversación y una bitácora de
+ * notas con fecha. Las notas se agregan, se editan y se borran una por una; el nombre y la descripción se
+ * guardan con Guardar.
+ */
+export function ProfileDialog({
   modal,
 }: {
-  modal: Extract<Modal, { type: "note" }>;
+  modal: Extract<Modal, { type: "profile" }>;
 }) {
   const { state } = useStore(app);
   const session = findSession(state, modal.id)?.session;
-  const [text, setText] = useState(session?.note ?? "");
+  const [name, setName] = useState(session?.name ?? "");
+  const [description, setDescription] = useState(session?.description ?? "");
+  const [draft, setDraft] = useState("");
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(
+    null,
+  );
   const ref = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.focus();
-    el.setSelectionRange(el.value.length, el.value.length);
-  }, []);
+  useEffect(() => ref.current?.focus(), []);
   if (!session) return null;
-  const save = (note: string) => {
-    closeModal();
-    void dispatch({ type: "session/note", id: session.id, note });
+  const notes = [...(session.notes ?? [])].reverse();
+
+  const addNote = () => {
+    if (!draft.trim()) return;
+    void dispatch({
+      type: "session/noteAdd",
+      id: session.id,
+      note: { id: newNoteId(), at: Date.now(), text: draft },
+    });
+    setDraft("");
   };
+  const removeNote = (note: SessionNote) => {
+    void dispatch({ type: "session/noteRemove", id: session.id, noteId: note.id });
+    toast("Se borró la nota.", {
+      label: "Deshacer",
+      run: () => void dispatch({ type: "session/noteAdd", id: session.id, note }),
+    });
+  };
+  const save = () => {
+    addNote();
+    const nextName = name.trim();
+    if (nextName && nextName !== session.name)
+      void dispatch({ type: "session/rename", id: session.id, name: nextName });
+    if (description !== (session.description ?? ""))
+      void dispatch({ type: "session/describe", id: session.id, description });
+    closeModal();
+  };
+
   return (
-    <Backdrop onClose={closeModal} labelledBy="note-title">
-      <h2 id="note-title">Nota de «{session.name}»</h2>
-      <p class="dialog-body">
-        Se ve al pasar el ratón por la sesión, y en su panel mientras está
-        dormida.
-      </p>
-      <textarea
-        ref={ref}
-        class="note-input"
-        data-field="note"
-        rows={7}
-        maxLength={MAX_NOTE}
-        value={text}
-        placeholder="Qué quedó pendiente, qué revisar al volver…"
-        onInput={(e) => setText(e.currentTarget.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && e.ctrlKey) {
-            e.preventDefault();
-            save(text);
-          }
-        }}
-      />
-      <div class="actions">
-        {session.note && (
-          <button class="note-delete" onClick={() => save("")}>
-            Borrar la nota
+    <Backdrop onClose={closeModal} labelledBy="profile-title">
+      <h2 id="profile-title">
+        {session.mark ? `${session.mark} ` : ""}Perfil de «{session.name}»
+      </h2>
+      <div class="profile">
+        <label class="profile-field">
+          <span>Nombre</span>
+          <input
+            data-field="profile-name"
+            value={name}
+            maxLength={MAX_NAME}
+            onInput={(e) => setName(e.currentTarget.value)}
+          />
+        </label>
+        <label class="profile-field">
+          <span>Descripción</span>
+          <textarea
+            class="note-input profile-description"
+            data-field="description"
+            rows={2}
+            maxLength={MAX_DESCRIPTION}
+            value={description}
+            placeholder="Para qué es esta sesión"
+            onInput={(e) => setDescription(e.currentTarget.value)}
+          />
+        </label>
+        <dl class="profile-facts">
+          {session.kind === "claude" && (
+            <>
+              <dt>ID de la conversación</dt>
+              <dd>
+                <code data-field="claude-id">{session.claudeId}</code>
+                <button
+                  class="link"
+                  data-action="copy-claude-id"
+                  title="Con este id, claude --resume retoma la conversación desde cualquier carpeta"
+                  onClick={() => void copyToClipboard(session.claudeId, "el id de la conversación")}
+                >
+                  Copiar
+                </button>
+              </dd>
+            </>
+          )}
+          <dt>Carpeta</dt>
+          <dd>
+            <code>{session.cwd}</code>
+            <button class="link" onClick={() => void copyToClipboard(session.cwd, "la carpeta")}>
+              Copiar
+            </button>
+          </dd>
+          <dt>Creada</dt>
+          <dd>{noteTime(session.createdAt)}</dd>
+        </dl>
+
+        <h3 class="profile-heading">Bitácora</h3>
+        <textarea
+          ref={ref}
+          class="note-input profile-draft"
+          data-field="note"
+          rows={3}
+          maxLength={MAX_NOTE}
+          value={draft}
+          placeholder="Qué hiciste, qué quedó pendiente, qué revisar al volver…"
+          onInput={(e) => setDraft(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && e.ctrlKey) {
+              e.preventDefault();
+              addNote();
+            }
+          }}
+        />
+        <div class="profile-row-actions">
+          <button
+            data-action="add-note"
+            title="Ctrl+Enter"
+            disabled={!draft.trim()}
+            onClick={addNote}
+          >
+            Agregar nota
           </button>
+        </div>
+        {notes.length === 0 ? (
+          <p class="dialog-body">Todavía no hay notas.</p>
+        ) : (
+          <ol class="profile-log" data-count={notes.length}>
+            {notes.map((note) => (
+              <li key={note.id} data-note-id={note.id}>
+                <div class="profile-log-head">
+                  <time>{noteTime(note.at)}</time>
+                  {editing?.id !== note.id && (
+                    <>
+                      <button
+                        class="link"
+                        data-action="edit-note"
+                        onClick={() => setEditing({ id: note.id, text: note.text })}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        class="link"
+                        data-action="delete-note"
+                        onClick={() => removeNote(note)}
+                      >
+                        Borrar
+                      </button>
+                    </>
+                  )}
+                </div>
+                {editing?.id === note.id ? (
+                  <>
+                    <textarea
+                      class="note-input"
+                      data-field="note-edit"
+                      rows={3}
+                      maxLength={MAX_NOTE}
+                      value={editing.text}
+                      onInput={(e) =>
+                        setEditing({ id: note.id, text: e.currentTarget.value })
+                      }
+                    />
+                    <div class="profile-row-actions">
+                      <button onClick={() => setEditing(null)}>Cancelar</button>
+                      <button
+                        class="primary"
+                        data-action="save-note-edit"
+                        onClick={() => {
+                          void dispatch({
+                            type: "session/noteEdit",
+                            id: session.id,
+                            noteId: note.id,
+                            text: editing.text,
+                          });
+                          setEditing(null);
+                        }}
+                      >
+                        Guardar la nota
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <p>{note.text}</p>
+                )}
+              </li>
+            ))}
+          </ol>
         )}
+      </div>
+      <div class="actions">
         <button onClick={closeModal}>Cancelar</button>
         <button
           class="primary"
           data-action="save-note"
-          title="Ctrl+Enter"
-          onClick={() => save(text)}
+          title="Guarda el nombre, la descripción y la nota que estés escribiendo"
+          onClick={save}
         >
           Guardar
         </button>

@@ -72,7 +72,7 @@ export type Modal =
   | { type: 'color'; target: ColorTarget }
   /** Cambiar la carpeta de un proyecto (#7): la elegida ya está guardada en el proceso principal, y aquí solo se muestra. */
   | { type: 'relocate'; projectId: string; pick: Extract<RelocatePick, { status: 'ok' }> }
-  | { type: 'note'; id: string }
+  | { type: 'profile'; id: string }
   | { type: 'mark'; id: string }
   | { type: 'confirm'; title: string; body: string; ok: string; danger: boolean; list?: string[]; resolve(ok: boolean): void };
 

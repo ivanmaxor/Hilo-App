@@ -1,4 +1,5 @@
 import type { PersistedState, RuntimeMap, SessionRecord, SessionStatus } from './types';
+import { notesSince } from './sessionNotes';
 
 /**
  * Resumen del día en Markdown (idea 42). Pura: la hora entra por parámetro y solo usa lo que Hilo ya
@@ -86,13 +87,13 @@ function noteLines(note: string): string[] {
   return out;
 }
 
-function sessionLine(s: SessionRecord, status: SessionStatus): string[] {
+function sessionLine(s: SessionRecord, status: SessionStatus, since: number): string[] {
   const mark = s.mark ? `${inline(s.mark)} ` : '';
   const parts = [SUMMARY_STATUS[status]];
   if (s.kind === 'shell') parts.unshift('PowerShell');
   if (s.lastActiveAt) parts.push(clock(s.lastActiveAt));
   const name = inline(s.name) || '(sin nombre)';
-  return [`- ${mark}**${name}** — ${parts.join(' · ')}`, ...noteLines(s.note ?? '')];
+  return [`- ${mark}**${name}** — ${parts.join(' · ')}`, ...notesSince(s, since).flatMap((n) => noteLines(n.text))];
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -133,7 +134,7 @@ export function buildDailySummary(state: Pick<PersistedState, 'projects'>, runti
   ];
   for (const g of groups) {
     out.push('', `## ${inline(g.project.name) || '(sin nombre)'}`, '');
-    for (const s of g.sessions) out.push(...sessionLine(s, statusOf(s)));
+    for (const s of g.sessions) out.push(...sessionLine(s, statusOf(s), since));
   }
   return `${out.join('\n')}\n`;
 }

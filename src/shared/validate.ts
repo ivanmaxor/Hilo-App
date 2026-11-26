@@ -3,7 +3,7 @@ import { isSoundChoice, SOUND_DURATIONS, SOUND_REPEATS } from './sounds';
 import { isValidTree } from './paneLayout';
 import { DEFAULT_SETTINGS, EFFORTS } from './defaults';
 import { changesProjectOf } from './paneContent';
-import type { Action, ProjectRecord, SessionRecord, Settings } from './types';
+import type { Action, ProjectRecord, SessionNote, SessionRecord, Settings } from './types';
 
 /**
  * Lo que entra por IPC o se lee de disco se comprueba antes de usarlo.
@@ -47,6 +47,15 @@ export const MAX_RECENT_COLORS = 6;
 /** Un emoji o un par de caracteres: sin espacios al borde ni caracteres de control. */
 export const isMark = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 16 && v.trim() === v && !/[\u0000-\u001f\u007f-\u009f]/.test(v);
 export const isNote = (v: unknown): v is string => typeof v === 'string' && v.length <= MAX_NOTE && !v.includes('\0');
+export const MAX_DESCRIPTION = 1000;
+/** Las entradas de la bitácora que se guardan por sesión: al pasar de aquí se va la más vieja. */
+export const MAX_NOTES = 200;
+export const isDescription = (v: unknown): v is string => typeof v === 'string' && v.length <= MAX_DESCRIPTION && !v.includes('\0');
+const isTime = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0;
+export const isSessionNote = (v: unknown): v is SessionNote => {
+  const n = v as Partial<SessionNote> | null;
+  return !!n && isSafeId(n.id) && isTime(n.at) && isNote(n.text) && n.text.trim().length > 0;
+};
 export const isPath = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= MAX_PATH && !v.includes('\0');
 const isIndex = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
 
@@ -65,7 +74,8 @@ function isSession(v: unknown): v is SessionRecord {
     (s.effort === undefined || isValidEffort(s.effort)) &&
     (s.mark === undefined || isMark(s.mark)) &&
     (s.unread === undefined || typeof s.unread === 'boolean') &&
-    (s.note === undefined || isNote(s.note)) &&
+    (s.description === undefined || isDescription(s.description)) &&
+    (s.notes === undefined || (Array.isArray(s.notes) && s.notes.length <= MAX_NOTES && s.notes.every(isSessionNote))) &&
     (s.lastActiveAt === undefined || (typeof s.lastActiveAt === 'number' && Number.isFinite(s.lastActiveAt)))
   );
 }
@@ -92,8 +102,14 @@ export function isValidAction(a: Action): boolean {
       return isSafeId(a.id) && (a.mark === null || isMark(a.mark));
     case 'session/unread':
       return isSafeId(a.id) && typeof a.unread === 'boolean';
-    case 'session/note':
-      return isSafeId(a.id) && isNote(a.note);
+    case 'session/describe':
+      return isSafeId(a.id) && isDescription(a.description);
+    case 'session/noteAdd':
+      return isSafeId(a.id) && isSessionNote(a.note);
+    case 'session/noteEdit':
+      return isSafeId(a.id) && isSafeId(a.noteId) && isNote(a.text);
+    case 'session/noteRemove':
+      return isSafeId(a.id) && isSafeId(a.noteId);
     case 'session/adopt':
       return isSafeId(a.id) && isClaudeId(a.claudeId) && isPath(a.cwd);
     case 'session/active':

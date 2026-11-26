@@ -57,7 +57,7 @@ import {
   ColorDialog,
   ColorPicker,
   MarkDialog,
-  NoteDialog,
+  ProfileDialog,
   QUICK_MARKS,
 } from "./extras";
 
@@ -935,8 +935,8 @@ export function Modals() {
       return <SettingsDialog modal={m} />;
     case "color":
       return <ColorDialog modal={m} />;
-    case "note":
-      return <NoteDialog modal={m} />;
+    case "profile":
+      return <ProfileDialog modal={m} />;
     case "mark":
       return <MarkDialog modal={m} />;
   }
@@ -1080,10 +1080,10 @@ export function ContextMenu() {
           role="menuitem"
           data-action="note"
           onClick={() =>
-            view.set({ menu: null, modal: { type: "note", id: session.id } })
+            view.set({ menu: null, modal: { type: "profile", id: session.id } })
           }
         >
-          {session.note ? "Editar la nota…" : "Dejar una nota…"}
+          Perfil y notas…
         </button>
         <button
           role="menuitem"

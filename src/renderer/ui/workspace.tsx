@@ -37,6 +37,7 @@ import { draggedPaneContent, endDragging, InlineRename, startDraggingPane, start
 import { MAX_PANES, moveDivider, paneDividers, paneRects, presetTree, resetDivider, type PaneDivider, type PaneEdge, type PaneNode, type PaneRect } from '../../shared/paneLayout';
 import { startZoom, zoomedPane, zoomRects, type PaneZoom } from '../../shared/paneZoom';
 import type { SessionRecord } from '../../shared/types';
+import { latestNote, noteTime } from '../../shared/sessionNotes';
 
 export function Tabs() {
   const { state } = useStore(app);
@@ -279,7 +280,8 @@ function Overlay({ sessionId, name, active }: { sessionId: string; name: string;
   const btn = useRef<HTMLButtonElement>(null);
   const message = runtime[sessionId]?.message;
   const blocking = status === 'error' && !!message;
-  const note = findSession(app.get().state, sessionId)?.session.note;
+  const record = findSession(app.get().state, sessionId)?.session;
+  const note = record ? latestNote(record) : undefined;
   useEffect(() => {
     // Un doble clic en la fila puede estar abriendo el campo de renombrar: no se le quita el foco.
     if (active && (status === 'asleep' || blocking) && !view.get().renaming && !view.get().modal) btn.current?.focus();
@@ -296,10 +298,10 @@ function Overlay({ sessionId, name, active }: { sessionId: string; name: string;
         </button>
         {note && (
           <div class="overlay-note" data-note={sessionId}>
-            <span class="overlay-note-label">Nota</span>
-            <p>{note}</p>
-            <button class="link" onClick={() => view.set({ modal: { type: 'note', id: sessionId } })}>
-              Editar la nota
+            <span class="overlay-note-label">Última nota · {noteTime(note.at)}</span>
+            <p>{note.text}</p>
+            <button class="link" onClick={() => view.set({ modal: { type: 'profile', id: sessionId } })}>
+              {record!.notes!.length > 1 ? `Ver las ${record!.notes!.length} notas` : 'Ver el perfil'}
             </button>
           </div>
         )}

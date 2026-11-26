@@ -15,7 +15,7 @@ test('resumen del día: se ve, se copia y se guarda sin pisar nada', async () =>
   const [a, b, c] = state.projects[0]!.sessions;
   a!.lastActiveAt = now - 1000;
   a!.mark = '🔥';
-  a!.note = '# Falta probar\n- con Google\n**ya**';
+  a!.notes = [{ id: 'n1', at: now - 1000, text: '# Falta probar\n- con Google\n**ya**' }];
   b!.lastActiveAt = now - 2000;
   // Hace dos días: nunca es "hoy".
   c!.lastActiveAt = now - 2 * 24 * 3600 * 1000;
