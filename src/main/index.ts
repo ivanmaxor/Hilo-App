@@ -251,7 +251,7 @@ function createWindow(): void {
     title: 'Hilo',
     backgroundColor: dark ? '#1a1b1e' : '#f6f6f7',
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: dark ? '#17181b' : '#ececee', symbolColor: dark ? '#b8b9bf' : '#3a3b40', height: 36 },
+    titleBarOverlay: titleBarOverlay(dark, state.settings.appZoom),
     webPreferences: {
       preload: join(__dirname, '..', 'preload', 'index.js'),
       contextIsolation: true,
@@ -777,15 +777,27 @@ function appInfo(): AppInfo {
   };
 }
 
+/**
+ * Los botones de la ventana (minimizar, maximizar, cerrar) miden lo mismo que la barra de pestañas, que crece y
+ * se achica con el zoom de la interfaz (#60). El hueco que les deja la barra lo mide la página con
+ * `env(titlebar-area-width)`.
+ */
+function titleBarOverlay(dark: boolean, appZoom: number): { color: string; symbolColor: string; height: number } {
+  return { color: dark ? '#17181b' : '#ececee', symbolColor: dark ? '#b8b9bf' : '#3a3b40', height: Math.round((36 * appZoom) / 100) };
+}
+
 function applyAppZoom(): void {
-  if (win && !win.isDestroyed()) win.webContents.setZoomFactor(store.get().settings.appZoom / 100);
+  if (!win || win.isDestroyed()) return;
+  const { appZoom, theme } = store.get().settings;
+  win.webContents.setZoomFactor(appZoom / 100);
+  win.setTitleBarOverlay(titleBarOverlay(theme === 'dark', appZoom));
 }
 
 function applyTheme(theme: PersistedState['settings']['theme']): void {
   if (!win) return;
   const dark = theme === 'dark';
   win.setBackgroundColor(dark ? '#1a1b1e' : '#f6f6f7');
-  win.setTitleBarOverlay({ color: dark ? '#17181b' : '#ececee', symbolColor: dark ? '#b8b9bf' : '#3a3b40', height: 36 });
+  win.setTitleBarOverlay(titleBarOverlay(dark, store.get().settings.appZoom));
 }
 
 store.subscribe((state, action) => {

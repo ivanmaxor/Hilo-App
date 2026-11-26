@@ -191,7 +191,8 @@ kbd { font: 11px "Segoe UI Variable Text", "Segoe UI", sans-serif; color: var(--
 .rail-cell.active { background: var(--raised-2); }
 
 /* Pestañas */
-.tabbar { flex: none; height: 36px; display: flex; background: var(--side); padding-right: 138px; -webkit-app-region: drag; }
+/* A la derecha, el hueco de los botones de la ventana, en px de la página: con el zoom no miden 138 (#60). */
+.tabbar { flex: none; height: 36px; display: flex; background: var(--side); padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px))); -webkit-app-region: drag; }
 .tabs { display: flex; min-width: 0; overflow-x: auto; scroll-padding-inline: 28px; scrollbar-width: none; -webkit-app-region: no-drag; }
 .tabs::-webkit-scrollbar { display: none; }
 .tabs.more-right { mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
