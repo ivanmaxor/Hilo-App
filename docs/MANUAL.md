@@ -73,7 +73,7 @@ Cuando Claude, o cualquier programa, escribe la ruta de un archivo o una carpeta
 - **Clic:** la muestra en el Explorador de Windows. Una carpeta se abre; un archivo queda marcado en la suya, sin abrirlo ni ejecutarlo.
 - **Ctrl+clic:** abre el archivo en el IDE del proyecto, en su línea si venía. Si queda fuera del proyecto, se muestra en el Explorador.
 
-Las rutas relativas se buscan desde la carpeta de la sesión. Las de red (`\\servidor\...`) no se tocan.
+Las rutas relativas se buscan primero desde la carpeta de la sesión, después desde las de arriba hasta la raíz de su repositorio y desde la del proyecto, porque Claude a veces escribe la ruta desde ahí. Las que empiezan por una carpeta tuya (`Documentos/...`, `Escritorio/...`, `Descargas/...`, `~/...`) se buscan en tu carpeta de usuario y en OneDrive. Las de red (`\\servidor\...`) no se tocan.
 
 **Soltar archivos** del Explorador sobre una sesión pega su ruta, sin Enter. En Claude, `@ruta` si está dentro de la carpeta de la sesión, y la ruta completa entre comillas si no. En PowerShell, la ruta completa, entre comillas simples si tiene espacios. Sobre una sesión dormida solo avisa.
 
