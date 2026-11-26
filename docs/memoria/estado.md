@@ -1,6 +1,6 @@
 # Estado
 
-Actualizado: 2026-11-25.
+Actualizado: 2026-11-26.
 
 ## Versión publicada
 
@@ -16,7 +16,7 @@ Hasta la 1.3.9 el código se escribía en un repo privado y se copiaba aquí lim
 
 ## Pruebas e2e
 
-El CI corre las e2e en `windows-latest` (138 pasan y 19 se omiten: las de Claude real y las de red). Las tres que fallaban a veces eran carreras de tiempo de las pruebas, no fallas de la app (#3):
+El CI corre las e2e en `windows-latest` (143 pasan y 19 se omiten: las de Claude real y las de red). Las tres que fallaban a veces eran carreras de tiempo de las pruebas, no fallas de la app (#3):
 
 - `pestanas`, "cerrar desde el menú": Escape llegaba antes de que el diálogo lo escuchara. Ahora espera a que "Cancelar" tenga el foco.
 - `leak`, "libera la terminal": el atajo de cerrar ignora una pulsación a menos de 800 ms de la anterior, y la prueba pulsaba antes. Ahora espera esa ventana.
