@@ -1,10 +1,10 @@
 # Estado
 
-Actualizado: 2026-11-26.
+Actualizado: 2026-11-27.
 
 ## Versión publicada
 
-**1.4.1** (25-nov-2026), en las Releases de este repo: perfil de la sesión con bitácora (D39), rutas relativas desde el repositorio y las carpetas de la persona, y el resumen del día (D38). La 1.4.0, del mismo día, fue la primera firmada (D36); la guía de prueba del Issue #54 sigue pendiente y sirve para las dos. Con esta, cada instalación en la 1.4.0 hace la primera actualización firmada real.
+**1.4.2** (27-nov-2026), en las Releases de este repo: los botones de la ventana siguen el zoom de la interfaz (#60), y la rama y el tiempo en la lista de sesiones van apagados por defecto, con su interruptor en Ajustes > Sesiones. La 1.4.1 (25-nov) trajo el perfil de la sesión con bitácora (D39), las rutas relativas y el resumen del día (D38); la 1.4.0 fue la primera firmada (D36). La guía de prueba del Issue #54 sigue pendiente.
 
 Lo que trae cada versión está en `src/shared/changelog.ts` y se ve en Ajustes > Novedades.
 

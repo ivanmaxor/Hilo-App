@@ -29,6 +29,9 @@ test('rama y tiempo en el estado bajo el nombre de cada sesión', async () => {
   ]);
   const cwds: Record<string, string> = { a: repoA, b: repoB, c: repoC, d: plain, e: repoA };
   for (const s of state.projects[0]!.sessions) s.cwd = cwds[s.id]!;
+  // Desde la 1.4.2 van apagados por defecto.
+  state.settings.showBranch = true;
+  state.settings.showStateTime = true;
 
   const ctx = await launch({ state, width: 1000, height: 640 });
   try {

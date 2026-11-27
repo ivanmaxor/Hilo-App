@@ -124,6 +124,10 @@ export interface Settings {
   recentColors: string[];
   /** Colorear las sesiones de Claude sin mensajes desde hace 1 h, 5 h y 1 día (D30). */
   staleMarks: boolean;
+  /** En la lista de sesiones, la rama de git junto al nombre. Apagado por defecto desde la 1.4.2. */
+  showBranch: boolean;
+  /** En la lista de sesiones, cuánto lleva cada una en su estado. Apagado por defecto desde la 1.4.2. */
+  showStateTime: boolean;
   /** En el panel Cambios, los signos + y − además del color. */
   changesShowSigns: boolean;
   /** En el panel Cambios, todo el archivo en vez de solo las zonas cambiadas. */

@@ -670,6 +670,9 @@ describe('PowerShell que pasa a Claude, y último mensaje', () => {
     expect(findSession(s, 'a')!.session.lastActiveAt).toBe(2000);
     expect(isValidAction({ type: 'session/adopt', id: 'a', claudeId: 'x', cwd: 'C:\\' })).toBe(false);
     expect(sanitizeSettings({}).staleMarks).toBe(true);
+    expect(sanitizeSettings({}).showBranch).toBe(false);
+    expect(sanitizeSettings({}).showStateTime).toBe(false);
+    expect(sanitizeSettings({ showBranch: true }).showBranch).toBe(true);
   });
 });
 

@@ -90,7 +90,14 @@ const MODULES: {
     id: "sessions",
     label: "Sesiones",
     hint: "Qué pasa al abrir Hilo, al elegir una sesión y cuando nadie la usa.",
-    keys: ["startup", "wakeOnSelect", "autoSleepMinutes", "staleMarks"],
+    keys: [
+      "startup",
+      "wakeOnSelect",
+      "autoSleepMinutes",
+      "staleMarks",
+      "showBranch",
+      "showStateTime",
+    ],
   },
   {
     id: "alerts",
@@ -956,6 +963,22 @@ export function SettingsDialog({
             checked={s.staleMarks}
             onChange={(on) => set({ staleMarks: on })}
             keywords="quietas olvidadas color"
+          />
+          <ToggleRow
+            field="show-branch"
+            title="Mostrar la rama de git junto al nombre"
+            desc="En la lista de sesiones. Al dejar el cursor encima de una sesión se ve siempre."
+            checked={s.showBranch}
+            onChange={(on) => set({ showBranch: on })}
+            keywords="git rama branch lista"
+          />
+          <ToggleRow
+            field="show-state-time"
+            title="Mostrar cuánto lleva cada sesión en su estado"
+            desc="Junto al nombre, en la lista de sesiones. Al dejar el cursor encima se ve siempre."
+            checked={s.showStateTime}
+            onChange={(on) => set({ showStateTime: on })}
+            keywords="tiempo minutos lista"
           />
         </Group>
       </>

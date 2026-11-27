@@ -44,6 +44,9 @@ export const DEFAULT_SETTINGS: Settings = {
   lastSeenVersion: '',
   recentColors: [],
   staleMarks: true,
+  // Se ven siempre al dejar el cursor encima de la sesión; en la fila, solo quien los encienda.
+  showBranch: false,
+  showStateTime: false,
   // Sin signos: quien no está acostumbrado a los diffs lee mejor solo el color y los números.
   changesShowSigns: false,
   changesFullFile: false,
