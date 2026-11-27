@@ -146,9 +146,11 @@ kbd { font: 11px "Segoe UI Variable Text", "Segoe UI", sans-serif; color: var(--
 .project-head:hover .add, .project-head .add:focus-visible, .project-head:hover .folder, .project-head .folder:focus-visible { opacity: 1; }
 .row { position: relative; width: 100%; height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 10px 0 14px; color: var(--muted); cursor: default; text-align: left; }
 .row .name { flex: 1; }
-/* Rama y tiempo en el estado, en la misma línea del nombre (decisión del dueño, #13): la fila sigue midiendo 28 px.
+/* Rama y tiempo en el estado, en la misma línea del nombre (#13), si están encendidos en Ajustes: desde la 1.4.2 van
+   apagados por defecto (decisión del dueño). La fila sigue midiendo 28 px.
    El nombre cede primero; la rama se corta con «…» y el tiempo no se corta nunca. */
-.row-text { flex: 1; min-width: 0; display: flex; flex-direction: row; align-items: center; gap: 8px; }
+/* overflow: un tiempo largo se corta aquí y no tapa el ícono de la nota ni los botones de la fila. */
+.row-text { flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: row; align-items: center; gap: 8px; }
 .row-text .name { flex: 1 1 auto; min-width: 3ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-meta { flex: 0 1 auto; display: flex; gap: 6px; min-width: 0; max-width: 55%; font-size: 11px; color: var(--faint); }
 .row-meta .branch { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

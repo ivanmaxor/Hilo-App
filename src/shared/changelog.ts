@@ -11,6 +11,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.4.2",
+    date: "2026-11-27",
+    items: [
+      "Los botones de la ventana (minimizar, maximizar y cerrar) siguen el tamaño de la ventana que elijas en Ajustes: ya no tapan el final de la barra de arriba.",
+      "La rama de git y el tiempo en el estado ya no salen junto al nombre de cada sesión, salvo que los enciendas en Ajustes > Sesiones. Al dejar el cursor encima se siguen viendo.",
+      "Un tiempo largo ya no tapa el ícono de la nota.",
+    ],
+  },
+  {
     version: "1.4.1",
     date: "2026-11-25",
     items: [

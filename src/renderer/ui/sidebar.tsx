@@ -109,11 +109,11 @@ export function sinceText(now: number, since: number): string {
   return now - since < 60_000 ? 'ahora' : formatSpan(now - since);
 }
 
-/** Rama y tiempo en el estado, en letra chica. Es lo único que se repinta cada minuto: la fila no se toca. */
-function RowMeta({ id }: { id: string }) {
+/** Rama y tiempo en el estado, en letra chica, si están encendidos en Ajustes. Es lo único que se repinta cada minuto. */
+function RowMeta({ id, branch, time }: { id: string; branch: boolean; time: boolean }) {
   const { now } = useStore(clock);
-  const head = headOf(id);
-  const since = sinceOf(id);
+  const head = branch ? headOf(id) : undefined;
+  const since = time ? sinceOf(id) : undefined;
   return (
     <span class="row-meta" data-meta={id}>
       {head && (
@@ -141,7 +141,8 @@ function SessionRow({ session, project, index, globalIndex }: { session: Session
   const lastMessage = session.kind === 'claude' && session.lastActiveAt ? `\nÚltimo mensaje hace ${formatSpan(now - session.lastActiveAt)}` : '';
   const head = headOf(session.id);
   const since = sinceOf(session.id);
-  const hasMeta = !renaming && (head !== undefined || since !== undefined);
+  const { showBranch, showStateTime } = state.settings;
+  const hasMeta = !renaming && ((showBranch && head !== undefined) || (showStateTime && since !== undefined));
   const stateTime = since !== undefined ? ` desde hace ${now - since < 60_000 ? 'menos de 1 min' : formatSpan(now - since)}` : '';
   const branchLine = head ? `\n${head.kind === 'detached' ? 'Commit suelto' : 'Rama'}: ${head.name}` : '';
   const latest = latestNote(session);
@@ -203,7 +204,7 @@ function SessionRow({ session, project, index, globalIndex }: { session: Session
       ) : (
         <span class="row-text">
           <span class="name">{session.name}</span>
-          {hasMeta && <RowMeta id={session.id} />}
+          {hasMeta && <RowMeta id={session.id} branch={showBranch} time={showStateTime} />}
         </span>
       )}
       {!renaming && (
